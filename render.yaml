@@ -1,0 +1,30 @@
+services:
+  - type: web
+    name: gastonbarea-api-worker
+    runtime: node
+    plan: starter
+    region: oregon
+    buildCommand: npm install && npm run build
+    startCommand: npm run start
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: NOTIFICATION_EMAIL
+        value: gastonbarea.com@gmail.com
+      - key: FROM_EMAIL
+        value: Gastón Barea <onboarding@resend.dev>
+      - key: WEBHOOK_SECRET
+        generateValue: true

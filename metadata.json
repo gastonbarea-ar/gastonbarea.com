@@ -1,0 +1,8 @@
+{
+  "name": "Gastón Barea – Arquitecto de Software & Consultor Tecnológico",
+  "description": "Sitio corporativo interactivo de Gastón Barea: consultoría tecnológica, arquitectura de software escalable, Business Intelligence, infraestructura Linux con Docker y dirección técnica para organizaciones de alta exigencia.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

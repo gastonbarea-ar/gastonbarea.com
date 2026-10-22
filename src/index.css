@@ -1,0 +1,141 @@
+@import "tailwindcss";
+
+@layer base {
+  html {
+    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
+    color-scheme: light;
+    background-color: #F4F4F4;
+    color: #0f2442;
+    scroll-behavior: smooth;
+  }
+  body {
+    background-color: #F4F4F4;
+    color: #0f2442;
+    overflow-x: hidden;
+  }
+  code, kbd, samp, pre {
+    font-family: 'JetBrains Mono', SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  }
+  section {
+    scroll-margin-top: 5.5rem;
+  }
+}
+
+/* Organic Movement and Dynamic Flow Animations (Grounding: No Floating/Bobbing Cards) */
+@keyframes pulse-glow {
+  0%, 100% {
+    opacity: 0.35;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.65;
+    transform: scale(1.04);
+  }
+}
+
+@keyframes gradient-flow {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+@keyframes flow-dash {
+  to {
+    stroke-dashoffset: -40;
+  }
+}
+
+@keyframes marquee {
+  0% {
+    transform: translateX(0%);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+.animate-marquee {
+  display: flex;
+  width: max-content;
+  animation: marquee 40s linear infinite;
+}
+
+.animate-marquee:hover {
+  animation-play-state: paused;
+}
+
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 5s ease-in-out infinite;
+}
+
+.animate-gradient-x {
+  background-size: 200% 200%;
+  animation: gradient-flow 8s ease infinite;
+}
+
+.animate-flow-line {
+  stroke-dasharray: 6 6;
+  animation: flow-dash 1.6s linear infinite;
+}
+
+/* Integrated Architecture Console & Grounded Bento */
+.integrated-console {
+  background: #FFFFFF;
+  border: 1px solid rgba(15, 36, 66, 0.12);
+  border-radius: 1.5rem;
+  box-shadow: 0 4px 20px -4px rgba(15, 36, 66, 0.05);
+}
+
+.integrated-row {
+  border-color: rgba(15, 36, 66, 0.08);
+}
+
+/* Apple Pro Theme (#F4F4F4 canvas + Deep Blue typography) */
+.apple-card {
+  background: #FFFFFF;
+  border: 1px solid rgba(15, 36, 66, 0.08);
+  border-radius: 1.25rem;
+  box-shadow: 0 2px 8px -2px rgba(15, 36, 66, 0.04);
+  transition: all 0.25s ease;
+}
+
+.apple-card:hover {
+  border-color: rgba(30, 58, 138, 0.22);
+  box-shadow: 0 6px 18px -4px rgba(15, 36, 66, 0.08);
+}
+
+.apple-inset {
+  background: #F8FAFC;
+  border: 1px solid rgba(15, 36, 66, 0.06);
+}
+
+/* Custom subtle scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #F4F4F4;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
