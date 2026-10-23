@@ -19,7 +19,8 @@ import {
   ShieldCheck,
   Check,
   ShoppingCart,
-  UserCheck
+  UserCheck,
+  Video
 } from 'lucide-react';
 import { SITE_CONFIG } from '../data/siteConfig';
 
@@ -155,13 +156,13 @@ export const Header: React.FC<HeaderProps> = ({
           </a>
         </div>
 
-        {/* Floating Desktop Navigation Links (Strictly Centered) */}
-        <nav className="hidden lg:flex items-center gap-1.5 xl:gap-2 absolute left-1/2 -translate-x-1/2 z-20 text-[13px] font-medium text-blue-900/85">
+        {/* Floating Desktop Navigation Links (Flex-1 natural centered, never overlaps) */}
+        <nav className="hidden xl:flex items-center justify-center gap-1 2xl:gap-1.5 flex-1 min-w-0 text-xs font-medium text-blue-900/85">
           {/* BOTÓN INNOVACIÓN DESTACADO (3 Pilares) */}
           <a
             href="#innovacion"
             onClick={(e) => handleNavClick(e, '#innovacion')}
-            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold text-blue-700 bg-blue-100/90 hover:bg-blue-600 hover:text-white border border-blue-200/80 shadow-2xs transition-all active:scale-95"
+            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold text-blue-700 bg-blue-100/90 hover:bg-blue-600 hover:text-white border border-blue-200/80 shadow-2xs transition-all active:scale-95 whitespace-nowrap shrink-0"
           >
             <TrendingUp className="w-3.5 h-3.5 text-blue-600 group-hover:text-white" />
             <span>INNOVACIÓN</span>
@@ -171,7 +172,7 @@ export const Header: React.FC<HeaderProps> = ({
           <a
             href="#project-manager"
             onClick={(e) => handleNavClick(e, '#project-manager')}
-            className="px-3 py-1.5 rounded-full text-blue-950 hover:text-indigo-600 hover:bg-indigo-50/80 font-semibold tracking-wide transition-all inline-flex items-center gap-1.5"
+            className="px-2.5 py-1 rounded-full text-blue-950 hover:text-indigo-600 hover:bg-indigo-50/80 font-semibold tracking-wide transition-all inline-flex items-center gap-1 whitespace-nowrap shrink-0"
             title="Project Management, Arquitectura & Dirección de Proyectos"
           >
             <FolderGit2 className="w-3.5 h-3.5 text-indigo-600" />
@@ -179,11 +180,11 @@ export const Header: React.FC<HeaderProps> = ({
           </a>
 
           {/* SERVICIOS & PARTE TÉCNICA UNIFICADOS (Dropdown) */}
-          <div className="relative" ref={dropdownRef}>
+          <div className="relative shrink-0" ref={dropdownRef}>
             <button
               type="button"
               onClick={() => setServicesDropdownOpen(!servicesDropdownOpen)}
-              className={`px-3 py-1.5 rounded-full transition-all inline-flex items-center gap-1.5 font-semibold text-blue-950 hover:text-blue-600 hover:bg-blue-50/80 cursor-pointer ${
+              className={`px-2.5 py-1 rounded-full transition-all inline-flex items-center gap-1 font-semibold text-blue-950 hover:text-blue-600 hover:bg-blue-50/80 cursor-pointer whitespace-nowrap ${
                 servicesDropdownOpen ? 'bg-blue-50 text-blue-600' : ''
               }`}
             >
@@ -251,7 +252,7 @@ export const Header: React.FC<HeaderProps> = ({
           <a
             href="#ecommerce-b2b2c"
             onClick={(e) => handleNavClick(e, '#ecommerce-b2b2c')}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold text-indigo-700 hover:text-indigo-950 hover:bg-indigo-50 border border-indigo-200/80 transition-all cursor-pointer"
+            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold text-indigo-700 hover:text-indigo-950 hover:bg-indigo-50 border border-indigo-200/80 transition-all cursor-pointer whitespace-nowrap shrink-0"
           >
             <ShoppingCart className="w-3.5 h-3.5 text-indigo-600" />
             <span>E-COMMERCE B2B2C</span>
@@ -261,7 +262,7 @@ export const Header: React.FC<HeaderProps> = ({
           <a
             href="#odoo"
             onClick={(e) => handleNavClick(e, '#odoo')}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold text-indigo-700 hover:text-indigo-900 hover:bg-indigo-50 border border-indigo-200/80 transition-all cursor-pointer"
+            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold text-indigo-700 hover:text-indigo-900 hover:bg-indigo-50 border border-indigo-200/80 transition-all cursor-pointer whitespace-nowrap shrink-0"
           >
             <Layers className="w-3.5 h-3.5 text-indigo-600" />
             <span>ODOO ERP</span>
@@ -271,7 +272,7 @@ export const Header: React.FC<HeaderProps> = ({
           <a
             href="#blog"
             onClick={(e) => handleNavClick(e, '#blog')}
-            className="px-3 py-1.5 rounded-full text-blue-950 hover:text-blue-600 hover:bg-blue-50/80 font-semibold tracking-wide transition-all inline-flex items-center gap-1.5"
+            className="px-2.5 py-1 rounded-full text-blue-950 hover:text-blue-600 hover:bg-blue-50/80 font-semibold tracking-wide transition-all inline-flex items-center gap-1 whitespace-nowrap shrink-0"
           >
             <BookOpen className="w-3.5 h-3.5 text-blue-600" />
             <span>BLOG</span>
@@ -281,25 +282,25 @@ export const Header: React.FC<HeaderProps> = ({
           <a
             href="#contacto"
             onClick={(e) => handleNavClick(e, '#contacto')}
-            className="px-3 py-1.5 rounded-full text-slate-700 hover:text-blue-600 hover:bg-blue-50/70 transition-all"
+            className="px-2.5 py-1 rounded-full text-slate-700 hover:text-blue-600 hover:bg-blue-50/70 transition-all whitespace-nowrap shrink-0"
           >
             Contacto
           </a>
         </nav>
 
         {/* Right Action Buttons */}
-        <div className="hidden sm:flex items-center gap-2 shrink-0">
+        <div className="hidden xl:flex items-center gap-1.5 2xl:gap-2 shrink-0">
           {/* BOTÓN LINKEDIN DESTACADO OFICIAL (#0A66C2) */}
           <a
             href={SITE_CONFIG.social.linkedin}
             target="_blank"
             rel="noopener noreferrer"
-            className="px-3 py-1.5 text-xs font-semibold text-white bg-[#0A66C2] hover:bg-[#004182] active:scale-95 rounded-full transition-all flex items-center gap-1.5 shadow-xs shadow-[#0A66C2]/25 cursor-pointer"
+            className="px-2.5 py-1 text-xs font-semibold text-white bg-[#0A66C2] hover:bg-[#004182] active:scale-95 rounded-full transition-all flex items-center gap-1 shadow-xs shadow-[#0A66C2]/25 cursor-pointer"
             title="LinkedIn Profesional de Gastón Barea"
             aria-label="LinkedIn"
           >
             <Linkedin className="w-3.5 h-3.5 fill-white" />
-            <span className="hidden md:inline">LinkedIn</span>
+            <span className="hidden 2xl:inline">LinkedIn</span>
           </a>
 
           {/* GitHub */}
@@ -307,7 +308,7 @@ export const Header: React.FC<HeaderProps> = ({
             href={SITE_CONFIG.social.github}
             target="_blank"
             rel="noopener noreferrer"
-            className="p-1.5 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-full transition-colors hidden xl:flex"
+            className="p-1.5 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-full transition-colors hidden 2xl:flex"
             title="GitHub de Gastón Barea (@xpatagonia)"
             aria-label="GitHub"
           >
@@ -319,7 +320,7 @@ export const Header: React.FC<HeaderProps> = ({
             <button
               onClick={onAdminClick}
               type="button"
-              className="p-1.5 text-slate-600 hover:text-blue-700 hover:bg-blue-50/80 rounded-full transition-colors hidden xl:flex cursor-pointer"
+              className="p-1.5 text-slate-600 hover:text-blue-700 hover:bg-blue-50/80 rounded-full transition-colors flex cursor-pointer"
               title="CRM Operativo & Presupuestos"
               aria-label="CRM Operativo"
             >
@@ -332,7 +333,7 @@ export const Header: React.FC<HeaderProps> = ({
             <button
               onClick={onClientPortalClick}
               type="button"
-              className="px-3 py-1.5 text-xs font-bold text-blue-900 bg-blue-50 hover:bg-blue-100 hover:text-blue-950 border border-blue-200/80 rounded-full transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
+              className="px-2.5 py-1 text-xs font-bold text-blue-900 bg-blue-50 hover:bg-blue-100 hover:text-blue-950 border border-blue-200/80 rounded-full transition-all flex items-center gap-1 cursor-pointer shadow-2xs whitespace-nowrap"
               title="Acceso al Portal de Clientes (Proyectos, Consultas & Soporte)"
             >
               <UserCheck className="w-3.5 h-3.5 text-blue-600" />
@@ -344,26 +345,27 @@ export const Header: React.FC<HeaderProps> = ({
           <button
             onClick={() => onWhatsAppClick()}
             type="button"
-            className="px-3.5 py-1.5 text-xs font-bold text-white bg-[#25D366] hover:bg-[#20ba59] active:scale-95 rounded-full transition-all whitespace-nowrap shadow-sm shadow-[#25D366]/35 flex items-center gap-1.5 cursor-pointer"
+            className="px-2.5 sm:px-3 py-1 text-xs font-bold text-white bg-[#25D366] hover:bg-[#20ba59] active:scale-95 rounded-full transition-all whitespace-nowrap shadow-sm shadow-[#25D366]/35 flex items-center gap-1 cursor-pointer"
             title="Abrir WhatsApp directo"
           >
             <MessageSquare className="w-3.5 h-3.5 fill-white" />
             <span className="hidden sm:inline">WhatsApp</span>
           </button>
 
-          {/* AGENDAR */}
+          {/* GOOGLE MEET PRO */}
           <button
             onClick={onScheduleClick}
             type="button"
-            className="px-3.5 py-1.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 active:scale-95 rounded-full transition-all whitespace-nowrap shadow-sm shadow-blue-600/25 flex items-center gap-1.5 cursor-pointer"
+            className="px-3 py-1 text-xs font-bold text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 active:scale-95 rounded-full transition-all whitespace-nowrap shadow-sm shadow-blue-600/30 flex items-center gap-1.5 cursor-pointer"
+            title="Agendar videollamada directa por Google Meet Pro"
           >
-            <Calendar className="w-3.5 h-3.5" />
-            <span>Agendar (30m)</span>
+            <Video className="w-3.5 h-3.5 text-sky-200" />
+            <span>Google Meet Pro</span>
           </button>
         </div>
 
-        {/* Mobile menu trigger */}
-        <div className="flex lg:hidden items-center gap-2">
+        {/* Mobile / Tablet menu trigger (<1280px) */}
+        <div className="flex xl:hidden items-center gap-2">
           {/* Mobile LinkedIn icon */}
           <a
             href={SITE_CONFIG.social.linkedin}
@@ -384,6 +386,30 @@ export const Header: React.FC<HeaderProps> = ({
             <MessageSquare className="w-3 h-3 fill-white" />
             <span>WA</span>
           </button>
+
+          {onClientPortalClick && (
+            <button
+              onClick={onClientPortalClick}
+              type="button"
+              className="px-2.5 py-1 text-xs font-bold text-blue-900 bg-blue-50 border border-blue-200 rounded-full flex items-center gap-1 cursor-pointer shadow-xs"
+              title="Portal Clientes"
+            >
+              <UserCheck className="w-3.5 h-3.5 text-blue-600" />
+              <span>Portal</span>
+            </button>
+          )}
+
+          {/* Quick Meet Pro on Tablet */}
+          <button
+            onClick={onScheduleClick}
+            type="button"
+            className="hidden sm:flex px-2.5 py-1 text-xs font-bold text-white bg-gradient-to-r from-blue-600 to-indigo-600 rounded-full items-center gap-1 shadow-xs cursor-pointer"
+            title="Google Meet Pro"
+          >
+            <Video className="w-3 h-3 text-sky-200" />
+            <span>Meet</span>
+          </button>
+
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             type="button"
@@ -397,7 +423,7 @@ export const Header: React.FC<HeaderProps> = ({
 
       {/* Mobile Drawer Menu */}
       {mobileMenuOpen && (
-        <div className="lg:hidden mt-2 max-w-6xl mx-auto bg-white/98 backdrop-blur-2xl rounded-3xl border border-blue-900/15 shadow-2xl p-5 space-y-3 text-left animate-in fade-in slide-in-from-top-2 duration-200 pointer-events-auto">
+        <div className="xl:hidden mt-2 max-w-6xl mx-auto bg-white/98 backdrop-blur-2xl rounded-3xl border border-blue-900/15 shadow-2xl p-5 space-y-3 text-left animate-in fade-in slide-in-from-top-2 duration-200 pointer-events-auto">
           <div className="space-y-1">
             <a
               href="#innovacion"
@@ -509,10 +535,10 @@ export const Header: React.FC<HeaderProps> = ({
                   setMobileMenuOpen(false);
                   onScheduleClick();
                 }}
-                className="w-full py-2.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-xl flex items-center justify-center gap-1.5 cursor-pointer shadow-sm shadow-blue-600/20"
+                className="w-full py-2.5 text-xs font-bold text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 rounded-xl flex items-center justify-center gap-2 cursor-pointer shadow-sm shadow-blue-600/25"
               >
-                <Calendar className="w-3.5 h-3.5" />
-                <span>Agendar Consulta Técnica (30 min)</span>
+                <Video className="w-4 h-4 text-sky-200" />
+                <span>Agendar Google Meet Pro (30 min)</span>
               </button>
 
               {onClientPortalClick && (

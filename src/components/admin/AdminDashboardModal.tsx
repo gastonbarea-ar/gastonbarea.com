@@ -27,6 +27,12 @@ import {
   ShieldCheck,
   HelpCircle,
   Send,
+  Youtube,
+  Twitter,
+  Instagram,
+  Linkedin,
+  Github,
+  Image as ImageIcon,
 } from 'lucide-react';
 import { BlogPost } from '../../types/blog';
 import { SiteConfig, SITE_CONFIG } from '../../data/siteConfig';
@@ -519,46 +525,204 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
                     </div>
                   )}
 
-                  {/* Section 1: Video de Presentación YouTube */}
+                  {/* Section 1: Control del Slider & Showcase Principal (Video / Frame 2) */}
                   <div className="p-5 rounded-2xl bg-slate-50 border border-slate-200/90 space-y-4">
-                    <div className="flex items-center gap-2 text-xs font-mono font-bold uppercase text-blue-700">
-                      <Video className="w-4 h-4" />
-                      <span>Video de Presentación Ejecutiva (YouTube)</span>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 text-xs font-mono font-bold uppercase text-blue-700">
+                        <Video className="w-4 h-4" />
+                        <span>Control del Slider & Showcase Principal (Video & Frame 2)</span>
+                      </div>
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 font-bold">
+                        Backend Central
+                      </span>
                     </div>
-                    <div>
-                      <label className="block text-xs font-medium text-slate-700 mb-1">
-                        URL o ID de YouTube
-                      </label>
-                      <input
-                        type="text"
-                        value={siteConfig.presentationVideo?.youtubeId || ''}
-                        onChange={(e) =>
-                          setSiteConfig({
-                            ...siteConfig,
-                            presentationVideo: {
-                              ...siteConfig.presentationVideo,
-                              youtubeId: e.target.value,
-                            },
-                          })
-                        }
-                        placeholder="Ej: https://www.youtube.com/watch?v=... o L_LUpnjgPso"
-                        className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-mono text-slate-900"
-                      />
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <p className="text-xs text-slate-500">
+                      Administra desde aquí el contenido del showcase principal, la reproducción automática al entrar y el avance automático entre frames sin botones en el front.
+                    </p>
+
+                    {/* Frame 1: Video de Fondo */}
+                    <div className="p-4 rounded-xl bg-white border border-slate-200 space-y-3">
+                      <div className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                        <Youtube className="w-3.5 h-3.5 text-rose-600" />
+                        <span>Frame 1 · Video YouTube de Portada</span>
+                      </div>
                       <div>
                         <label className="block text-xs font-medium text-slate-700 mb-1">
-                          Título del Video
+                          URL o ID de YouTube
                         </label>
                         <input
                           type="text"
-                          value={siteConfig.presentationVideo?.title || ''}
+                          value={siteConfig.presentationVideo?.youtubeId || ''}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            const match = val.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))([\w-]{11})/);
+                            const extractedId = match && match[1] ? match[1] : val;
+                            setSiteConfig({
+                              ...siteConfig,
+                              presentationVideo: {
+                                ...siteConfig.presentationVideo,
+                                youtubeId: extractedId,
+                              },
+                            });
+                          }}
+                          placeholder="Ej: https://www.youtube.com/watch?v=L_LUpnjgPso o L_LUpnjgPso"
+                          className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-xl text-xs font-mono text-slate-900"
+                        />
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs font-medium text-slate-700 mb-1">
+                            Título del Video
+                          </label>
+                          <input
+                            type="text"
+                            value={siteConfig.presentationVideo?.title || ''}
+                            onChange={(e) =>
+                              setSiteConfig({
+                                ...siteConfig,
+                                presentationVideo: {
+                                  ...siteConfig.presentationVideo,
+                                  title: e.target.value,
+                                },
+                              })
+                            }
+                            className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-xl text-xs text-slate-900"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-slate-700 mb-1">
+                            Duración Mostrada
+                          </label>
+                          <input
+                            type="text"
+                            value={siteConfig.presentationVideo?.duration || ''}
+                            onChange={(e) =>
+                              setSiteConfig({
+                                ...siteConfig,
+                                presentationVideo: {
+                                  ...siteConfig.presentationVideo,
+                                  duration: e.target.value,
+                                },
+                              })
+                            }
+                            className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-xl text-xs font-mono text-slate-900"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Autoplay & Auto-advance controls */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-slate-100">
+                        <label className="flex items-center gap-2 text-xs font-medium text-slate-800 cursor-pointer p-2 rounded-lg bg-slate-50 border border-slate-200 hover:bg-slate-100/70 transition-colors">
+                          <input
+                            type="checkbox"
+                            checked={siteConfig.presentationVideo?.autoplay ?? true}
+                            onChange={(e) =>
+                              setSiteConfig({
+                                ...siteConfig,
+                                presentationVideo: {
+                                  ...siteConfig.presentationVideo,
+                                  autoplay: e.target.checked,
+                                },
+                              })
+                            }
+                            className="w-4 h-4 text-blue-600 rounded"
+                          />
+                          <span>Arrancar video automáticamente al ingresar</span>
+                        </label>
+
+                        <div>
+                          <label className="block text-xs font-medium text-slate-700 mb-1">
+                            Segundos antes de pasar automáticamente al Frame 2
+                          </label>
+                          <input
+                            type="number"
+                            min="3"
+                            max="120"
+                            value={siteConfig.presentationVideo?.autoAdvanceSeconds ?? 15}
+                            onChange={(e) =>
+                              setSiteConfig({
+                                ...siteConfig,
+                                presentationVideo: {
+                                  ...siteConfig.presentationVideo,
+                                  autoAdvanceSeconds: parseInt(e.target.value, 10) || 15,
+                                },
+                              })
+                            }
+                            className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-xl text-xs font-mono text-slate-900"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Frame 2: Ecosistema & Arquitectura */}
+                    <div className="p-4 rounded-xl bg-white border border-slate-200 space-y-3">
+                      <div className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                        <ImageIcon className="w-3.5 h-3.5 text-blue-600" />
+                        <span>Frame 2 · Showcase (Ecosistema / Arquitectura)</span>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs font-medium text-slate-700 mb-1">
+                            Badge Superior
+                          </label>
+                          <input
+                            type="text"
+                            value={siteConfig.presentationVideo?.frame2?.badge || ''}
+                            onChange={(e) =>
+                              setSiteConfig({
+                                ...siteConfig,
+                                presentationVideo: {
+                                  ...siteConfig.presentationVideo,
+                                  frame2: {
+                                    ...(siteConfig.presentationVideo?.frame2 || ({} as any)),
+                                    badge: e.target.value,
+                                  },
+                                },
+                              })
+                            }
+                            className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-xl text-xs text-slate-900"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-slate-700 mb-1">
+                            URL de Imagen o Medios
+                          </label>
+                          <input
+                            type="text"
+                            value={siteConfig.presentationVideo?.frame2?.mediaUrl || ''}
+                            onChange={(e) =>
+                              setSiteConfig({
+                                ...siteConfig,
+                                presentationVideo: {
+                                  ...siteConfig.presentationVideo,
+                                  frame2: {
+                                    ...(siteConfig.presentationVideo?.frame2 || ({} as any)),
+                                    mediaUrl: e.target.value,
+                                  },
+                                },
+                              })
+                            }
+                            placeholder="https://..."
+                            className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-xl text-xs font-mono text-slate-900"
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-slate-700 mb-1">
+                          Título Frame 2
+                        </label>
+                        <input
+                          type="text"
+                          value={siteConfig.presentationVideo?.frame2?.title || ''}
                           onChange={(e) =>
                             setSiteConfig({
                               ...siteConfig,
                               presentationVideo: {
                                 ...siteConfig.presentationVideo,
-                                title: e.target.value,
+                                frame2: {
+                                  ...(siteConfig.presentationVideo?.frame2 || ({} as any)),
+                                  title: e.target.value,
+                                },
                               },
                             })
                           }
@@ -567,35 +731,68 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
                       </div>
                       <div>
                         <label className="block text-xs font-medium text-slate-700 mb-1">
-                          Duración Mostrada
+                          Descripción Frame 2
                         </label>
-                        <input
-                          type="text"
-                          value={siteConfig.presentationVideo?.duration || ''}
+                        <textarea
+                          rows={2}
+                          value={siteConfig.presentationVideo?.frame2?.description || ''}
                           onChange={(e) =>
                             setSiteConfig({
                               ...siteConfig,
                               presentationVideo: {
                                 ...siteConfig.presentationVideo,
-                                duration: e.target.value,
+                                frame2: {
+                                  ...(siteConfig.presentationVideo?.frame2 || ({} as any)),
+                                  description: e.target.value,
+                                },
                               },
                             })
                           }
-                          className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-xl text-xs font-mono text-slate-900"
+                          className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-xl text-xs text-slate-900"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-slate-700 mb-1">
+                          Texto del Botón de Acción
+                        </label>
+                        <input
+                          type="text"
+                          value={siteConfig.presentationVideo?.frame2?.buttonText || ''}
+                          onChange={(e) =>
+                            setSiteConfig({
+                              ...siteConfig,
+                              presentationVideo: {
+                                ...siteConfig.presentationVideo,
+                                frame2: {
+                                  ...(siteConfig.presentationVideo?.frame2 || ({} as any)),
+                                  buttonText: e.target.value,
+                                },
+                              },
+                            })
+                          }
+                          className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-xl text-xs text-slate-900"
                         />
                       </div>
                     </div>
                   </div>
 
-                  {/* Section 2: Redes Sociales */}
+                  {/* Section 2: Redes Sociales & Canales Oficiales */}
                   <div className="p-5 rounded-2xl bg-slate-50 border border-slate-200/90 space-y-4">
-                    <div className="flex items-center gap-2 text-xs font-mono font-bold uppercase text-blue-700">
-                      <Globe className="w-4 h-4" />
-                      <span>Redes & Canales Oficiales</span>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 text-xs font-mono font-bold uppercase text-blue-700">
+                        <Globe className="w-4 h-4" />
+                        <span>Redes Sociales & Canales Oficiales</span>
+                      </div>
+                      <span className="text-[10px] font-mono text-slate-500">
+                        Sincronizado con Footer y Navegación
+                      </span>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div>
-                        <label className="block text-xs font-medium text-slate-700 mb-1">LinkedIn</label>
+                        <label className="block text-xs font-medium text-slate-700 mb-1 flex items-center gap-1.5">
+                          <Linkedin className="w-3.5 h-3.5 text-blue-600" />
+                          <span>LinkedIn</span>
+                        </label>
                         <input
                           type="url"
                           value={siteConfig.social.linkedin}
@@ -609,7 +806,10 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
                         />
                       </div>
                       <div>
-                        <label className="block text-xs font-medium text-slate-700 mb-1">GitHub</label>
+                        <label className="block text-xs font-medium text-slate-700 mb-1 flex items-center gap-1.5">
+                          <Github className="w-3.5 h-3.5 text-slate-800" />
+                          <span>GitHub</span>
+                        </label>
                         <input
                           type="url"
                           value={siteConfig.social.github}
@@ -623,7 +823,64 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
                         />
                       </div>
                       <div>
-                        <label className="block text-xs font-medium text-slate-700 mb-1">Email Oficial</label>
+                        <label className="block text-xs font-medium text-slate-700 mb-1 flex items-center gap-1.5">
+                          <Youtube className="w-3.5 h-3.5 text-rose-600" />
+                          <span>Canal de YouTube</span>
+                        </label>
+                        <input
+                          type="url"
+                          value={siteConfig.social.youtube || ''}
+                          onChange={(e) =>
+                            setSiteConfig({
+                              ...siteConfig,
+                              social: { ...siteConfig.social, youtube: e.target.value },
+                            })
+                          }
+                          placeholder="https://www.youtube.com/@gastonbarea"
+                          className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-xl text-xs text-slate-900 font-mono"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-slate-700 mb-1 flex items-center gap-1.5">
+                          <Twitter className="w-3.5 h-3.5 text-slate-700" />
+                          <span>Twitter / X</span>
+                        </label>
+                        <input
+                          type="url"
+                          value={siteConfig.social.twitter || ''}
+                          onChange={(e) =>
+                            setSiteConfig({
+                              ...siteConfig,
+                              social: { ...siteConfig.social, twitter: e.target.value },
+                            })
+                          }
+                          placeholder="https://x.com/gastonbarea"
+                          className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-xl text-xs text-slate-900 font-mono"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-slate-700 mb-1 flex items-center gap-1.5">
+                          <Instagram className="w-3.5 h-3.5 text-pink-600" />
+                          <span>Instagram</span>
+                        </label>
+                        <input
+                          type="url"
+                          value={siteConfig.social.instagram || ''}
+                          onChange={(e) =>
+                            setSiteConfig({
+                              ...siteConfig,
+                              social: { ...siteConfig.social, instagram: e.target.value },
+                            })
+                          }
+                          placeholder="https://instagram.com/gastonbarea"
+                          className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-xl text-xs text-slate-900 font-mono"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-slate-700 mb-1 flex items-center gap-1.5">
+                          <Mail className="w-3.5 h-3.5 text-blue-600" />
+                          <span>Email Oficial</span>
+                        </label>
                         <input
                           type="email"
                           value={siteConfig.email}
@@ -634,16 +891,75 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
                     </div>
                   </div>
 
-                  {/* Section 3: Agenda Técnica (Calendly / Cal.com) */}
+                  {/* Section 3: Google Meet Pro & Agenda Técnica */}
                   <div className="p-5 rounded-2xl bg-slate-50 border border-slate-200/90 space-y-4">
-                    <div className="flex items-center gap-2 text-xs font-mono font-bold uppercase text-blue-700">
-                      <Calendar className="w-4 h-4" />
-                      <span>Agenda Técnica (Calendly / Cal.com)</span>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 text-xs font-mono font-bold uppercase text-blue-700">
+                        <Video className="w-4 h-4 text-blue-600" />
+                        <span>Google Meet Pro & Canales de Agenda</span>
+                      </div>
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800 font-bold">
+                        Google Meet Pro
+                      </span>
                     </div>
+
+                    <div>
+                      <label className="block text-xs font-medium text-slate-700 mb-1">
+                        URL de Google Meet Pro (Sala Directa o Enlace de Reunión)
+                      </label>
+                      <input
+                        type="url"
+                        value={siteConfig.booking.googleMeetUrl || ''}
+                        onChange={(e) =>
+                          setSiteConfig({
+                            ...siteConfig,
+                            booking: { ...siteConfig.booking, googleMeetUrl: e.target.value },
+                          })
+                        }
+                        placeholder="https://meet.google.com/..."
+                        className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-xl text-xs text-slate-900 font-mono"
+                      />
+                    </div>
+
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div>
                         <label className="block text-xs font-medium text-slate-700 mb-1">
-                          URL de Calendly
+                          Título de Reunión Google Meet Pro
+                        </label>
+                        <input
+                          type="text"
+                          value={siteConfig.booking.meetingTitle || ''}
+                          onChange={(e) =>
+                            setSiteConfig({
+                              ...siteConfig,
+                              booking: { ...siteConfig.booking, meetingTitle: e.target.value },
+                            })
+                          }
+                          className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-xl text-xs text-slate-900"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-slate-700 mb-1">
+                          Duración de la Consulta
+                        </label>
+                        <input
+                          type="text"
+                          value={siteConfig.booking.defaultDuration || ''}
+                          onChange={(e) =>
+                            setSiteConfig({
+                              ...siteConfig,
+                              booking: { ...siteConfig.booking, defaultDuration: e.target.value },
+                            })
+                          }
+                          className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-xl text-xs text-slate-900"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-slate-200">
+                      <div>
+                        <label className="block text-xs font-medium text-slate-700 mb-1">
+                          URL de Calendly (Sincronizado)
                         </label>
                         <input
                           type="url"

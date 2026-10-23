@@ -36,12 +36,14 @@ interface HeroProps {
   onWhatsAppClick: () => void;
   onDiagnosticoClick: () => void;
   onExplorePillars?: () => void;
+  onClientPortalClick?: () => void;
 }
 
 export const Hero: React.FC<HeroProps> = ({
   onScheduleClick,
   onWhatsAppClick,
   onDiagnosticoClick,
+  onClientPortalClick,
 }) => {
   return (
     <section className="relative pt-2 sm:pt-4 pb-12 md:pb-20 overflow-hidden border-b border-blue-900/10 bg-[#F4F4F4]">
@@ -59,6 +61,7 @@ export const Hero: React.FC<HeroProps> = ({
           onScheduleClick={onScheduleClick}
           onDiagnosticoClick={onDiagnosticoClick}
           onWhatsAppClick={onWhatsAppClick}
+          onClientPortalClick={onClientPortalClick}
         />
 
         {/* 2. WALL STREET TECH TICKER / VALOR BURSÁTIL TECNOLÓGICAS (PANEL CORREDIZO) */}

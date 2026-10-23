@@ -186,6 +186,7 @@ Quisiéramos coordinar una llamada de diagnóstico técnico para evaluar la viab
           onWhatsAppClick={() => handleOpenWhatsApp()}
           onDiagnosticoClick={() => handleNavigate('#diagnostico-ia')}
           onExplorePillars={() => handleNavigate('#innovacion')}
+          onClientPortalClick={() => setIsClientPortalOpen(true)}
         />
 
         {/* 2. DYNAMIC WORKSPACE HUB (Opción 1: Selector de Espacios de Trabajo sin fatiga de scroll) */}

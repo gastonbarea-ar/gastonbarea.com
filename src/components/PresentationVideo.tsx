@@ -1,24 +1,16 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
   Play,
-  Pause,
   ChevronLeft,
   ChevronRight,
   Sparkles,
-  Edit3,
-  Check,
-  RotateCcw,
   Clock,
   Layers,
   ShieldCheck,
   Video,
   X,
-  Volume2,
-  VolumeX,
   Image as ImageIcon,
   ArrowRight,
-  Sliders,
-  ExternalLink,
   TrendingUp,
   FolderGit2,
   BookOpen,
@@ -27,52 +19,41 @@ import {
   Brain,
   Server,
   MessageSquare,
-  Calendar,
   Linkedin,
   Github,
   Menu,
-  ShoppingCart
+  ShoppingCart,
+  UserCheck,
 } from 'lucide-react';
-import { SITE_CONFIG } from '../data/siteConfig';
+import { SITE_CONFIG, Frame2Settings } from '../data/siteConfig';
 
 interface PresentationVideoProps {
   onScheduleClick?: () => void;
   onDiagnosticoClick?: () => void;
   onWhatsAppClick?: (customText?: string) => void;
-}
-
-interface Frame2Config {
-  type: 'image' | 'video';
-  mediaUrl: string;
-  badge: string;
-  title: string;
-  description: string;
-  buttonText: string;
-  buttonAction: 'schedule' | 'diagnostico';
+  onClientPortalClick?: () => void;
 }
 
 export const PresentationVideo: React.FC<PresentationVideoProps> = ({
   onScheduleClick,
   onDiagnosticoClick,
   onWhatsAppClick,
+  onClientPortalClick,
 }) => {
   // Navigation & Dropdown States inside the Frame
   const [technicalDropdownOpen, setTechnicalDropdownOpen] = useState<boolean>(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Active Frame: 0 = Video de Fondo, 1 = Segundo Frame (Foto o Video con Texto)
+  // Active Frame: 0 = Video de Fondo, 1 = Segundo Frame (Ecosistema & Arquitectura)
   const [activeFrame, setActiveFrame] = useState<number>(0);
-
-  // Frame 1: Video de Fondo State
-  const defaultVideoId = SITE_CONFIG.presentationVideo?.youtubeId || 'L_LUpnjgPso';
-  const [currentVideoId, setCurrentVideoId] = useState<string>(() => {
-    return localStorage.getItem('gb_presentation_video_id') || defaultVideoId;
-  });
   const [isForegroundVideoPlaying, setIsForegroundVideoPlaying] = useState<boolean>(false);
+  const [hasAutoAdvanced, setHasAutoAdvanced] = useState<boolean>(false);
 
-  // Frame 2: Carrusel Banner State (Foto o Video con Texto)
-  const defaultFrame2: Frame2Config = {
+  // Configuration loaded from SITE_CONFIG (administrable from Backend / CRM)
+  const currentVideoId = SITE_CONFIG.presentationVideo?.youtubeId || 'L_LUpnjgPso';
+  const autoAdvanceSecs = SITE_CONFIG.presentationVideo?.autoAdvanceSeconds || 15;
+  const frame2Config: Frame2Settings = SITE_CONFIG.presentationVideo?.frame2 || {
     type: 'image',
     mediaUrl:
       'https://images.unsplash.com/photo-1558494949-ef010cbdcc31?auto=format&fit=crop&w=1200&q=80',
@@ -80,24 +61,24 @@ export const PresentationVideo: React.FC<PresentationVideoProps> = ({
     title: 'Topología Desacoplada: Edge Computing + Supabase + Agentes de IA',
     description:
       'Diseñamos infraestructuras resilientes donde el frontend carga en menos de 50ms a nivel global, y los procesos pesados de IA se orquestan en workers dedicados sin afectar la experiencia del cliente.',
-    buttonText: 'Evaluar mi Arquitectura (30 min)',
+    buttonText: 'Agendar Google Meet Pro (30 min)',
     buttonAction: 'schedule',
   };
 
-  const [frame2Config, setFrame2Config] = useState<Frame2Config>(() => {
-    try {
-      const saved = localStorage.getItem('gb_frame2_config');
-      if (saved) return JSON.parse(saved);
-    } catch (e) {
-      // fallback
-    }
-    return defaultFrame2;
-  });
+  // Autoplay video on entrance and automatically advance to Frame 2 after configured seconds
+  useEffect(() => {
+    if (hasAutoAdvanced) return;
 
-  // Editor Modal / Drawer State
-  const [isEditing, setIsEditing] = useState<boolean>(false);
-  const [tempVideoId, setTempVideoId] = useState<string>(currentVideoId);
-  const [tempFrame2, setTempFrame2] = useState<Frame2Config>(frame2Config);
+    const timer = setTimeout(() => {
+      // Advance to next frame automatically if foreground full player is not open
+      if (!isForegroundVideoPlaying) {
+        setActiveFrame(1);
+        setHasAutoAdvanced(true);
+      }
+    }, autoAdvanceSecs * 1000);
+
+    return () => clearTimeout(timer);
+  }, [hasAutoAdvanced, isForegroundVideoPlaying, autoAdvanceSecs]);
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -122,31 +103,12 @@ export const PresentationVideo: React.FC<PresentationVideoProps> = ({
 
   const extractYouTubeId = (input: string): string => {
     const trimmed = (input || '').trim();
-    if (!trimmed) return defaultVideoId;
+    if (!trimmed) return currentVideoId;
     const regExp = /(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))([\w-]{11})/;
     const match = trimmed.match(regExp);
     if (match && match[1]) return match[1];
     if (trimmed.length === 11 && !trimmed.includes('/')) return trimmed;
     return trimmed;
-  };
-
-  const handleSaveConfig = () => {
-    const parsedId = extractYouTubeId(tempVideoId);
-    setCurrentVideoId(parsedId);
-    setFrame2Config(tempFrame2);
-    localStorage.setItem('gb_presentation_video_id', parsedId);
-    localStorage.setItem('gb_frame2_config', JSON.stringify(tempFrame2));
-    setIsEditing(false);
-  };
-
-  const handleResetDefaults = () => {
-    setCurrentVideoId(defaultVideoId);
-    setFrame2Config(defaultFrame2);
-    setTempVideoId(defaultVideoId);
-    setTempFrame2(defaultFrame2);
-    localStorage.removeItem('gb_presentation_video_id');
-    localStorage.removeItem('gb_frame2_config');
-    setIsEditing(false);
   };
 
   const serviceDropdownItems = [
@@ -188,12 +150,6 @@ export const PresentationVideo: React.FC<PresentationVideoProps> = ({
       href: '#topologia',
       icon: Server,
     },
-    {
-      label: 'Configurador de Arquitectura & Tiempos',
-      desc: 'Estimador de stack y presupuesto óptimo',
-      href: '#configurador',
-      icon: Sliders,
-    },
   ];
 
   return (
@@ -205,40 +161,41 @@ export const PresentationVideo: React.FC<PresentationVideoProps> = ({
         aria-hidden="true"
       />
 
-      {/* MASTER EXECUTIVE FRAME: FULL SCREEN (100dvh) + RESPONSIVE MÓVIL Y TABLETAS */}
+      {/* MASTER EXECUTIVE FRAME: FULL SCREEN (100dvh) + RESPONSIVE */}
       <div className="relative w-full min-h-[88dvh] sm:min-h-[92dvh] md:min-h-[94dvh] rounded-2xl sm:rounded-3xl md:rounded-[2.5rem] bg-slate-950 border border-blue-800/40 shadow-2xl overflow-hidden text-white flex flex-col justify-between">
         
-        {/* 1. CABECERA: MENÚ ESTRICTAMENTE CENTRADO + MARCA GASTÓN BAREA */}
-        <div className="relative z-30 w-full px-4 sm:px-6 md:px-8 py-3.5 bg-slate-950/85 backdrop-blur-2xl border-b border-white/10 flex items-center justify-between">
+        {/* 1. CABECERA: MENÚ INTEGRADO + PORTAL CLIENTES + MARCA GASTÓN BAREA */}
+        {/* 1. CABECERA: MENÚ INTEGRADO + PORTAL CLIENTES + MARCA GASTÓN BAREA */}
+        <div className="relative z-30 w-full px-3 sm:px-5 lg:px-6 py-2.5 bg-slate-950/90 backdrop-blur-2xl border-b border-white/10 flex items-center justify-between gap-2 lg:gap-4">
           
           {/* LADO IZQUIERDO: Marca / Nombre de Gastón Barea */}
           <div className="flex items-center z-10 shrink-0">
             <a
               href="#"
-              className="flex items-center gap-2.5 sm:gap-3 text-sm font-semibold tracking-tight text-white whitespace-nowrap group"
+              className="flex items-center gap-2 sm:gap-2.5 text-sm font-semibold tracking-tight text-white whitespace-nowrap group"
             >
-              <span className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-sky-400 flex items-center justify-center font-mono font-bold text-xs sm:text-sm text-white shadow-md shadow-blue-500/30 group-hover:scale-105 transition-all">
+              <span className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-sky-400 flex items-center justify-center font-mono font-bold text-xs text-white shadow-md shadow-blue-500/30 group-hover:scale-105 transition-all">
                 GB
               </span>
               <div className="flex flex-col text-left">
-                <span className="text-white font-bold group-hover:text-sky-300 transition-colors leading-tight text-xs sm:text-sm md:text-base">
+                <span className="text-white font-bold group-hover:text-sky-300 transition-colors leading-tight text-xs sm:text-sm">
                   Gastón Barea
                 </span>
-                <span className="text-[9px] sm:text-[10px] font-mono text-sky-400 font-medium tracking-wide">
+                <span className="text-[9px] font-mono text-sky-400 font-medium tracking-wide hidden sm:inline">
                   Business & Tech Architecture
                 </span>
               </div>
             </a>
           </div>
 
-          {/* CENTRO ABSOLUTO HORIZONTAL: Menú de Navegación Estrictamente Centrado */}
-          <nav className="hidden lg:flex items-center gap-1.5 xl:gap-2 absolute left-1/2 -translate-x-1/2 z-20 text-[13px] font-medium text-slate-200">
+          {/* CENTRO: Menú de Navegación con Portal Clientes Integrado (Flex natural sin absolute overlap) */}
+          <nav className="hidden xl:flex items-center justify-center gap-1 2xl:gap-1.5 flex-1 min-w-0 text-xs font-medium text-slate-200">
             
-            {/* BOTÓN INNOVACIÓN DESTACADO (3 Pilares) */}
+            {/* BOTÓN INNOVACIÓN (3 Pilares) */}
             <a
               href="#innovacion"
               onClick={(e) => handleNavClick(e, '#innovacion')}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold text-sky-300 bg-sky-500/20 hover:bg-sky-500 hover:text-white border border-sky-400/30 shadow-2xs transition-all active:scale-95"
+              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold text-sky-300 bg-sky-500/20 hover:bg-sky-500 hover:text-white border border-sky-400/30 shadow-2xs transition-all active:scale-95 whitespace-nowrap shrink-0"
             >
               <TrendingUp className="w-3.5 h-3.5 text-sky-400 group-hover:text-white" />
               <span>INNOVACIÓN</span>
@@ -248,18 +205,18 @@ export const PresentationVideo: React.FC<PresentationVideoProps> = ({
             <a
               href="#project-manager"
               onClick={(e) => handleNavClick(e, '#project-manager')}
-              className="px-3 py-1.5 rounded-full hover:text-sky-400 hover:bg-white/10 font-semibold tracking-wide transition-all inline-flex items-center gap-1.5"
+              className="px-2.5 py-1 rounded-full hover:text-sky-400 hover:bg-white/10 font-semibold tracking-wide transition-all inline-flex items-center gap-1 whitespace-nowrap shrink-0"
             >
               <FolderGit2 className="w-3.5 h-3.5 text-sky-400" />
               <span>PROJECT MANAGER</span>
             </a>
 
             {/* SERVICIOS (Dropdown) */}
-            <div className="relative" ref={dropdownRef}>
+            <div className="relative shrink-0" ref={dropdownRef}>
               <button
                 type="button"
                 onClick={() => setTechnicalDropdownOpen(!technicalDropdownOpen)}
-                className={`px-3 py-1.5 rounded-full transition-all inline-flex items-center gap-1.5 font-semibold hover:text-sky-400 hover:bg-white/10 cursor-pointer ${
+                className={`px-2.5 py-1 rounded-full transition-all inline-flex items-center gap-1 font-semibold hover:text-sky-400 hover:bg-white/10 cursor-pointer whitespace-nowrap ${
                   technicalDropdownOpen ? 'bg-white/15 text-sky-300' : ''
                 }`}
               >
@@ -323,21 +280,34 @@ export const PresentationVideo: React.FC<PresentationVideoProps> = ({
               )}
             </div>
 
-            {/* SECCIÓN ODOO COMMUNITY ERP DIRECTA */}
+            {/* SECCIÓN ODOO COMMUNITY ERP */}
             <a
               href="#odoo"
               onClick={(e) => handleNavClick(e, '#odoo')}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold text-indigo-300 hover:text-white hover:bg-indigo-600/30 border border-indigo-400/30 transition-all cursor-pointer"
+              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold text-indigo-300 hover:text-white hover:bg-indigo-600/30 border border-indigo-400/30 transition-all cursor-pointer whitespace-nowrap shrink-0"
             >
               <Layers className="w-3.5 h-3.5 text-indigo-400" />
               <span>ODOO ERP</span>
             </a>
 
+            {/* PORTAL CLIENTES (Acceso Destacado en Menú) */}
+            {onClientPortalClick && (
+              <button
+                type="button"
+                onClick={onClientPortalClick}
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold text-sky-300 hover:text-white bg-blue-900/60 hover:bg-blue-800 border border-sky-400/40 transition-all cursor-pointer shadow-xs whitespace-nowrap shrink-0"
+                title="Acceso al Portal del Cliente Verificado (Proyectos, Consultas & SLA)"
+              >
+                <UserCheck className="w-3.5 h-3.5 text-sky-400" />
+                <span>PORTAL CLIENTES</span>
+              </button>
+            )}
+
             {/* BLOG */}
             <a
               href="#blog"
               onClick={(e) => handleNavClick(e, '#blog')}
-              className="px-3 py-1.5 rounded-full hover:text-sky-400 hover:bg-white/10 font-semibold tracking-wide transition-all inline-flex items-center gap-1.5"
+              className="px-2.5 py-1 rounded-full hover:text-sky-400 hover:bg-white/10 font-semibold tracking-wide transition-all inline-flex items-center gap-1 whitespace-nowrap shrink-0"
             >
               <BookOpen className="w-3.5 h-3.5 text-sky-400" />
               <span>BLOG</span>
@@ -347,71 +317,73 @@ export const PresentationVideo: React.FC<PresentationVideoProps> = ({
             <a
               href="#contacto"
               onClick={(e) => handleNavClick(e, '#contacto')}
-              className="px-3 py-1.5 rounded-full hover:text-sky-400 hover:bg-white/10 transition-all text-slate-300"
+              className="px-2.5 py-1 rounded-full hover:text-sky-400 hover:bg-white/10 transition-all text-slate-300 whitespace-nowrap shrink-0"
             >
               Contacto
             </a>
 
           </nav>
 
-          {/* LADO DERECHO: Botones de Acción (LinkedIn destacado, WhatsApp verde oficial y Agendar) */}
-          <div className="flex items-center gap-2 sm:gap-2.5 z-10 shrink-0">
-            {/* BOTÓN LINKEDIN DESTACADO */}
+          {/* LADO DERECHO: Botones de Acción (LinkedIn, WhatsApp y Google Meet Pro) */}
+          <div className="flex items-center gap-1.5 sm:gap-2 z-10 shrink-0">
+            {/* LINKEDIN */}
             <a
               href={SITE_CONFIG.social.linkedin}
               target="_blank"
               rel="noopener noreferrer"
-              className="px-3 py-1.5 text-xs font-semibold text-white bg-[#0A66C2] hover:bg-[#004182] active:scale-95 rounded-full transition-all flex items-center gap-1.5 shadow-sm shadow-[#0A66C2]/30 cursor-pointer"
+              className="px-2.5 py-1 text-xs font-semibold text-white bg-[#0A66C2] hover:bg-[#004182] active:scale-95 rounded-full transition-all flex items-center gap-1 shadow-xs cursor-pointer"
               title="LinkedIn Profesional de Gastón Barea"
               aria-label="LinkedIn"
             >
               <Linkedin className="w-3.5 h-3.5 fill-white" />
-              <span className="hidden sm:inline">LinkedIn</span>
+              <span className="hidden 2xl:inline">LinkedIn</span>
             </a>
 
-            {/* GitHub */}
+            {/* GITHUB */}
             <a
               href={SITE_CONFIG.social.github}
               target="_blank"
               rel="noopener noreferrer"
-              className="hidden md:flex p-1.5 text-slate-400 hover:text-sky-300 hover:bg-white/10 rounded-full transition-colors"
+              className="hidden 2xl:flex p-1.5 text-slate-400 hover:text-sky-300 hover:bg-white/10 rounded-full transition-colors"
               title="GitHub de Gastón Barea"
               aria-label="GitHub"
             >
-              <Github className="w-4 h-4" />
+              <Github className="w-3.5 h-3.5" />
             </a>
 
-            {/* BOTÓN WHATSAPP VERDE OFICIAL (#25D366) */}
+            {/* WHATSAPP */}
             <button
               onClick={() => (onWhatsAppClick ? onWhatsAppClick() : null)}
               type="button"
-              className="px-3 sm:px-3.5 py-1.5 text-xs font-bold text-white bg-[#25D366] hover:bg-[#20ba59] active:scale-95 rounded-full transition-all whitespace-nowrap shadow-md shadow-[#25D366]/35 flex items-center gap-1.5 cursor-pointer"
+              className="px-2.5 sm:px-3 py-1 text-xs font-bold text-white bg-[#25D366] hover:bg-[#20ba59] active:scale-95 rounded-full transition-all whitespace-nowrap shadow-sm shadow-[#25D366]/35 flex items-center gap-1 cursor-pointer"
               title="Contactar directamente por WhatsApp"
             >
               <MessageSquare className="w-3.5 h-3.5 fill-white" />
               <span className="hidden sm:inline">WhatsApp</span>
             </button>
 
-            {/* BOTÓN AGENDAR (Visible en tabletas y desktop) */}
+            {/* GOOGLE MEET PRO */}
             {onScheduleClick && (
               <button
                 onClick={onScheduleClick}
                 type="button"
-                className="hidden sm:flex px-3.5 py-1.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-500 active:scale-95 rounded-full transition-all whitespace-nowrap shadow-md shadow-blue-600/30 items-center gap-1.5 cursor-pointer"
+                className="px-3 py-1 text-xs font-bold text-white bg-gradient-to-r from-blue-600 via-indigo-600 to-sky-500 hover:from-blue-500 hover:to-sky-400 active:scale-95 rounded-full transition-all whitespace-nowrap shadow-sm shadow-blue-600/30 flex items-center gap-1.5 cursor-pointer"
+                title="Agendar videollamada por Google Meet Pro"
               >
-                <Calendar className="w-3.5 h-3.5" />
-                <span>Agendar (30m)</span>
+                <Video className="w-3.5 h-3.5 text-sky-200" />
+                <span className="hidden xs:inline">Google Meet Pro</span>
+                <span className="xs:hidden">Meet</span>
               </button>
             )}
 
-            {/* Mobile / Tablet Menu Toggle Button */}
+            {/* Mobile / Tablet Menu Toggle */}
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               type="button"
-              className="lg:hidden p-2 text-slate-300 hover:text-white rounded-xl hover:bg-white/10 transition-colors cursor-pointer border border-white/10"
+              className="xl:hidden p-1.5 text-slate-300 hover:text-white rounded-xl hover:bg-white/10 transition-colors cursor-pointer border border-white/10"
               aria-label="Abrir menú de navegación"
             >
-              {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+              {mobileMenuOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
             </button>
           </div>
 
@@ -419,8 +391,21 @@ export const PresentationVideo: React.FC<PresentationVideoProps> = ({
 
         {/* Mobile & Tablet Drawer Menu */}
         {mobileMenuOpen && (
-          <div className="lg:hidden relative z-30 bg-slate-900/98 backdrop-blur-2xl border-b border-white/10 p-5 space-y-3 text-left animate-in fade-in slide-in-from-top-2 duration-200">
+          <div className="xl:hidden relative z-30 bg-slate-900/98 backdrop-blur-2xl border-b border-white/10 p-4 sm:p-5 space-y-3 text-left animate-in fade-in slide-in-from-top-2 duration-200">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {onClientPortalClick && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    onClientPortalClick();
+                  }}
+                  className="flex items-center gap-2.5 py-2.5 px-3.5 rounded-xl bg-blue-800/50 text-white font-bold text-xs border border-sky-400/40 text-left"
+                >
+                  <UserCheck className="w-4 h-4 text-sky-400" />
+                  <span>PORTAL CLIENTES (Proyectos & SLA)</span>
+                </button>
+              )}
               <a
                 href="#innovacion"
                 onClick={(e) => handleNavClick(e, '#innovacion')}
@@ -469,14 +454,6 @@ export const PresentationVideo: React.FC<PresentationVideoProps> = ({
                 <BookOpen className="w-4 h-4 text-sky-400" />
                 <span>BLOG & ARTÍCULOS</span>
               </a>
-              <a
-                href="#tech-specs"
-                onClick={(e) => handleNavClick(e, '#tech-specs')}
-                className="flex items-center gap-2.5 py-2.5 px-3.5 rounded-xl hover:bg-white/10 text-slate-200 font-semibold text-xs border border-white/5"
-              >
-                <Cpu className="w-4 h-4 text-indigo-400" />
-                <span>MODERN TECH STACK</span>
-              </a>
             </div>
 
             <div className="pt-2 border-t border-slate-800 flex items-center justify-between gap-2">
@@ -490,14 +467,6 @@ export const PresentationVideo: React.FC<PresentationVideoProps> = ({
                 <span>LinkedIn</span>
               </a>
 
-              <a
-                href="#contacto"
-                onClick={(e) => handleNavClick(e, '#contacto')}
-                className="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-white/10"
-              >
-                Contacto Directo
-              </a>
-
               {onScheduleClick && (
                 <button
                   type="button"
@@ -505,19 +474,18 @@ export const PresentationVideo: React.FC<PresentationVideoProps> = ({
                     setMobileMenuOpen(false);
                     onScheduleClick();
                   }}
-                  className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-bold"
+                  className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-bold flex items-center gap-1.5"
                 >
-                  Agendar (30m)
+                  <Video className="w-3.5 h-3.5 text-sky-200" />
+                  <span>Google Meet Pro</span>
                 </button>
               )}
             </div>
           </div>
         )}
 
-
-        {/* 2. SUB-BARRA DE CONTROL DEL CARRUSEL (Pestañas y Controles de Frames) */}
-        <div className="relative z-20 px-4 sm:px-6 md:px-8 py-2.5 bg-slate-900/90 border-b border-white/10 flex flex-wrap items-center justify-between gap-3 text-xs">
-          
+        {/* 2. SUB-BARRA DE INDICADORES DE FRAMES (Limpia, sin botones de edición en el front) */}
+        <div className="relative z-20 px-4 sm:px-6 md:px-8 py-2 bg-slate-900/80 border-b border-white/10 flex items-center justify-between text-xs">
           {/* Frame Tabs Selector */}
           <div className="flex items-center gap-2 overflow-x-auto">
             <button
@@ -530,7 +498,7 @@ export const PresentationVideo: React.FC<PresentationVideoProps> = ({
               }`}
             >
               <Video className="w-3.5 h-3.5 text-sky-400" />
-              <span>01. Presentación (Video de Fondo)</span>
+              <span>01. Video de Inicio (Autoplay)</span>
             </button>
 
             <button
@@ -547,156 +515,35 @@ export const PresentationVideo: React.FC<PresentationVideoProps> = ({
             </button>
           </div>
 
-          {/* Right Controls: Carousel arrows & Config trigger */}
-          <div className="flex items-center gap-2 shrink-0">
-            {/* Arrows */}
-            <div className="flex items-center gap-1 bg-white/10 rounded-full p-0.5 border border-white/10">
-              <button
-                type="button"
-                onClick={() => setActiveFrame(activeFrame === 0 ? 1 : 0)}
-                className="p-1 hover:bg-white/20 rounded-full transition-colors cursor-pointer"
-                title="Frame anterior"
-              >
-                <ChevronLeft className="w-3.5 h-3.5" />
-              </button>
-              <span className="text-[10px] font-mono px-1 font-bold text-sky-300">
-                {activeFrame + 1}/2
-              </span>
-              <button
-                type="button"
-                onClick={() => setActiveFrame(activeFrame === 1 ? 0 : 1)}
-                className="p-1 hover:bg-white/20 rounded-full transition-colors cursor-pointer"
-                title="Siguiente frame"
-              >
-                <ChevronRight className="w-3.5 h-3.5" />
-              </button>
-            </div>
-
-            {/* Config Button (Control total en vivo de fotos, videos y textos) */}
+          {/* Navigation Arrows */}
+          <div className="flex items-center gap-1 bg-white/10 rounded-full p-0.5 border border-white/10">
             <button
               type="button"
-              onClick={() => {
-                setTempVideoId(currentVideoId);
-                setTempFrame2(frame2Config);
-                setIsEditing(!isEditing);
-              }}
-              className="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-slate-200 border border-white/15 transition-all flex items-center gap-1.5 cursor-pointer text-xs"
-              title="Personalizar frames del carrusel banner"
+              onClick={() => setActiveFrame(activeFrame === 0 ? 1 : 0)}
+              className="p-1 hover:bg-white/20 rounded-full transition-colors cursor-pointer"
+              title="Frame anterior"
             >
-              <Sliders className="w-3.5 h-3.5 text-sky-300" />
-              <span>{isEditing ? 'Cerrar' : 'Configurar Showcase'}</span>
+              <ChevronLeft className="w-3.5 h-3.5" />
+            </button>
+            <span className="text-[10px] font-mono px-1.5 font-bold text-sky-300">
+              {activeFrame + 1} / 2
+            </span>
+            <button
+              type="button"
+              onClick={() => setActiveFrame(activeFrame === 1 ? 0 : 1)}
+              className="p-1 hover:bg-white/20 rounded-full transition-colors cursor-pointer"
+              title="Siguiente frame"
+            >
+              <ChevronRight className="w-3.5 h-3.5" />
             </button>
           </div>
-
         </div>
 
-        {/* Drawer de Configuración en Vivo */}
-        {isEditing && (
-          <div className="relative z-20 bg-slate-900/98 border-b border-blue-800/40 p-5 text-slate-200 text-xs animate-in fade-in duration-150 text-left">
-            <div className="max-w-3xl mx-auto space-y-4">
-              <div className="flex items-center justify-between">
-                <span className="font-bold text-white text-sm">
-                  Control Total de Contenido (Frames 1 y 2)
-                </span>
-                <button
-                  type="button"
-                  onClick={handleResetDefaults}
-                  className="text-slate-400 hover:text-white flex items-center gap-1 underline text-[11px] cursor-pointer"
-                >
-                  <RotateCcw className="w-3 h-3" /> Restaurar predeterminados
-                </button>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Frame 1 settings */}
-                <div className="p-3.5 rounded-xl bg-slate-800/80 border border-slate-700 space-y-2">
-                  <div className="font-mono text-sky-400 font-bold">FRAME 1 · Video de Fondo (YouTube)</div>
-                  <label className="block text-[11px] text-slate-300">URL o ID de YouTube:</label>
-                  <input
-                    type="text"
-                    value={tempVideoId}
-                    onChange={(e) => setTempVideoId(e.target.value)}
-                    placeholder="https://www.youtube.com/watch?v=... o L_LUpnjgPso"
-                    className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-600 rounded-lg text-xs font-mono text-white"
-                  />
-                  <p className="text-[10px] text-slate-400">
-                    Se reproducirá como fondo inmersivo de la tarjeta ejecutiva.
-                  </p>
-                </div>
-
-                {/* Frame 2 settings */}
-                <div className="p-3.5 rounded-xl bg-slate-800/80 border border-slate-700 space-y-2">
-                  <div className="font-mono text-indigo-400 font-bold">FRAME 2 · Banner / Carrusel</div>
-                  <div className="flex gap-4 text-[11px]">
-                    <label className="flex items-center gap-1 cursor-pointer">
-                      <input
-                        type="radio"
-                        name="f2type"
-                        checked={tempFrame2.type === 'image'}
-                        onChange={() => setTempFrame2({ ...tempFrame2, type: 'image' })}
-                      />
-                      <span>Foto / Diagrama</span>
-                    </label>
-                    <label className="flex items-center gap-1 cursor-pointer">
-                      <input
-                        type="radio"
-                        name="f2type"
-                        checked={tempFrame2.type === 'video'}
-                        onChange={() => setTempFrame2({ ...tempFrame2, type: 'video' })}
-                      />
-                      <span>Segundo Video</span>
-                    </label>
-                  </div>
-                  <input
-                    type="text"
-                    value={tempFrame2.mediaUrl}
-                    onChange={(e) => setTempFrame2({ ...tempFrame2, mediaUrl: e.target.value })}
-                    placeholder={tempFrame2.type === 'image' ? 'URL de imagen (https://...)' : 'URL/ID de YouTube'}
-                    className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-600 rounded-lg text-xs font-mono text-white"
-                  />
-                  <input
-                    type="text"
-                    value={tempFrame2.title}
-                    onChange={(e) => setTempFrame2({ ...tempFrame2, title: e.target.value })}
-                    placeholder="Título del frame 2"
-                    className="w-full px-2.5 py-1 bg-slate-950 border border-slate-600 rounded-lg text-xs text-white"
-                  />
-                  <textarea
-                    rows={2}
-                    value={tempFrame2.description}
-                    onChange={(e) => setTempFrame2({ ...tempFrame2, description: e.target.value })}
-                    placeholder="Descripción o texto explicativo..."
-                    className="w-full px-2.5 py-1 bg-slate-950 border border-slate-600 rounded-lg text-xs text-white"
-                  />
-                </div>
-              </div>
-
-              <div className="flex justify-end gap-2 pt-1">
-                <button
-                  type="button"
-                  onClick={() => setIsEditing(false)}
-                  className="px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300 hover:text-white"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="button"
-                  onClick={handleSaveConfig}
-                  className="px-4 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold flex items-center gap-1.5 cursor-pointer shadow-xs"
-                >
-                  <Check className="w-3.5 h-3.5" />
-                  <span>Aplicar Cambios</span>
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* --- 3. CONTENIDO: FRAME 1 (VIDEO DE FONDO CINEMÁTICO - FULL SCREEN FLEX) --- */}
+        {/* 3. CONTENIDO: FRAME 1 (VIDEO AUTOPLAY AL ENTRAR) */}
         {activeFrame === 0 && (
           <div className="relative flex-1 w-full overflow-hidden flex flex-col justify-between p-5 sm:p-8 md:p-12 text-left">
             
-            {/* Background Video Layer */}
+            {/* Background Video Layer with YouTube Embed */}
             {isForegroundVideoPlaying ? (
               <div className="absolute inset-0 z-0 bg-black">
                 <iframe
@@ -708,25 +555,20 @@ export const PresentationVideo: React.FC<PresentationVideoProps> = ({
                 />
               </div>
             ) : (
-              <>
-                {/* Embedded Video as Ambient Background Loop */}
-                <div className="absolute inset-0 pointer-events-none overflow-hidden z-0">
-                  <iframe
-                    src={`https://www.youtube-nocookie.com/embed/${currentVideoId}?autoplay=1&mute=1&controls=0&loop=1&playlist=${currentVideoId}&showinfo=0&rel=0&modestbranding=1&disablekb=1`}
-                    title="Background Video"
-                    className="w-full h-full scale-125 opacity-35 object-cover pointer-events-none mix-blend-screen"
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope;"
-                  />
-                  {/* Subtle dark gradient overlay */}
-                  <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/80 to-blue-950/70" />
-                </div>
-              </>
+              <div className="absolute inset-0 pointer-events-none overflow-hidden z-0">
+                <iframe
+                  src={`https://www.youtube-nocookie.com/embed/${currentVideoId}?autoplay=1&mute=1&controls=0&loop=1&playlist=${currentVideoId}&showinfo=0&rel=0&modestbranding=1&disablekb=1`}
+                  title="Background Video"
+                  className="w-full h-full scale-125 opacity-40 object-cover pointer-events-none mix-blend-screen"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope;"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/80 to-blue-950/70" />
+              </div>
             )}
 
             {/* Content Floating on Top of Video */}
             {!isForegroundVideoPlaying && (
               <>
-                {/* Top Strip */}
                 <div className="relative z-10 flex items-center justify-between text-xs">
                   <div className="flex items-center gap-2">
                     <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
@@ -740,7 +582,6 @@ export const PresentationVideo: React.FC<PresentationVideoProps> = ({
                   </div>
                 </div>
 
-                {/* Middle Narrative */}
                 <div className="relative z-10 max-w-3xl my-auto py-6 sm:py-8 space-y-4">
                   <h1 className="text-3xl sm:text-5xl md:text-6xl font-extrabold text-white tracking-tight leading-[1.08] [text-wrap:balance] drop-shadow-md">
                     Nuevos Modelos de Negocio Digitales impulsados por{' '}
@@ -752,7 +593,6 @@ export const PresentationVideo: React.FC<PresentationVideoProps> = ({
                     No construimos software estático. Diseñamos plataformas escalables, agentes autónomos y arquitecturas resilientes que transforman organizaciones tradicionales en negocios ágiles de alto margen.
                   </p>
 
-                  {/* Highlights */}
                   <div className="flex flex-wrap gap-2 pt-2">
                     <span className="px-3 py-1 rounded-full bg-white/10 backdrop-blur-md border border-white/15 text-[11px] font-mono text-sky-200">
                       ⚡ Vercel Edge + Supabase
@@ -793,22 +633,21 @@ export const PresentationVideo: React.FC<PresentationVideoProps> = ({
                       <button
                         type="button"
                         onClick={onScheduleClick}
-                        className="px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white font-medium text-xs transition-colors backdrop-blur-md flex items-center gap-1.5 cursor-pointer"
+                        className="px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs transition-colors backdrop-blur-md flex items-center gap-1.5 cursor-pointer"
                       >
-                        <span>Agendar (30m)</span>
+                        <Video className="w-3.5 h-3.5 text-sky-300" />
+                        <span>Google Meet Pro</span>
                       </button>
                     )}
                   </div>
 
                   <div className="flex items-center gap-2 text-xs font-mono text-slate-400">
-                    <span>Gastón Barea</span>
-                    <span>·</span>
                     <button
                       type="button"
                       onClick={() => setActiveFrame(1)}
                       className="text-sky-400 hover:text-sky-300 underline flex items-center gap-1 cursor-pointer"
                     >
-                      <span>Ver Frame 02 (Arquitectura)</span>
+                      <span>Ver Siguiente Frame (Arquitectura)</span>
                       <ArrowRight className="w-3 h-3" />
                     </button>
                   </div>
@@ -816,7 +655,6 @@ export const PresentationVideo: React.FC<PresentationVideoProps> = ({
               </>
             )}
 
-            {/* Close button if full player is playing */}
             {isForegroundVideoPlaying && (
               <button
                 type="button"
@@ -831,13 +669,12 @@ export const PresentationVideo: React.FC<PresentationVideoProps> = ({
           </div>
         )}
 
-        {/* --- 4. CONTENIDO: FRAME 2 (CARRUSEL BANNER - FOTO O VIDEO CON TEXTO - FULL SCREEN FLEX) --- */}
+        {/* 4. CONTENIDO: FRAME 2 (ECOSISTEMA & ARQUITECTURA) */}
         {activeFrame === 1 && (
           <div className="relative flex-1 w-full p-5 sm:p-8 md:p-12 flex flex-col justify-between animate-in fade-in duration-200 text-left">
             
             <div className="grid grid-cols-1 md:grid-cols-12 gap-6 md:gap-10 items-center my-auto">
               
-              {/* Left Column: Visual Media (Foto o Segundo Video) */}
               <div className="md:col-span-6 relative rounded-2xl overflow-hidden border border-blue-800/40 bg-slate-900 shadow-xl group">
                 {frame2Config.type === 'video' ? (
                   <div className="aspect-video w-full">
@@ -865,7 +702,6 @@ export const PresentationVideo: React.FC<PresentationVideoProps> = ({
                 )}
               </div>
 
-              {/* Right Column: Text & Context */}
               <div className="md:col-span-6 space-y-4">
                 <div className="flex items-center gap-2">
                   <span className="w-2 h-2 rounded-full bg-indigo-400" />
@@ -882,7 +718,6 @@ export const PresentationVideo: React.FC<PresentationVideoProps> = ({
                   {frame2Config.description}
                 </p>
 
-                {/* Call to action button */}
                 <div className="pt-2 flex flex-wrap items-center gap-3">
                   <button
                     type="button"
@@ -911,10 +746,9 @@ export const PresentationVideo: React.FC<PresentationVideoProps> = ({
 
             </div>
 
-            {/* Bottom Strip */}
             <div className="flex items-center justify-between text-xs text-slate-400 pt-4 border-t border-white/10 mt-6">
               <span className="font-mono text-[11px]">
-                Control editable desde el botón "Configurar Showcase"
+                Administrado centralizadamente desde el Panel de Control / CRM
               </span>
               <div className="flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-slate-600" />

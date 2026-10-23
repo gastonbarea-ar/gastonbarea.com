@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArrowUp, Mail, MessageSquare, Linkedin, Github, Calendar, Lock, UserCheck } from 'lucide-react';
+import { ArrowUp, Mail, MessageSquare, Linkedin, Github, Calendar, Lock, UserCheck, Video, Youtube, Instagram, Twitter } from 'lucide-react';
 import { SITE_CONFIG } from '../data/siteConfig';
 
 interface FooterProps {
@@ -42,12 +42,13 @@ export const Footer: React.FC<FooterProps> = ({
               {SITE_CONFIG.location}
             </div>
 
-            <div className="flex items-center gap-3 pt-2 text-xs">
+            <div className="flex flex-wrap items-center gap-3 pt-2 text-xs">
               <a
                 href={SITE_CONFIG.social.linkedin}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center gap-1.5 text-blue-900/80 hover:text-blue-600 font-medium transition-colors"
+                title="LinkedIn"
               >
                 <Linkedin className="w-3.5 h-3.5 text-blue-600" />
                 <span>LinkedIn</span>
@@ -58,10 +59,56 @@ export const Footer: React.FC<FooterProps> = ({
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center gap-1.5 text-blue-900/80 hover:text-blue-600 font-medium transition-colors"
+                title="GitHub"
               >
                 <Github className="w-3.5 h-3.5 text-blue-800" />
-                <span>GitHub (@xpatagonia)</span>
+                <span>GitHub</span>
               </a>
+              {SITE_CONFIG.social.youtube && (
+                <>
+                  <span className="text-blue-300">·</span>
+                  <a
+                    href={SITE_CONFIG.social.youtube}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1.5 text-blue-900/80 hover:text-rose-600 font-medium transition-colors"
+                    title="Canal de YouTube"
+                  >
+                    <Youtube className="w-3.5 h-3.5 text-rose-600" />
+                    <span>YouTube</span>
+                  </a>
+                </>
+              )}
+              {SITE_CONFIG.social.twitter && (
+                <>
+                  <span className="text-blue-300">·</span>
+                  <a
+                    href={SITE_CONFIG.social.twitter}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1.5 text-blue-900/80 hover:text-slate-900 font-medium transition-colors"
+                    title="Twitter / X"
+                  >
+                    <Twitter className="w-3.5 h-3.5 text-slate-700" />
+                    <span>X</span>
+                  </a>
+                </>
+              )}
+              {SITE_CONFIG.social.instagram && (
+                <>
+                  <span className="text-blue-300">·</span>
+                  <a
+                    href={SITE_CONFIG.social.instagram}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1.5 text-blue-900/80 hover:text-pink-600 font-medium transition-colors"
+                    title="Instagram"
+                  >
+                    <Instagram className="w-3.5 h-3.5 text-pink-600" />
+                    <span>Instagram</span>
+                  </a>
+                </>
+              )}
             </div>
           </div>
 
@@ -112,10 +159,10 @@ export const Footer: React.FC<FooterProps> = ({
                 <button
                   type="button"
                   onClick={onScheduleClick}
-                  className="flex items-center gap-2 text-blue-700 hover:text-blue-950 transition-colors font-medium text-left"
+                  className="flex items-center gap-2 text-blue-700 hover:text-blue-950 transition-colors font-medium text-left cursor-pointer"
                 >
-                  <Calendar className="w-3.5 h-3.5 text-blue-600" />
-                  <span className="underline underline-offset-2">Agendar por Calendly (30 min)</span>
+                  <Video className="w-3.5 h-3.5 text-blue-600" />
+                  <span className="underline underline-offset-2">Agendar Google Meet Pro (30 min)</span>
                 </button>
               )}
 
