@@ -1,26 +1,14 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Menu,
   X,
-  Linkedin,
-  Github,
-  Calendar,
-  Sparkles,
-  TrendingUp,
-  FolderGit2,
-  Cpu,
-  ChevronDown,
-  Layers,
-  Brain,
-  Sliders,
-  Server,
-  BookOpen,
-  MessageSquare,
-  ShieldCheck,
-  Check,
-  ShoppingCart,
+  ArrowUpRight,
+  ArrowRight,
+  Video,
   UserCheck,
-  Video
+  MessageSquare,
+  Youtube,
+  Compass,
 } from 'lucide-react';
 import { SITE_CONFIG } from '../data/siteConfig';
 
@@ -32,41 +20,157 @@ interface HeaderProps {
   onClientPortalClick?: () => void;
 }
 
-export const Header: React.FC<HeaderProps> = ({ 
-  onScheduleClick, 
-  onWhatsAppClick, 
-  onNavigate, 
-  onAdminClick,
-  onClientPortalClick
-}) => {
-  const [isScrolled, setIsScrolled] = useState(false);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [servicesDropdownOpen, setServicesDropdownOpen] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
+interface FwaMenuItem {
+  index: string;
+  label: string;
+  href: string;
+  category: string;
+  description: string;
+  metrics: string;
+  featuredItems: string[];
+}
 
+const FWA_MENU_SECTIONS: FwaMenuItem[] = [
+  {
+    index: '01',
+    label: 'Portada & Reel Interactivo',
+    href: '#inicio',
+    category: 'Experiencia en Video Full-Width · Canal YouTube & Buscador IA',
+    description:
+      'Escenario audiovisual a ancho completo desde el canal de Gastón Barea integrado con el menú superior y el buscador de soluciones asistido por Inteligencia Artificial.',
+    metrics: 'Canal @gastonbarea · IA en Vivo',
+    featuredItems: [
+      'Showreel interactivo full-width de proyectos tecnológicos y bioeconomía',
+      'Selector de episodios del canal de YouTube en primer plano',
+      'Buscador inteligente que enruta cada consulta a su solución web',
+    ],
+  },
+  {
+    index: '02',
+    label: 'Soluciones & Arquitectura',
+    href: '#servicios',
+    category: 'Matriz de 6 Verticales de Ingeniería & Negocios',
+    description:
+      'Desarrollo de proyectos de base tecnológica, IA Services, trazabilidad bioeconómica, dirección PMO, Odoo ERP v18 y servidores Linux/Docker.',
+    metrics: '6 Ejes Productivos · Hitos 40·40·20',
+    featuredItems: [
+      '01. Proyectos de Base Tecnológica & Plataformas Digitales',
+      '02. IA Services: Gemelos Digitales, Agentes RAG & BI',
+      '03. Proyectos Basados en Bioeconomía & Telemetría IoT',
+      '04. Dirección Ejecutiva de Proyectos con Clientes (14 Años PMO)',
+      '05. Odoo Community ERP v18 & E-Commerce B2B2C',
+      '06. Infraestructura Crítica Linux, Docker & Ciberseguridad',
+    ],
+  },
+  {
+    index: '03',
+    label: 'IA Services & Estructurador',
+    href: '#ia-services',
+    category: 'Gemelos Digitales Corporativos & Blueprint Técnico',
+    description:
+      'Convertimos portales corporativos y operaciones industriales en Gemelos Digitales interactivos. Probá en vivo el estructurador de proyectos en 3 fases.',
+    metrics: '3 a 6 Semanas · Arquitectura Viva',
+    featuredItems: [
+      'Diseño de Gemelos Digitales para atención, ventas B2B y operaciones',
+      'Generador instantáneo de hoja de ruta (40% Inicio · 40% Staging · 20% Producción)',
+      'Simulación de stack técnico, plazos y entregables auditables por vertical',
+    ],
+  },
+  {
+    index: '04',
+    label: 'Bioeconomía & Casos Reales',
+    href: '#bioeconomia',
+    category: 'Convergencia Tecnológica-Productiva & Evidencia',
+    description:
+      'Digitalización de bioprocesos, valorización de biomasa, economía circular y casos de impacto auditables en agroindustria, distribución y energía.',
+    metrics: '-42% Mermas · 100% Trazabilidad',
+    featuredItems: [
+      'Pasaportes digitales de lote y monitoreo IoT en planta y campo',
+      'Estructuración técnica de Empresas de Base Tecnológica (EBTs)',
+      'Casos de éxito documentados con métricas reales de retorno',
+    ],
+  },
+  {
+    index: '05',
+    label: 'Trayectoria (30 Años)',
+    href: '#trayectoria',
+    category: '30 Años Sector Tecnológico · 14 Años Dirección PMO',
+    description:
+      'Tres décadas desarrollando tecnología aplicada a la producción real (1996–2026) y 14 años liderando proyectos estratégicos directamente junto a clientes.',
+    metrics: '1996–2026 · Patagonia & Global',
+    featuredItems: [
+      '1996–2012: Ingeniería de sistemas, redes industriales y Linux',
+      '2012–2021: Dirección ejecutiva PMO, bases PostgreSQL y sistemas ERP',
+      '2021–2026: Base tecnológica, IA Services, Bioeconomía y Odoo v18',
+    ],
+  },
+  {
+    index: '06',
+    label: 'Publicaciones & Contacto',
+    href: '#contacto',
+    category: 'Notas Ejecutivas, Canal Directo & Protocolo NDA',
+    description:
+      'Artículos de análisis técnico e inicio inmediato de evaluación de proyectos bajo acuerdo de confidencialidad o sesión en Google Meet Pro.',
+    metrics: 'Respuesta < 24h · NDA Garantizado',
+    featuredItems: [
+      'Formulario ejecutivo de relevamiento de proyectos',
+      'Agenda directa de videollamada en Google Meet Pro (30 min)',
+      'Acceso a publicaciones sobre IA, Bioeconomía y Modern Tech Stack',
+    ],
+  },
+];
+
+export const Header: React.FC<HeaderProps> = ({
+  onScheduleClick,
+  onWhatsAppClick,
+  onNavigate,
+  onClientPortalClick,
+}) => {
+  const [fwaMenuOpen, setFwaMenuOpen] = useState(false);
+  const [hoveredIndex, setHoveredIndex] = useState<number>(0);
+  const [isScrolledPastVideo, setIsScrolledPastVideo] = useState(false);
+
+  // Detect scroll to transition header from integrated video overlay to crisp white bar
   useEffect(() => {
     const handleScroll = () => {
-      setIsScrolled(window.scrollY > 350);
+      const threshold = window.innerHeight * 0.65;
+      setIsScrolledPastVideo(window.scrollY > threshold);
     };
+    handleScroll();
     window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // Close dropdown on outside click
+  // Close menu on ESC key
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setServicesDropdownOpen(false);
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && fwaMenuOpen) {
+        setFwaMenuOpen(false);
       }
     };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [fwaMenuOpen]);
+
+  // Lock body scroll when full-screen FWA menu is open
+  useEffect(() => {
+    if (fwaMenuOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [fwaMenuOpen]);
 
   const handleNavClick = (e: React.MouseEvent<HTMLAnchorElement>, href: string) => {
     e.preventDefault();
-    setMobileMenuOpen(false);
-    setServicesDropdownOpen(false);
+    setFwaMenuOpen(false);
+    if (href === '#inicio') {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
     if (onNavigate) {
       onNavigate(href);
     } else {
@@ -77,499 +181,339 @@ export const Header: React.FC<HeaderProps> = ({
     }
   };
 
-  const serviceAndTechItems = [
-    {
-      label: 'Capa de E-Commerce B2B2C & Omnicanal',
-      desc: 'Portales mayoristas B2B, checkout 1-click B2C y sincronización ERP',
-      href: '#ecommerce-b2b2c',
-      icon: ShoppingCart,
-      isFeatured: true,
-    },
-    {
-      label: 'Odoo Community ERP (Implementación & Migración)',
-      desc: 'Gestión empresarial completa sin costos de licencias por usuario',
-      href: '#odoo',
-      icon: Layers,
-      isFeatured: true,
-    },
-    {
-      label: 'Capacidades de Software & Resiliencia',
-      desc: 'Sistemas que resisten el crecimiento del negocio sin caídas',
-      href: '#servicios',
-      icon: ShieldCheck,
-    },
-    {
-      label: 'Modern Tech Stack',
-      desc: 'Vercel Edge, Supabase & React 19',
-      href: '#tech-specs',
-      icon: Cpu,
-    },
-    {
-      label: 'Diagnóstico Interactivo con IA',
-      desc: 'Simulador de soluciones personalizadas',
-      href: '#diagnostico-ia',
-      icon: Brain,
-    },
-    {
-      label: 'Topología de Servidores Linux & Docker',
-      desc: 'Infraestructura dedicada, VPN & Redes seguras',
-      href: '#topologia',
-      icon: Server,
-    },
-    {
-      label: 'Configurador de Arquitectura & Tiempos',
-      desc: 'Estimador de stack y presupuesto óptimo',
-      href: '#configurador',
-      icon: Sliders,
-    },
-  ];
+  const activePreview = FWA_MENU_SECTIONS[hoveredIndex] || FWA_MENU_SECTIONS[0];
+
+  // When on top of the Hero video (or when FWA menu is open), use dark glass integrated into the video stage
+  const isOverDarkStage = !isScrolledPastVideo || fwaMenuOpen;
 
   return (
-    <header
-      className={`fixed top-2.5 sm:top-4 left-0 right-0 z-50 px-3 sm:px-6 pointer-events-none transition-all duration-300 ${
-        isScrolled
-          ? 'opacity-100 translate-y-0'
-          : 'opacity-0 -translate-y-4'
-      }`}
-    >
-      {/* Floating Island / Floating Pill Container */}
-      <div
-        className="relative max-w-6xl mx-auto pointer-events-auto rounded-full transition-all duration-300 px-4 sm:px-6 py-2 sm:py-2.5 flex items-center justify-between gap-3 bg-white/95 backdrop-blur-2xl shadow-xl shadow-blue-950/10 border border-white/80"
+    <>
+      {/* FULL-WIDTH INTEGRATED FWA TOP BAR (Sits directly inside the video stage at top=0) */}
+      <header
+        className={`fixed top-0 left-0 right-0 z-50 w-full transition-colors duration-200 border-b ${
+          isOverDarkStage
+            ? 'bg-black/65 backdrop-blur-md text-white border-white/15'
+            : 'bg-white/95 backdrop-blur-md text-[#1D1D1F] border-black/[0.14]'
+        }`}
       >
-        {/* Left Brand Identity */}
-        <div className="flex items-center shrink-0 z-10">
-          <a
-            href="#"
-            className="flex items-center gap-2.5 text-sm font-semibold tracking-tight text-blue-950 hover:opacity-90 transition-opacity"
-          >
-            <span className="w-8 h-8 rounded-full bg-gradient-to-tr from-blue-700 via-indigo-600 to-blue-900 flex items-center justify-center font-mono font-bold text-xs text-white shadow-xs">
-              GB
-            </span>
-            <div className="flex flex-col text-left">
-              <span className="text-blue-950 font-bold leading-tight text-xs sm:text-sm">
-                Gastón Barea
-              </span>
-              <span className="text-[9px] font-mono text-blue-600 font-medium tracking-wide hidden sm:inline">
-                Tech Architecture
-              </span>
-            </div>
-          </a>
-        </div>
-
-        {/* Floating Desktop Navigation Links (Flex-1 natural centered, never overlaps) */}
-        <nav className="hidden xl:flex items-center justify-center gap-1 2xl:gap-1.5 flex-1 min-w-0 text-xs font-medium text-blue-900/85">
-          {/* BOTÓN INNOVACIÓN DESTACADO (3 Pilares) */}
-          <a
-            href="#innovacion"
-            onClick={(e) => handleNavClick(e, '#innovacion')}
-            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold text-blue-700 bg-blue-100/90 hover:bg-blue-600 hover:text-white border border-blue-200/80 shadow-2xs transition-all active:scale-95 whitespace-nowrap shrink-0"
-          >
-            <TrendingUp className="w-3.5 h-3.5 text-blue-600 group-hover:text-white" />
-            <span>INNOVACIÓN</span>
-          </a>
-
-          {/* PROJECT MANAGER */}
-          <a
-            href="#project-manager"
-            onClick={(e) => handleNavClick(e, '#project-manager')}
-            className="px-2.5 py-1 rounded-full text-blue-950 hover:text-indigo-600 hover:bg-indigo-50/80 font-semibold tracking-wide transition-all inline-flex items-center gap-1 whitespace-nowrap shrink-0"
-            title="Project Management, Arquitectura & Dirección de Proyectos"
-          >
-            <FolderGit2 className="w-3.5 h-3.5 text-indigo-600" />
-            <span>PROJECT MANAGER</span>
-          </a>
-
-          {/* SERVICIOS & PARTE TÉCNICA UNIFICADOS (Dropdown) */}
-          <div className="relative shrink-0" ref={dropdownRef}>
+        <div className="w-full flex items-center justify-between gap-4 sm:gap-8 px-4 sm:px-8 lg:px-12 h-16">
+          {/* Zone 1: FWA Menu Trigger + Brand Wordmark */}
+          <div className="flex items-center gap-3 sm:gap-5 shrink-0">
             <button
               type="button"
-              onClick={() => setServicesDropdownOpen(!servicesDropdownOpen)}
-              className={`px-2.5 py-1 rounded-full transition-all inline-flex items-center gap-1 font-semibold text-blue-950 hover:text-blue-600 hover:bg-blue-50/80 cursor-pointer whitespace-nowrap ${
-                servicesDropdownOpen ? 'bg-blue-50 text-blue-600' : ''
+              onClick={() => setFwaMenuOpen(!fwaMenuOpen)}
+              className={`px-3 sm:px-4 py-2 text-xs font-mono font-bold tracking-wider border transition-colors inline-flex items-center gap-2 cursor-pointer rounded-none whitespace-nowrap ${
+                fwaMenuOpen
+                  ? 'bg-[#291B64] text-white border-white/30'
+                  : isOverDarkStage
+                  ? 'bg-white/10 text-white border-white/25 hover:bg-[#291B64] hover:border-white/40'
+                  : 'bg-white text-[#1D1D1F] border-black/[0.18] hover:bg-[#0A0A0C] hover:text-white'
+              }`}
+              aria-expanded={fwaMenuOpen}
+              aria-label="Alternar menú principal estilo FWA"
+            >
+              {fwaMenuOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
+              <span>{fwaMenuOpen ? 'CERRAR' : 'MENÚ'}</span>
+            </button>
+
+            <a
+              href="#inicio"
+              onClick={(e) => handleNavClick(e, '#inicio')}
+              className={`font-display text-base sm:text-xl font-bold tracking-tight whitespace-nowrap shrink-0 hover:opacity-80 transition-opacity ${
+                isOverDarkStage ? 'text-white' : 'text-[#1D1D1F]'
               }`}
             >
-              <Cpu className="w-3.5 h-3.5 text-indigo-600" />
-              <span>SERVICIOS</span>
-              <ChevronDown
-                className={`w-3.5 h-3.5 text-blue-500 transition-transform duration-200 ${
-                  servicesDropdownOpen ? 'rotate-180' : ''
-                }`}
-              />
-            </button>
-
-            {/* Submenu Dropdown Card */}
-            {servicesDropdownOpen && (
-              <div className="absolute top-full left-0 mt-3 w-88 bg-white/98 backdrop-blur-2xl rounded-2xl border border-blue-900/15 shadow-2xl shadow-blue-950/15 p-2.5 z-50 animate-in fade-in slide-in-from-top-2 duration-150">
-                <div className="px-3 py-2 border-b border-slate-100 mb-1.5 flex items-center justify-between">
-                  <span className="text-[10px] font-mono uppercase tracking-wider text-blue-600 font-bold">
-                    Servicios & Arquitectura Técnica
-                  </span>
-                  <span className="text-[10px] font-mono text-emerald-600 flex items-center gap-1 font-bold">
-                    <ShieldCheck className="w-3 h-3" /> NDA & Seguridad
-                  </span>
-                </div>
-                <div className="space-y-1">
-                  {serviceAndTechItems.map((item) => {
-                    const Icon = item.icon;
-                    return (
-                      <a
-                        key={item.href}
-                        href={item.href}
-                        onClick={(e) => handleNavClick(e, item.href)}
-                        className={`flex items-start gap-3 p-2.5 rounded-xl hover:bg-blue-50/80 transition-colors group ${
-                          (item as any).isFeatured ? 'bg-indigo-50/60 border border-indigo-200/60' : ''
-                        }`}
-                      >
-                        <span className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 mt-0.5 transition-colors ${
-                          (item as any).isFeatured
-                            ? 'bg-indigo-600 text-white'
-                            : 'bg-blue-100/70 text-blue-700 group-hover:bg-blue-600 group-hover:text-white'
-                        }`}>
-                          <Icon className="w-4 h-4" />
-                        </span>
-                        <div>
-                          <div className="text-xs font-bold text-slate-900 group-hover:text-blue-600 transition-colors flex items-center gap-1.5">
-                            <span>{item.label}</span>
-                            {(item as any).isFeatured && (
-                              <span className="text-[9px] font-mono font-bold px-1.5 py-0.2 bg-indigo-100 text-indigo-700 rounded-md">
-                                Destacado
-                              </span>
-                            )}
-                          </div>
-                          <div className="text-[11px] text-slate-500 line-clamp-1">
-                            {item.desc}
-                          </div>
-                        </div>
-                      </a>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
+              Gastón Barea
+            </a>
           </div>
 
-          {/* E-COMMERCE B2B2C DIRECTO */}
-          <a
-            href="#ecommerce-b2b2c"
-            onClick={(e) => handleNavClick(e, '#ecommerce-b2b2c')}
-            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold text-indigo-700 hover:text-indigo-950 hover:bg-indigo-50 border border-indigo-200/80 transition-all cursor-pointer whitespace-nowrap shrink-0"
+          {/* Zone 2: 5 Clean Single-Line Architectural Links */}
+          <nav
+            className={`hidden xl:flex items-center gap-7 text-xs font-mono font-semibold ${
+              isOverDarkStage ? 'text-neutral-300' : 'text-[#515154]'
+            }`}
           >
-            <ShoppingCart className="w-3.5 h-3.5 text-indigo-600" />
-            <span>E-COMMERCE B2B2C</span>
-          </a>
-
-          {/* ODOO DIRECTO */}
-          <a
-            href="#odoo"
-            onClick={(e) => handleNavClick(e, '#odoo')}
-            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold text-indigo-700 hover:text-indigo-900 hover:bg-indigo-50 border border-indigo-200/80 transition-all cursor-pointer whitespace-nowrap shrink-0"
-          >
-            <Layers className="w-3.5 h-3.5 text-indigo-600" />
-            <span>ODOO ERP</span>
-          </a>
-
-          {/* BLOG */}
-          <a
-            href="#blog"
-            onClick={(e) => handleNavClick(e, '#blog')}
-            className="px-2.5 py-1 rounded-full text-blue-950 hover:text-blue-600 hover:bg-blue-50/80 font-semibold tracking-wide transition-all inline-flex items-center gap-1 whitespace-nowrap shrink-0"
-          >
-            <BookOpen className="w-3.5 h-3.5 text-blue-600" />
-            <span>BLOG</span>
-          </a>
-
-          {/* CONTACTO */}
-          <a
-            href="#contacto"
-            onClick={(e) => handleNavClick(e, '#contacto')}
-            className="px-2.5 py-1 rounded-full text-slate-700 hover:text-blue-600 hover:bg-blue-50/70 transition-all whitespace-nowrap shrink-0"
-          >
-            Contacto
-          </a>
-        </nav>
-
-        {/* Right Action Buttons */}
-        <div className="hidden xl:flex items-center gap-1.5 2xl:gap-2 shrink-0">
-          {/* BOTÓN LINKEDIN DESTACADO OFICIAL (#0A66C2) */}
-          <a
-            href={SITE_CONFIG.social.linkedin}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="px-2.5 py-1 text-xs font-semibold text-white bg-[#0A66C2] hover:bg-[#004182] active:scale-95 rounded-full transition-all flex items-center gap-1 shadow-xs shadow-[#0A66C2]/25 cursor-pointer"
-            title="LinkedIn Profesional de Gastón Barea"
-            aria-label="LinkedIn"
-          >
-            <Linkedin className="w-3.5 h-3.5 fill-white" />
-            <span className="hidden 2xl:inline">LinkedIn</span>
-          </a>
-
-          {/* GitHub */}
-          <a
-            href={SITE_CONFIG.social.github}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="p-1.5 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-full transition-colors hidden 2xl:flex"
-            title="GitHub de Gastón Barea (@xpatagonia)"
-            aria-label="GitHub"
-          >
-            <Github className="w-4 h-4" />
-          </a>
-
-          {/* CRM Operativo Shortcut */}
-          {onAdminClick && (
-            <button
-              onClick={onAdminClick}
-              type="button"
-              className="p-1.5 text-slate-600 hover:text-blue-700 hover:bg-blue-50/80 rounded-full transition-colors flex cursor-pointer"
-              title="CRM Operativo & Presupuestos"
-              aria-label="CRM Operativo"
+            <a
+              href="#servicios"
+              onClick={(e) => handleNavClick(e, '#servicios')}
+              className={`underline-offset-4 hover:underline transition-colors whitespace-nowrap shrink-0 ${
+                isOverDarkStage ? 'hover:text-white' : 'hover:text-[#291B64]'
+              }`}
             >
-              <TrendingUp className="w-4 h-4 text-emerald-600" />
-            </button>
-          )}
-
-          {/* Portal Clientes Verificado */}
-          {onClientPortalClick && (
-            <button
-              onClick={onClientPortalClick}
-              type="button"
-              className="px-2.5 py-1 text-xs font-bold text-blue-900 bg-blue-50 hover:bg-blue-100 hover:text-blue-950 border border-blue-200/80 rounded-full transition-all flex items-center gap-1 cursor-pointer shadow-2xs whitespace-nowrap"
-              title="Acceso al Portal de Clientes (Proyectos, Consultas & Soporte)"
+              01. Soluciones
+            </a>
+            <a
+              href="#ia-services"
+              onClick={(e) => handleNavClick(e, '#ia-services')}
+              className={`underline-offset-4 hover:underline transition-colors whitespace-nowrap shrink-0 ${
+                isOverDarkStage ? 'hover:text-white' : 'hover:text-[#291B64]'
+              }`}
             >
-              <UserCheck className="w-3.5 h-3.5 text-blue-600" />
-              <span>Portal Clientes</span>
+              02. IA Services
+            </a>
+            <a
+              href="#bioeconomia"
+              onClick={(e) => handleNavClick(e, '#bioeconomia')}
+              className={`underline-offset-4 hover:underline transition-colors whitespace-nowrap shrink-0 ${
+                isOverDarkStage ? 'hover:text-white' : 'hover:text-[#291B64]'
+              }`}
+            >
+              03. Bioeconomía & Tech
+            </a>
+            <a
+              href="#trayectoria"
+              onClick={(e) => handleNavClick(e, '#trayectoria')}
+              className={`underline-offset-4 hover:underline transition-colors whitespace-nowrap shrink-0 ${
+                isOverDarkStage ? 'hover:text-white' : 'hover:text-[#291B64]'
+              }`}
+            >
+              04. Trayectoria
+            </a>
+            <button
+              type="button"
+              onClick={() => {
+                setFwaMenuOpen(false);
+                if (onClientPortalClick) onClientPortalClick();
+              }}
+              className={`underline-offset-4 hover:underline transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+                isOverDarkStage ? 'hover:text-white' : 'hover:text-[#291B64]'
+              }`}
+            >
+              05. Portal Clientes
             </button>
-          )}
+          </nav>
 
-          {/* BOTÓN WHATSAPP VERDE CARACTERÍSTICO */}
-          <button
-            onClick={() => onWhatsAppClick()}
-            type="button"
-            className="px-2.5 sm:px-3 py-1 text-xs font-bold text-white bg-[#25D366] hover:bg-[#20ba59] active:scale-95 rounded-full transition-all whitespace-nowrap shadow-sm shadow-[#25D366]/35 flex items-center gap-1 cursor-pointer"
-            title="Abrir WhatsApp directo"
-          >
-            <MessageSquare className="w-3.5 h-3.5 fill-white" />
-            <span className="hidden sm:inline">WhatsApp</span>
-          </button>
-
-          {/* GOOGLE MEET PRO */}
-          <button
-            onClick={onScheduleClick}
-            type="button"
-            className="px-3 py-1 text-xs font-bold text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 active:scale-95 rounded-full transition-all whitespace-nowrap shadow-sm shadow-blue-600/30 flex items-center gap-1.5 cursor-pointer"
-            title="Agendar videollamada directa por Google Meet Pro"
-          >
-            <Video className="w-3.5 h-3.5 text-sky-200" />
-            <span>Google Meet Pro</span>
-          </button>
+          {/* Zone 3: 1 Primary Action */}
+          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+            <button
+              type="button"
+              onClick={() => {
+                setFwaMenuOpen(false);
+                onScheduleClick();
+              }}
+              className="px-3.5 sm:px-5 py-2 sm:py-2.5 text-xs font-mono font-bold text-white bg-[#291B64] border border-white/20 rounded-none hover:bg-[#382586] transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+            >
+              <span className="hidden sm:inline">Agendar Google Meet Pro</span>
+              <span className="sm:hidden">Meet Pro</span>
+            </button>
+          </div>
         </div>
+      </header>
 
-        {/* Mobile / Tablet menu trigger (<1280px) */}
-        <div className="flex xl:hidden items-center gap-2">
-          {/* Mobile LinkedIn icon */}
-          <a
-            href={SITE_CONFIG.social.linkedin}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="p-1.5 text-white bg-[#0A66C2] rounded-full flex items-center justify-center cursor-pointer shadow-xs"
-            title="LinkedIn"
-            aria-label="LinkedIn"
-          >
-            <Linkedin className="w-3.5 h-3.5 fill-white" />
-          </a>
-
-          <button
-            onClick={() => onWhatsAppClick()}
-            type="button"
-            className="px-2.5 py-1 text-xs font-bold text-white bg-[#25D366] rounded-full flex items-center gap-1 cursor-pointer shadow-xs"
-          >
-            <MessageSquare className="w-3 h-3 fill-white" />
-            <span>WA</span>
-          </button>
-
-          {onClientPortalClick && (
-            <button
-              onClick={onClientPortalClick}
-              type="button"
-              className="px-2.5 py-1 text-xs font-bold text-blue-900 bg-blue-50 border border-blue-200 rounded-full flex items-center gap-1 cursor-pointer shadow-xs"
-              title="Portal Clientes"
-            >
-              <UserCheck className="w-3.5 h-3.5 text-blue-600" />
-              <span>Portal</span>
-            </button>
-          )}
-
-          {/* Quick Meet Pro on Tablet */}
-          <button
-            onClick={onScheduleClick}
-            type="button"
-            className="hidden sm:flex px-2.5 py-1 text-xs font-bold text-white bg-gradient-to-r from-blue-600 to-indigo-600 rounded-full items-center gap-1 shadow-xs cursor-pointer"
-            title="Google Meet Pro"
-          >
-            <Video className="w-3 h-3 text-sky-200" />
-            <span>Meet</span>
-          </button>
-
-          <button
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            type="button"
-            className="p-1.5 text-blue-950 hover:bg-blue-100/60 rounded-full transition-colors cursor-pointer"
-            aria-label="Menú de navegación"
-          >
-            {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-          </button>
-        </div>
-      </div>
-
-      {/* Mobile Drawer Menu */}
-      {mobileMenuOpen && (
-        <div className="xl:hidden mt-2 max-w-6xl mx-auto bg-white/98 backdrop-blur-2xl rounded-3xl border border-blue-900/15 shadow-2xl p-5 space-y-3 text-left animate-in fade-in slide-in-from-top-2 duration-200 pointer-events-auto">
-          <div className="space-y-1">
-            <a
-              href="#innovacion"
-              onClick={(e) => handleNavClick(e, '#innovacion')}
-              className="flex items-center gap-2 py-2 px-3 rounded-xl bg-blue-50 text-blue-700 font-bold text-sm"
-            >
-              <TrendingUp className="w-4 h-4 text-blue-600" />
-              <span>INNOVACIÓN (3 Pilares)</span>
-            </a>
-
-            <a
-              href="#project-manager"
-              onClick={(e) => handleNavClick(e, '#project-manager')}
-              className="flex items-center gap-2 py-2 px-3 rounded-xl hover:bg-indigo-50 text-blue-950 font-bold text-sm"
-            >
-              <FolderGit2 className="w-4 h-4 text-indigo-600" />
-              <span>PROJECT MANAGER & DIRECCIÓN</span>
-            </a>
-
-            <a
-              href="#odoo"
-              onClick={(e) => handleNavClick(e, '#odoo')}
-              className="flex items-center gap-2 py-2 px-3 rounded-xl bg-indigo-50/80 text-indigo-900 font-bold text-sm border border-indigo-200/60"
-            >
-              <Layers className="w-4 h-4 text-indigo-600" />
-              <span>ODOO COMMUNITY ERP</span>
-            </a>
-
-            <a
-              href="#ecommerce-b2b2c"
-              onClick={(e) => handleNavClick(e, '#ecommerce-b2b2c')}
-              className="flex items-center gap-2 py-2 px-3 rounded-xl bg-purple-50 text-purple-900 font-bold text-sm border border-purple-200/60"
-            >
-              <ShoppingCart className="w-4 h-4 text-purple-600" />
-              <span>E-COMMERCE B2B2C</span>
-            </a>
-
-            <a
-              href="#blog"
-              onClick={(e) => handleNavClick(e, '#blog')}
-              className="flex items-center gap-2 py-2 px-3 rounded-xl hover:bg-blue-50 text-blue-950 font-bold text-sm"
-            >
-              <BookOpen className="w-4 h-4 text-blue-600" />
-              <span>BLOG & ARTÍCULOS</span>
-            </a>
-
-            {/* Mobile SERVICIOS & PARTE TÉCNICA */}
-            <div className="pt-2 pb-1">
-              <span className="text-[10px] font-mono tracking-wider uppercase text-blue-600 font-bold px-3 flex items-center justify-between">
-                <span>SERVICIOS</span>
-                <span className="text-emerald-600 text-[9px] flex items-center gap-1">
-                  <ShieldCheck className="w-3 h-3" /> NDA
-                </span>
-              </span>
-              <div className="mt-1 space-y-1 pl-2">
-                {serviceAndTechItems.map((item) => {
-                  const Icon = item.icon;
+      {/* THE FWA FULL-SCREEN ARCHITECTURAL MEGA-MENU OVERLAY (100% FULL WIDTH) */}
+      {fwaMenuOpen && (
+        <div className="fixed inset-0 top-16 z-40 w-full bg-[#0A0A0C] text-white overflow-y-auto border-t border-white/15">
+          <div className="w-full min-h-[calc(100vh-4rem)] grid grid-cols-1 lg:grid-cols-12 divide-y lg:divide-y-0 lg:divide-x divide-white/15">
+            {/* LEFT COLUMN (7 COLS): FWA OVERSIZED EDITORIAL INDEX */}
+            <div className="lg:col-span-7 flex flex-col justify-between">
+              <div className="divide-y divide-white/15">
+                {FWA_MENU_SECTIONS.map((item, idx) => {
+                  const isActive = hoveredIndex === idx;
                   return (
                     <a
-                      key={item.href}
+                      key={item.index}
                       href={item.href}
+                      onMouseEnter={() => setHoveredIndex(idx)}
+                      onFocus={() => setHoveredIndex(idx)}
                       onClick={(e) => handleNavClick(e, item.href)}
-                      className="flex items-center gap-2.5 py-1.5 px-3 rounded-lg text-xs font-medium text-slate-800 hover:text-blue-600 hover:bg-blue-50"
+                      className={`group px-4 sm:px-8 lg:px-12 py-5 sm:py-7 flex items-center justify-between gap-4 sm:gap-6 transition-colors ${
+                        isActive ? 'bg-[#291B64] text-white' : 'bg-[#0A0A0C] hover:bg-white/[0.04]'
+                      }`}
                     >
-                      <Icon className="w-3.5 h-3.5 text-slate-500" />
-                      <span>{item.label}</span>
+                      <div className="flex items-baseline gap-4 sm:gap-7 text-left min-w-0">
+                        <span
+                          className={`text-xs sm:text-sm font-mono font-bold tabular-nums shrink-0 ${
+                            isActive ? 'text-emerald-300' : 'text-neutral-500'
+                          }`}
+                        >
+                          {item.index}
+                        </span>
+                        <div className="space-y-1 min-w-0">
+                          <div className="font-display text-xl sm:text-3xl lg:text-4xl font-bold tracking-tight text-white truncate">
+                            {item.label}
+                          </div>
+                          <div
+                            className={`text-xs font-mono line-clamp-1 ${
+                              isActive ? 'text-white/85' : 'text-neutral-400'
+                            }`}
+                          >
+                            {item.category}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-3 shrink-0">
+                        <span className="hidden md:inline text-xs font-mono text-white/70">
+                          {item.metrics}
+                        </span>
+                        <ArrowUpRight
+                          className={`w-5 h-5 sm:w-6 sm:h-6 transition-transform duration-150 ${
+                            isActive ? 'translate-x-0.5 -translate-y-0.5 text-white' : 'text-neutral-500'
+                          }`}
+                        />
+                      </div>
                     </a>
                   );
                 })}
               </div>
+
+              {/* Bottom Quick Index Strip */}
+              <div className="px-4 sm:px-8 lg:px-12 py-5 bg-[#111115] border-t border-white/15 flex flex-wrap items-center justify-between gap-4 text-xs font-mono text-neutral-400">
+                <div>
+                  <span>GASTÓN BAREA · GEMELO DIGITAL INTERACTIVO</span>
+                </div>
+                <div className="flex flex-wrap items-center gap-5">
+                  <a
+                    href={SITE_CONFIG.social.youtube}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="hover:text-white inline-flex items-center gap-1.5"
+                  >
+                    <Youtube className="w-3.5 h-3.5 text-red-500" />
+                    <span>YouTube @gastonbarea</span>
+                  </a>
+                  <a
+                    href={SITE_CONFIG.social.linkedin}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="hover:text-white"
+                  >
+                    LinkedIn
+                  </a>
+                  <a
+                    href={SITE_CONFIG.social.github}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="hover:text-white"
+                  >
+                    GitHub
+                  </a>
+                </div>
+              </div>
             </div>
 
-            <div className="pt-1 space-y-1 border-t border-slate-100">
-              <a
-                href="#contacto"
-                onClick={(e) => handleNavClick(e, '#contacto')}
-                className="block py-1.5 px-3 text-sm font-semibold text-slate-800 hover:text-blue-600"
-              >
-                Contacto Directo
-              </a>
-            </div>
-          </div>
+            {/* RIGHT COLUMN (5 COLS): DYNAMIC INTERACTIVE PREVIEW & DIRECT ACTIONS */}
+            <div className="lg:col-span-5 p-5 sm:p-8 lg:p-12 bg-[#101014] flex flex-col justify-between space-y-8 text-left">
+              {/* Dynamic Section Inspector */}
+              <div className="space-y-6">
+                <div className="pb-4 border-b border-white/15 flex flex-wrap items-center justify-between gap-2 text-xs font-mono">
+                  <span className="text-emerald-400">
+                    SECCIÓN {activePreview.index} · VISTA PREVIA
+                  </span>
+                  <span className="text-neutral-400">{activePreview.metrics}</span>
+                </div>
 
-          <div className="pt-3 border-t border-slate-100 space-y-3">
-            <div className="flex flex-col gap-2">
-              <a
-                href={SITE_CONFIG.social.linkedin}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="w-full py-2 text-xs font-semibold text-white bg-[#0A66C2] hover:bg-[#004182] rounded-xl flex items-center justify-center gap-2 shadow-xs cursor-pointer"
-              >
-                <Linkedin className="w-3.5 h-3.5 fill-white" />
-                <span>Ver Perfil en LinkedIn</span>
-              </a>
+                <div className="space-y-3">
+                  <h3 className="font-display text-xl sm:text-3xl font-bold text-white leading-tight">
+                    {activePreview.label}
+                  </h3>
+                  <p className="text-xs sm:text-sm text-neutral-300 leading-relaxed">
+                    {activePreview.description}
+                  </p>
+                </div>
 
-              <button
-                onClick={() => {
-                  setMobileMenuOpen(false);
-                  onWhatsAppClick();
-                }}
-                className="w-full py-2.5 text-xs font-bold text-white bg-[#25D366] hover:bg-[#20ba59] rounded-xl flex items-center justify-center gap-2 shadow-sm shadow-[#25D366]/30 cursor-pointer"
-              >
-                <MessageSquare className="w-3.5 h-3.5 fill-white" />
-                <span>WhatsApp Directo</span>
-              </button>
+                <div className="space-y-3 pt-2">
+                  <div className="text-xs font-mono text-neutral-400">
+                    Contenido y capacidades en esta sección:
+                  </div>
+                  <div className="space-y-2">
+                    {activePreview.featuredItems.map((feat, i) => (
+                      <div
+                        key={i}
+                        className="p-3 bg-black/50 border border-white/10 text-xs text-neutral-200 flex items-start gap-2.5"
+                      >
+                        <span className="font-mono text-emerald-400 font-bold">
+                          0{i + 1}
+                        </span>
+                        <span>{feat}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
 
-              <button
-                onClick={() => {
-                  setMobileMenuOpen(false);
-                  onScheduleClick();
-                }}
-                className="w-full py-2.5 text-xs font-bold text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 rounded-xl flex items-center justify-center gap-2 cursor-pointer shadow-sm shadow-blue-600/25"
-              >
-                <Video className="w-4 h-4 text-sky-200" />
-                <span>Agendar Google Meet Pro (30 min)</span>
-              </button>
+                <div className="pt-2">
+                  <a
+                    href={activePreview.href}
+                    onClick={(e) => handleNavClick(e, activePreview.href)}
+                    className="px-5 py-3 text-xs font-mono font-bold text-white bg-[#291B64] hover:bg-[#382586] border border-white/15 rounded-none inline-flex items-center gap-2 transition-colors"
+                  >
+                    <span>Ir a {activePreview.label}</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </a>
+                </div>
+              </div>
 
-              {onClientPortalClick && (
-                <button
-                  onClick={() => {
-                    setMobileMenuOpen(false);
-                    onClientPortalClick();
-                  }}
-                  className="w-full py-2.5 text-xs font-bold text-blue-900 bg-blue-50 hover:bg-blue-100 rounded-xl flex items-center justify-center gap-2 cursor-pointer border border-blue-200"
-                >
-                  <UserCheck className="w-3.5 h-3.5 text-blue-600" />
-                  <span>Portal Clientes (Proyectos & Soporte)</span>
-                </button>
-              )}
+              {/* Direct Platform Utilities Box */}
+              <div className="pt-6 border-t border-white/15 space-y-4">
+                <div className="text-xs font-mono text-neutral-400">
+                  Accesos Ejecutivos Directos · 30 Años Tech · 14 Años PMO
+                </div>
 
-              {onAdminClick && (
-                <button
-                  onClick={() => {
-                    setMobileMenuOpen(false);
-                    onAdminClick();
-                  }}
-                  className="w-full py-2.5 text-xs font-bold text-slate-800 bg-slate-100 hover:bg-slate-200 rounded-xl flex items-center justify-center gap-2 cursor-pointer border border-slate-200"
-                >
-                  <TrendingUp className="w-3.5 h-3.5 text-emerald-600" />
-                  <span>CRM Operativo & Presupuestos</span>
-                </button>
-              )}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFwaMenuOpen(false);
+                      onScheduleClick();
+                    }}
+                    className="p-3.5 bg-[#291B64] hover:bg-[#382586] text-white border border-white/15 text-xs font-semibold flex items-center justify-between gap-2 cursor-pointer transition-colors"
+                  >
+                    <span className="inline-flex items-center gap-2">
+                      <Video className="w-4 h-4 text-emerald-300" />
+                      <span>Google Meet Pro</span>
+                    </span>
+                    <ArrowUpRight className="w-3.5 h-3.5" />
+                  </button>
+
+                  {onClientPortalClick && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFwaMenuOpen(false);
+                        onClientPortalClick();
+                      }}
+                      className="p-3.5 bg-white/5 hover:bg-white/10 text-white border border-white/15 text-xs font-semibold flex items-center justify-between gap-2 cursor-pointer transition-colors"
+                    >
+                      <span className="inline-flex items-center gap-2">
+                        <UserCheck className="w-4 h-4 text-emerald-400" />
+                        <span>Portal Clientes</span>
+                      </span>
+                      <ArrowUpRight className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFwaMenuOpen(false);
+                      onWhatsAppClick();
+                    }}
+                    className="p-3.5 bg-white/5 hover:bg-white/10 text-white border border-white/15 text-xs font-semibold flex items-center justify-between gap-2 cursor-pointer transition-colors"
+                  >
+                    <span className="inline-flex items-center gap-2">
+                      <MessageSquare className="w-4 h-4 text-emerald-400" />
+                      <span>WhatsApp Directo</span>
+                    </span>
+                    <ArrowUpRight className="w-3.5 h-3.5" />
+                  </button>
+
+                  <a
+                    href="#ia-services"
+                    onClick={(e) => handleNavClick(e, '#ia-services')}
+                    className="p-3.5 bg-white/5 hover:bg-white/10 text-white border border-white/15 text-xs font-semibold flex items-center justify-between gap-2 transition-colors"
+                  >
+                    <span className="inline-flex items-center gap-2">
+                      <Compass className="w-4 h-4 text-emerald-400" />
+                      <span>Estructurador IA</span>
+                    </span>
+                    <ArrowUpRight className="w-3.5 h-3.5" />
+                  </a>
+                </div>
+              </div>
             </div>
           </div>
         </div>
       )}
-    </header>
+    </>
   );
 };

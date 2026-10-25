@@ -2,22 +2,26 @@
 
 @layer base {
   html {
-    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
+    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
     color-scheme: light;
-    background-color: #F4F4F4;
-    color: #0f2442;
+    background-color: #FFFFFF;
+    color: #0F172A;
     scroll-behavior: smooth;
   }
   body {
-    background-color: #F4F4F4;
-    color: #0f2442;
+    background-color: #FFFFFF;
+    color: #0F172A;
     overflow-x: hidden;
   }
-  code, kbd, samp, pre {
+  h1, h2, h3, .font-display {
+    font-family: 'Outfit', 'Plus Jakarta Sans', sans-serif;
+  }
+  code, kbd, samp, pre, .font-mono {
     font-family: 'JetBrains Mono', SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-variant-numeric: tabular-nums;
   }
   section {
-    scroll-margin-top: 5.5rem;
+    scroll-margin-top: 5rem;
   }
 }
 
@@ -97,7 +101,7 @@
 .integrated-console {
   background: #FFFFFF;
   border: 1px solid rgba(15, 36, 66, 0.12);
-  border-radius: 1.5rem;
+  border-radius: 0;
   box-shadow: 0 4px 20px -4px rgba(15, 36, 66, 0.05);
 }
 
@@ -105,11 +109,11 @@
   border-color: rgba(15, 36, 66, 0.08);
 }
 
-/* Apple Pro Theme (#F4F4F4 canvas + Deep Blue typography) */
+/* Apple Pro Theme */
 .apple-card {
   background: #FFFFFF;
-  border: 1px solid rgba(15, 36, 66, 0.08);
-  border-radius: 1.25rem;
+  border: 1px solid rgba(15, 36, 66, 0.12);
+  border-radius: 0;
   box-shadow: 0 2px 8px -2px rgba(15, 36, 66, 0.04);
   transition: all 0.25s ease;
 }

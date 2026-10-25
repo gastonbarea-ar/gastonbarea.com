@@ -127,7 +127,7 @@ function requireAdminAuth(req: express.Request, res: express.Response, next: exp
 
 
 
-// Fallback generator for realistic architecture proposals if API key is missing or calls fail
+// Fallback generator for realistic architecture & bioeconomy proposals if API key is missing or calls fail
 function generateRuleBasedProposal(payload: {
   organizationType: string;
   primaryChallenge: string;
@@ -135,28 +135,48 @@ function generateRuleBasedProposal(payload: {
   urgency: string;
   description?: string;
 }) {
-  const { organizationType, primaryChallenge, currentStack, urgency, description } = payload;
+  const { organizationType, primaryChallenge, urgency } = payload;
 
-  let title = 'Arquitectura de Transformación: Nuevos Modelos Digitales & Operaciones con IA';
-  let stack = ['Vercel Edge Platform', 'Supabase (PostgreSQL 16 RLS)', 'Google Gemini AI API', 'React 19 + TypeScript', 'Docker Compose'];
-  let time = '4 a 6 semanas';
-  let diag = `La organización requiere transicionar de procesos manuales a un modelo digital escalable. Conectaremos nuevos canales de monetización mediante un stack resiliente y agentes inteligentes de asistencia.`;
+  let title = 'Arquitectura Integral: Proyecto de Base Tecnológica & Gestión Productiva';
+  let stack = ['Odoo Community ERP v18', 'PostgreSQL 16 + Supabase', 'React 19 + TypeScript', 'Docker Compose & Linux', ' Sensores IoT & BI'];
+  let time = '4 a 8 semanas';
+  let diag = `A partir de mis 30 años en el sector tecnológico-productivo y 14 años dirigiendo proyectos con clientes, identifico la necesidad de articular la operación física y comercial en una arquitectura unificada, trazable y escalable.`;
 
-  if (primaryChallenge.includes('Modelo') || primaryChallenge.includes('Innovación') || primaryChallenge.includes('SaaS') || primaryChallenge.includes('Plataforma')) {
-    title = 'Pilar 1: Plataforma B2B & Ecosistema de Monetización Recurrente';
-    stack = ['React 19 + TypeScript', 'Vercel Edge Network', 'Supabase PostgreSQL RLS', 'Stripe Billing / Lemonsqueezy', 'Google Gemini AI'];
-    time = '4 a 6 semanas';
-    diag = `El modelo actual depende de horas manuales o intermediación costosa. Diseñaremos un portal digital de autoservicio B2B que empaquete el know-how corporativo en activos digitales con márgenes brutos superiores al 70%.`;
-  } else if (primaryChallenge.includes('Inteligente') || primaryChallenge.includes('IA') || primaryChallenge.includes('Agente') || primaryChallenge.includes('BI') || primaryChallenge.includes('Datos')) {
-    title = 'Pilar 2: Negocio Inteligente con Agentes Autónomos & Real-Time BI';
-    stack = ['Google Gemini AI API', 'PostgreSQL pgvector & Supabase', 'LangChain Workflows', 'React 19 Streaming UI', 'Docker Pipelines'];
-    time = '3 a 5 semanas';
-    diag = `La dispersión de información y la lentitud en la toma de decisiones consumen hasta un 70% de horas en tareas repetitivas. Implementaremos agentes autónomos y un pipeline de BI predictivo en tiempo real.`;
-  } else if (primaryChallenge.includes('Stack') || primaryChallenge.includes('Servidor') || primaryChallenge.includes('Caídas') || primaryChallenge.includes('inestabilidad')) {
-    title = 'Pilar 3: Modern Tech Stack de Alta Disponibilidad & Resiliencia Cloud';
-    stack = ['Ubuntu Server 24.04 LTS', 'Docker Compose', 'Vercel Edge', 'Supabase PostgreSQL', 'Nginx Reverse Proxy con SSL'];
-    time = urgency === 'Crítica (Inmediata)' ? '2 a 3 semanas (Fast-Track)' : '4 semanas';
-    diag = `La infraestructura presenta riesgos críticos de cuello de botella por monolitos sin aislamiento. Migraremos a topología contenerizada de alta disponibilidad con failover y monitoreo proactivo 24/7.`;
+  if (
+    primaryChallenge.toLowerCase().includes('bio') ||
+    primaryChallenge.toLowerCase().includes('agro') ||
+    primaryChallenge.toLowerCase().includes('circular') ||
+    organizationType.toLowerCase().includes('bio')
+  ) {
+    title = 'Plataforma de Bioeconomía: Trazabilidad Productiva, Valorización de Biomasa & Telemetría IoT';
+    stack = ['Sensores IoT & Telemetría MQTT', 'PostgreSQL + TimescaleDB', 'Odoo MRP & Trazabilidad Lotes', 'Dashboards BI en Tiempo Real', 'Linux Docker Edge'];
+    time = '6 a 10 semanas';
+    diag = `En los proyectos de bioeconomía y producción sostenible, la rentabilidad depende de medir en tiempo real la conversión de biomasa, la huella hídrica/de carbono y la trazabilidad de punta a punta para certificar valor en mercados exigentes.`;
+  } else if (
+    primaryChallenge.toLowerCase().includes('dirección') ||
+    primaryChallenge.toLowerCase().includes('pmo') ||
+    primaryChallenge.toLowerCase().includes('liderazgo') ||
+    primaryChallenge.toLowerCase().includes('rescate')
+  ) {
+    title = 'Dirección Ejecutiva de Proyecto (PMO Externa) & Reingeniería de Procesos';
+    stack = ['Metodología Híbrida Ágil / Etapa-Puerta', 'Matriz de Hitos & SLA Auditables', 'Arquitectura Desacoplada Docker', 'Tablero Ejecutivo de Avance', 'Repositorio & CI/CD'];
+    time = '4 a 6 semanas (Ciclo Inicial)';
+    diag = `Con 14 años dirigiendo proyectos complejos junto a clientes, estructuramos la gobernanza técnica, alineamos proveedores y equipos de desarrollo, eliminamos sobrecostos y aseguramos entregables auditables por hito.`;
+  } else if (
+    primaryChallenge.toLowerCase().includes('erp') ||
+    primaryChallenge.toLowerCase().includes('odoo') ||
+    primaryChallenge.toLowerCase().includes('ecommerce') ||
+    primaryChallenge.toLowerCase().includes('b2b')
+  ) {
+    title = 'Ecosistema Productivo: Odoo Community ERP v18 + Portal E-Commerce B2B2C';
+    stack = ['Odoo Community v18 (Sin Licencias)', 'Storefront React 19 B2B/B2C', 'PostgreSQL 16 Optimizado', 'Pasarelas Mercado Pago & Stripe', 'Ubuntu Server + Docker'];
+    time = '5 a 7 semanas';
+    diag = `Unificamos inventario, producción, facturación fiscal y canales mayoristas/minoristas en una arquitectura abierta sin costos de licencias por usuario, garantizando soberanía de datos y escalabilidad.`;
+  } else if (urgency.includes('Crítica') || primaryChallenge.toLowerCase().includes('servidor')) {
+    title = 'Blindaje de Infraestructura Crítica, Contenerización Docker & Continuidad 24/7';
+    stack = ['Ubuntu Server 24.04 LTS', 'Docker Compose & Aislamiento', 'PostgreSQL 16 Replicado', 'WireGuard VPN & Firewall UFW', 'Backups S3 Automatizados'];
+    time = '2 a 4 semanas';
+    diag = `Eliminamos los puntos únicos de fallo aislando servicios críticos en contenedores Linux con monitoreo proactivo y políticas de recuperación ante desastres probadas.`;
   }
 
   return {
@@ -166,112 +186,162 @@ function generateRuleBasedProposal(payload: {
     recommendedStack: stack,
     keyComponents: [
       {
-        name: 'Capa de Innovación & Modelos Digitales',
-        detail: 'Portal de autoservicio para clientes con suscripción, onboarding en 5 minutos y monetización automatizada.',
+        name: 'Dirección Ejecutiva & Gobernanza (PMO)',
+        detail: 'Planificación por hitos validables basada en 14 años liderando implementaciones reales con clientes.',
       },
       {
-        name: 'Capa de Inteligencia & Agentes IA',
-        detail: 'Modelos de lenguaje multimodales Gemini y búsqueda vectorial para resolver consultas y orquestar flujos operativos.',
+        name: 'Núcleo Tecnológico & Productivo',
+        detail: 'Integración de procesos físicos, industriales o bioeconómicos con sistemas digitales de misión crítica.',
       },
       {
-        name: 'Capa de Infraestructura & Modern Stack',
-        detail: 'Despliegues en el Edge con Vercel, persistencia segura con Supabase/PostgreSQL y contenedores Linux Docker.',
+        name: 'Inteligencia de Datos & Trazabilidad',
+        detail: 'Base de datos PostgreSQL auditada con indicadores clave de rendimiento (KPIs), costos y márgenes en vivo.',
       },
       {
-        name: 'Observabilidad & Business Intelligence',
-        detail: 'Monitoreo de métricas clave de negocio (márgenes, tiempo de respuesta, LTV) en tiempo real.',
+        name: 'Soberanía Tecnológica & Escalabilidad',
+        detail: 'Infraestructura abierta sobre Linux y Docker sin ataduras de licencias perpetuas ni costos ocultos.',
       },
     ],
     workPhases: [
       {
-        phase: 'Fase 1: Diagnóstico de Pilares & Relevamiento de Modelo',
+        phase: 'Fase 1: Relevamiento Ejecutivo & Viabilidad Técnico-Productiva',
         duration: 'Semana 1',
-        deliverable: 'Auditoría del modelo comercial, matriz de datos y especificación técnica de la arquitectura.',
+        deliverable: 'Diagnóstico integral de procesos, matriz de riesgos y hoja de ruta con presupuesto cerrado por hitos.',
       },
       {
-        phase: 'Fase 2: Prototipado Rápido & Staging Funcional',
-        duration: 'Semana 2 a 3',
-        deliverable: 'MVP funcional en Vercel y Supabase con agentes de IA integrados y base de datos con RLS.',
+        phase: 'Fase 2: Arquitectura, Prototipado & Entorno Staging',
+        duration: 'Semanas 2 a 4',
+        deliverable: 'Despliegue del entorno de pruebas funcional con datos reales e integración de módulos clave.',
       },
       {
-        phase: 'Fase 3: Despliegue en Producción & Cero Fricción',
-        duration: 'Semana 4',
-        deliverable: 'Puesta en marcha con alta disponibilidad, DNS configurado, SSL y monitoreo en vivo.',
+        phase: 'Fase 3: Homologación con Usuarios Clave & Puesta en Producción',
+        duration: 'Semanas 5 a 6',
+        deliverable: 'Salida en vivo sin interrupción operativa, capacitación a equipos y transferencia de control.',
       },
       {
-        phase: 'Fase 4: Acompañamiento Estratégico & Evolución Continua',
-        duration: 'Soporte Continuo',
-        deliverable: 'Reuniones de evolución de producto, optimización de ROI y soporte directo con Gastón Barea.',
+        phase: 'Fase 4: Seguimiento Continuo en Portal de Clientes',
+        duration: 'Acompañamiento Post Go-Live',
+        deliverable: 'Monitoreo de métricas de retorno (ROI), soporte SLA y evolución continua del proyecto.',
       },
     ],
     tangibleBenefits: [
-      'Multiplicador de LTV y creación de activos digitales de propiedad intelectual',
-      'Reducción de hasta un 70% en tareas operativas manuales mediante agentes IA',
-      'Infraestructura serverless de alta disponibilidad con latencia menor a 50ms',
-      'Cero dependencia de costos de servidores ociosos gracias al Edge Computing',
+      'Respaldo directo de 30 años de experiencia en el sector tecnológico-productivo',
+      'Dirección de proyecto senior (14 años PMO) que evita desvíos de alcance y presupuesto',
+      'Trazabilidad completa desde el insumo biológico/industrial hasta la facturación B2B2C',
+      'Propiedad total del código e infraestructura sin costos de licencias por usuario',
     ],
-    executiveMessage: `Estimado equipo de ${organizationType || 'la organización'}: esta arquitectura articula de forma directa los 3 pilares estratégicos (Innovación de Negocios, Agentes Inteligentes y Modern Stack). Podemos profundizar la viabilidad técnica en una reunión de 30 minutos sin compromiso.`,
+    executiveMessage: `Soy el Gemelo Digital de Gastón Barea. He estructurado esta hoja de ruta preliminar para ${organizationType || 'su organización'} combinando ingeniería de base tecnológica y visión productiva. Podemos validar cada etapa en una sesión directa de 30 minutos por Google Meet Pro.`,
     isAiGenerated: false,
   };
 }
 
-// Interactive Architecture Assessment & AI Proposal Route
+const GASTON_DIGITAL_TWIN_SYSTEM_INSTRUCTION = `Eres la Inteligencia Artificial integrada en gastonbarea.com (el Gemelo Digital interactivo que da vida a toda la web de Gastón Barea).
+Tu misión principal es ayudar a cada visitante a encontrar la solución exacta dentro de la web según su desafío tecnológico, productivo o de bioeconomía, respondiendo con el criterio real de Gastón Barea.
+Datos fundamentales de Gastón Barea que SIEMPRE debes tener presentes:
+- Nombre: Gastón Barea (gastonbarea.com), desde Chubut, Patagonia Argentina hacia toda Iberoamérica.
+- Experiencia general: 30 años de trayectoria continua en el sector tecnológico-productivo (1996–2026), integrando ingeniería de software, industria, agroindustria, energía, cooperativas y cadenas de valor.
+- Dirección de proyectos: 14 años dirigiendo proyectos estratégicos con clientes (PMO externa, liderazgo de equipos multidisciplinarios, control de hitos 40/40/20, presupuestos cerrados y entrega en tiempo y forma).
+- Catálogo de Soluciones de la Web (a las cuales debes guiar al usuario):
+  1. Proyectos de Base Tecnológica (EBTs & Software Crítico): Arquitectura full-stack, plataformas SaaS/B2B, validación de MVP y escalado productivo (Sección #servicios, código "01").
+  2. IA Services (Agentes IA, Gemelos Digitales Corporativos & BI): Integración de IA en webs y operaciones, asistentes entrenados con datos propios (RAG), automatización de procesos y tableros predictivos (Sección #servicios, código "02").
+  3. Proyectos Basados en Bioeconomía & Economía Circular: Trazabilidad de biomasa, agroindustria, forestal y pesca, telemetría IoT en planta/campo y certificación de huella ambiental (Sección #bioeconomia, código "03").
+  4. Dirección Ejecutiva de Proyectos PMO (14 Años): Liderazgo de implementaciones complejas, rescate de proyectos tecnológicos y gobernanza transparente con Portal de Clientes (Sección #trayectoria, código "04").
+  5. Odoo Community ERP v18 & E-Commerce B2B2C: Unificación de producción, stock multidepósito, facturación y comercio mayorista/minorista sin costos de licencias por usuario (Sección #servicios, código "05").
+  6. Infraestructura Crítica Linux, Docker & Soberanía de Datos: Servidores Ubuntu blindados, contenedores Docker Compose, alta disponibilidad y backups automatizados (Sección #servicios, código "06").
+- Tono: Innovador, ejecutivo, claro y pragmático, con diseño de soluciones directo al grano.`;
+
+// Helper to map any user query to a concrete solution inside the website
+function matchWebSolution(text: string) {
+  const lower = text.toLowerCase();
+  if (lower.includes('bio') || lower.includes('agro') || lower.includes('circular') || lower.includes('biomasa') || lower.includes('iot') || lower.includes('trazabilidad') || lower.includes('forestal')) {
+    return {
+      serviceCode: '03',
+      serviceTitle: '03. Proyectos Basados en Bioeconomía & Trazabilidad IoT',
+      sectionId: '#bioeconomia',
+      timeline: '6 a 10 semanas',
+      summary: 'Trazabilidad digital de lotes biológicos, telemetría IoT en planta/campo y valorización de biomasa con indicadores en tiempo real.',
+      ctaLabel: 'Explorar Solución de Bioeconomía',
+    };
+  }
+  if (lower.includes('ia') || lower.includes('inteligencia') || lower.includes('gemelo') || lower.includes('agent') || lower.includes('automatiz') || lower.includes('bi') || lower.includes('datos')) {
+    return {
+      serviceCode: '02',
+      serviceTitle: '02. IA Services, Gemelos Digitales & Business Intelligence',
+      sectionId: '#servicios',
+      timeline: '3 a 6 semanas',
+      summary: 'Despliegue de arquitecturas web interactivas con IA, Gemelos Digitales corporativos, agentes RAG y tableros ejecutivos.',
+      ctaLabel: 'Ver IA Services en la Web',
+    };
+  }
+  if (lower.includes('odoo') || lower.includes('erp') || lower.includes('ecommerce') || lower.includes('b2b') || lower.includes('mayorista') || lower.includes('stock') || lower.includes('factur')) {
+    return {
+      serviceCode: '05',
+      serviceTitle: '05. Odoo Community ERP v18 & E-Commerce B2B2C',
+      sectionId: '#servicios',
+      timeline: '5 a 7 semanas',
+      summary: 'Unificación de inventario, producción MRP, facturación fiscal y portales B2B/B2C sin costo de licencias por usuario.',
+      ctaLabel: 'Ver Solución Odoo & B2B2C',
+    };
+  }
+  if (lower.includes('pmo') || lower.includes('dirección') || lower.includes('direccion') || lower.includes('lider') || lower.includes('equipo') || lower.includes('plazo') || lower.includes('cliente')) {
+    return {
+      serviceCode: '04',
+      serviceTitle: '04. Dirección Ejecutiva de Proyectos (14 Años PMO)',
+      sectionId: '#trayectoria',
+      timeline: 'Ciclos por Hitos 40 · 40 · 20%',
+      summary: '14 años liderando proyectos con clientes. Gobernanza técnica, control de presupuesto, Staging verificable y Portal de Clientes.',
+      ctaLabel: 'Ver Metodología PMO 14 Años',
+    };
+  }
+  if (lower.includes('linux') || lower.includes('docker') || lower.includes('servidor') || lower.includes('seguridad') || lower.includes('nube') || lower.includes('cloud')) {
+    return {
+      serviceCode: '06',
+      serviceTitle: '06. Infraestructura Crítica Linux, Docker & Soberanía',
+      sectionId: '#servicios',
+      timeline: '2 a 4 semanas',
+      summary: 'Contenerización con Docker Compose, servidores Ubuntu blindados, VPN WireGuard y continuidad operativa 24/7.',
+      ctaLabel: 'Ver Infraestructura Crítica',
+    };
+  }
+  return {
+    serviceCode: '01',
+    serviceTitle: '01. Consultoría y Desarrollo de Proyectos de Base Tecnológica',
+    sectionId: '#servicios',
+    timeline: '4 a 8 semanas',
+    summary: 'Estructuración técnica, económica y de software para Empresas de Base Tecnológica (EBTs) y sistemas productivos.',
+    ctaLabel: 'Ver Proyectos de Base Tecnológica',
+  };
+}
+
+// Interactive Architecture & Bioeconomy Assessment Route
 app.post('/api/architecture-proposal', async (req, res) => {
   try {
     const {
-      organizationType = 'Empresa Privada',
-      primaryChallenge = 'Innovación de Negocios y Nuevos Modelos Digitales',
+      organizationType = 'Empresa Tecnológica / Productiva',
+      primaryChallenge = 'Desarrollo de Proyecto de Base Tecnológica o Bioeconomía',
       currentStack = [],
       urgency = 'Media',
       customContext = '',
       contactName = '',
     } = req.body;
 
-    // If Gemini client is available, generate custom proposal
     if (ai) {
-      const prompt = `Actúa como Gastón Barea, Consultor Estratégico en Innovación de Negocios y Arquitecto de Software Senior (gastonbarea.com.ar).
-Tu enfoque profesional descansa sobre 3 Pilares Fundamentales:
-1. Business Innovación & Nuevos Modelos Digitales (Plataformas B2B, SaaS, monetización recurrente, productización de servicios expertos).
-2. Negocios Inteligentes & Operaciones Autónomas con IA (Agentes autónomos de IA, analítica predictiva en tiempo real, BI en vivo).
-3. Stack Técnico de Próxima Generación (Vercel Edge, Supabase / PostgreSQL con RLS, React 19, TypeScript, Docker Compose).
-
-El cliente ha completado el formulario de diagnóstico interactivo:
+      const prompt = `El cliente ha solicitado estructurar un proyecto en gastonbarea.com:
 - Organización / Sector: ${organizationType}
-- Desafío principal: ${primaryChallenge}
-- Tecnologías o stack actual que usan: ${currentStack.join(', ') || 'No especificado'}
-- Nivel de urgencia / Criticidad: ${urgency}
-- Contexto adicional descrito: "${customContext || 'Sin detalles adicionales'}"
-- Nombre del solicitante: ${contactName || 'Responsable de Tecnología / Gerencia'}
+- Eje o Desafío Principal: ${primaryChallenge}
+- Tecnologías o recursos actuales: ${currentStack.join(', ') || 'En definición'}
+- Horizonte / Urgencia: ${urgency}
+- Descripción del proyecto o necesidad: "${customContext || 'Solicita diagnóstico integral'}"
+- Solicitante: ${contactName || 'Dirección / Gerencia de Proyecto'}
 
-Genera una propuesta técnica interactiva y pragmática en formato JSON estructurado exacto que integre los 3 pilares.
-El JSON debe responder a las siguientes propiedades:
-{
-  "architectureTitle": "Título técnico claro y ejecutivo que mencione los pilares aplicables",
-  "diagnosticSummary": "Diagnóstico conciso de 2 o 3 oraciones sobre por qué sucede el problema y cuál es la oportunidad de negocio y técnica.",
-  "estimatedTimeline": "Tiempo estimado de implementación (ej: 4 a 6 semanas)",
-  "recommendedStack": ["Lista de 4 a 6 tecnologías concretas recomendadas, ej: Vercel Edge, Supabase PostgreSQL RLS, React 19, Gemini AI API, Docker"],
-  "keyComponents": [
-    { "name": "Nombre del componente o capa", "detail": "Explicación breve de 1 frase del rol de este componente" }
-  ],
-  "workPhases": [
-    { "phase": "Nombre de la fase", "duration": "ej: Semana 1-2", "deliverable": "Entregable concreto de Gastón" }
-  ],
-  "tangibleBenefits": [
-    "Beneficio 1 medible de negocio o ingresos",
-    "Beneficio 2 medible de automatización/eficiencia",
-    "Beneficio 3 medible de rendimiento técnico",
-    "Beneficio 4 medible"
-  ],
-  "executiveMessage": "Breve mensaje personalizado directo de Gastón para el cliente invitándolo a coordinar los detalles en una consulta técnica de 30 minutos sin cargo."
-}`;
+Como Gastón Barea (30 años en el sector tecnológico-productivo, 14 años en dirección de proyectos con clientes, especialista en proyectos de base tecnológica, IA Services y bioeconomía), genera una propuesta ejecutiva en formato JSON estructurado.`;
 
       const response = await ai.models.generateContent({
         model: 'gemini-3.8-flash',
         contents: prompt,
         config: {
           responseMimeType: 'application/json',
-          systemInstruction:
-            'Eres Gastón Barea, consultor de innovación de negocios y arquitecto de software de Patagonia Argentina. Responde siempre en español formal, técnico y pragmático. Devuelve únicamente el objeto JSON válido.',
+          systemInstruction: GASTON_DIGITAL_TWIN_SYSTEM_INSTRUCTION + ' Devuelve únicamente el objeto JSON válido.',
           responseSchema: {
             type: Type.OBJECT,
             properties: {
@@ -335,7 +405,6 @@ El JSON debe responder a las siguientes propiedades:
       }
     }
 
-    // Fallback if AI key is missing or call didn't produce text
     const fallback = generateRuleBasedProposal({
       organizationType,
       primaryChallenge,
@@ -347,8 +416,8 @@ El JSON debe responder a las siguientes propiedades:
   } catch (error) {
     console.error('Error in /api/architecture-proposal:', error);
     const fallback = generateRuleBasedProposal({
-      organizationType: req.body?.organizationType || 'Empresa',
-      primaryChallenge: req.body?.primaryChallenge || 'Infraestructura',
+      organizationType: req.body?.organizationType || 'Organización Productiva',
+      primaryChallenge: req.body?.primaryChallenge || 'Proyecto Tecnológico & Bioeconomía',
       currentStack: req.body?.currentStack || [],
       urgency: req.body?.urgency || 'Media',
       description: req.body?.customContext || '',
@@ -357,7 +426,7 @@ El JSON debe responder a las siguientes propiedades:
   }
 });
 
-// Interactive AI Q&A endpoint: client can ask a follow-up question about the proposal
+// Interactive AI Q&A endpoint
 app.post('/api/architecture-qa', async (req, res) => {
   try {
     const { question, proposalContext } = req.body;
@@ -366,39 +435,105 @@ app.post('/api/architecture-qa', async (req, res) => {
     }
 
     if (ai) {
-      const prompt = `Actúa como Gastón Barea, Consultor en Innovación de Negocios y Arquitecto de Software Senior.
-El cliente está revisando la siguiente propuesta de arquitectura técnica preliminar:
+      const prompt = `Contexto del proyecto evaluado:
 "${JSON.stringify(proposalContext || {})}"
 
-El cliente tiene la siguiente consulta específica sobre la solución:
+Consulta del cliente:
 "${question}"
 
-Responde con precisión de ingeniero pragmático y estratega de negocio en 2 o 3 párrafos concisos:
-1. Responde a la inquietud explicando el impacto en su modelo de negocio y en su stack técnico.
-2. Explica cómo protege los datos, reduce costos operativos o multiplica márgenes.
-3. Menciona cómo se validaría esto durante la reunión de 30 minutos.
-Mantén el tono profesional, claro, seguro y accesible.`;
+Responde como Gastón Barea en 2 párrafos claros, pragmáticos y ejecutivos, conectando tu experiencia de 30 años en el sector tecnológico-productivo y 14 años dirigiendo proyectos con clientes.`;
 
       const response = await ai.models.generateContent({
         model: 'gemini-3.8-flash',
         contents: prompt,
         config: {
-          systemInstruction:
-            'Eres Gastón Barea, consultor de negocios digitales y arquitecto de software de Patagonia Argentina. Respuestas técnicas, claras, pragmáticas.',
+          systemInstruction: GASTON_DIGITAL_TWIN_SYSTEM_INSTRUCTION,
         },
       });
 
       return res.json({ answer: response.text });
     }
 
-    // Rule-based answer fallback
     return res.json({
-      answer: `Con respecto a tu consulta ("${question}"): Al implementar una arquitectura basada en nuestros 3 Pilares (Innovación de Negocios, Operaciones Inteligentes y Modern Stack), cualquier módulo o nuevo modelo digital se prueba en entornos de staging en Vercel y Supabase sin afectar la operación diaria. En nuestra reunión técnica de 30 minutos revisaremos este aspecto en detalle para tu caso concreto.`,
+      answer: `Respecto a tu consulta ("${question}"): En mis 14 años dirigiendo proyectos con clientes y 30 años en el sector tecnológico-productivo, estructuro cada implementación mediante hitos verificables en un entorno de prueba (Staging) antes de pasar a producción. Podemos revisar los detalles técnicos y económicos en una videollamada de 30 minutos por Google Meet Pro.`,
     });
   } catch (error) {
     console.error('Error in /api/architecture-qa:', error);
     return res.json({
-      answer: `Buena consulta. Toda decisión de arquitectura en mis proyectos se fundamenta en pruebas de carga previas y estándares abiertos para evitar costos ocultos. En nuestra reunión técnica profundizaremos exactamente en este punto.`,
+      answer: `Excelente punto. En todos los proyectos que dirijo aplicamos validación por etapas (40% inicio, 40% entrega en staging con pruebas reales, 20% salida a producción) para asegurar retorno de inversión y riesgo cero. Lo vemos en detalle por Google Meet Pro.`,
+    });
+  }
+});
+
+// Dedicated Web AI Navigator & Digital Twin Interactive Endpoint
+app.post('/api/digital-twin/chat', async (req, res) => {
+  try {
+    const { message, history = [] } = req.body;
+    if (!message || typeof message !== 'string') {
+      return res.status(400).json({ error: 'Mensaje requerido' });
+    }
+
+    const matchedSolution = matchWebSolution(message);
+
+    if (ai) {
+      const formattedHistory = Array.isArray(history)
+        ? history
+            .slice(-6)
+            .map((m: { role: string; text: string }) => `${m.role === 'user' ? 'Visitante' : 'Web IA (Gastón Barea)'}: ${m.text}`)
+            .join('\n\n')
+        : '';
+
+      const fullPrompt = `${
+        formattedHistory ? `Historial reciente:\n${formattedHistory}\n\n` : ''
+      }Consulta del usuario en la web: "${message}"
+Solución detectada dentro de la web: "${matchedSolution.serviceTitle}" (${matchedSolution.summary})
+
+Responde en 2 párrafos ágiles y ejecutivos como la inteligencia viva de gastonbarea.com (con la voz y experiencia de 30 años en el sector tecnológico-productivo y 14 años dirigiendo proyectos con clientes de Gastón Barea). Orienta al usuario exactamente a cómo resolvemos su problema y por qué la solución "${matchedSolution.serviceTitle}" dentro de la web es el camino indicado.`;
+
+      const response = await ai.models.generateContent({
+        model: 'gemini-3.8-flash',
+        contents: fullPrompt,
+        config: {
+          systemInstruction: GASTON_DIGITAL_TWIN_SYSTEM_INSTRUCTION,
+        },
+      });
+
+      if (response.text) {
+        return res.json({
+          reply: response.text,
+          matchedSolution,
+          suggestedAction: matchedSolution.ctaLabel,
+        });
+      }
+    }
+
+    // Intelligent domain-aware fallback if AI key/quota is unavailable
+    const lower = message.toLowerCase();
+    let reply = '';
+    if (lower.includes('bio') || lower.includes('agro') || lower.includes('circular') || lower.includes('biomasa')) {
+      reply = `Para tu iniciativa de bioeconomía y producción sostenible, dentro de la web hemos diseñado la vertical "${matchedSolution.serviceTitle}". Combino mis 30 años en el sector tecnológico-productivo con telemetría IoT, trazabilidad digital de lotes biológicos y valorización de biomasa en tiempo real.\n\nTe recomiendo explorar el módulo interactivo de Bioeconomía aquí abajo o generar directamente la Hoja de Ruta técnica para definir sensores, arquitectura de datos y retorno de inversión.`;
+    } else if (lower.includes('ia') || lower.includes('inteligencia') || lower.includes('gemelo') || lower.includes('agent')) {
+      reply = `Esta misma plataforma web es un ejemplo vivo de nuestra unidad "${matchedSolution.serviceTitle}". Integramos modelos de IA generativa, Gemelos Digitales interactivos y agentes entrenados con la documentación y bases de datos propias de tu organización.\n\nPodés ir directo al bloque 02 (IA Services) en la sección de Soluciones para conocer los entregables o estructurar un prototipo funcional en menos de 4 semanas.`;
+    } else if (lower.includes('odoo') || lower.includes('erp') || lower.includes('ecommerce') || lower.includes('b2b')) {
+      reply = `La solución ideal dentro de nuestra plataforma es "${matchedSolution.serviceTitle}". Desplegamos Odoo Community v18 sobre contenedores Docker en Linux —sin pagar licencias perpetuas por usuario— integrado en tiempo real con portales mayoristas B2B y minoristas B2C.\n\nCon 14 años dirigiendo proyectos junto a clientes, aseguramos una migración ordenada de stock, listas de precios y facturación mediante hitos auditables.`;
+    } else if (lower.includes('dirección') || lower.includes('proyecto') || lower.includes('pmo') || lower.includes('etapa') || lower.includes('trabaj')) {
+      reply = `Tu requerimiento encaja directamente con "${matchedSolution.serviceTitle}". Aporto 14 años específicos liderando proyectos complejos con clientes y 30 años en el sector tecnológico-productivo.\n\nTrabajamos bajo el esquema 40% inicio de arquitectura, 40% validación funcional en entorno Staging y 20% salida a producción, con seguimiento 24/7 desde el Portal de Clientes.`;
+    } else {
+      reply = `Analizando tu consulta desde mis 30 años en el sector tecnológico-productivo y 14 años dirigiendo proyectos con clientes, la solución recomendada dentro de gastonbarea.com es "${matchedSolution.serviceTitle}".\n\nAbajo te habilité el acceso directo a la solución correspondiente dentro de la web, junto con la opción de estructurar el plan de trabajo por etapas o agendar una sesión ejecutiva de 30 minutos en Google Meet Pro.`;
+    }
+
+    return res.json({
+      reply,
+      matchedSolution,
+      suggestedAction: matchedSolution.ctaLabel,
+    });
+  } catch (err) {
+    console.error('Error in /api/digital-twin/chat:', err);
+    const matchedSolution = matchWebSolution(req.body?.message || '');
+    return res.json({
+      reply: `Desde la plataforma interactiva de Gastón Barea (30 años en el sector tecnológico-productivo y 14 años dirigiendo proyectos con clientes), te recomendamos explorar la solución "${matchedSolution.serviceTitle}" o agendar una sesión de 30 minutos por Google Meet Pro.`,
+      matchedSolution,
+      suggestedAction: matchedSolution.ctaLabel,
     });
   }
 });

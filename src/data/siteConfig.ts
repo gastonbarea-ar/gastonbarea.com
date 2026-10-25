@@ -65,9 +65,9 @@ const getEnvVar = (key: string): string | undefined => {
 
 export const SITE_CONFIG: SiteConfig = {
   name: 'Gastón Barea',
-  role: 'Arquitecto de Software & Consultor Tecnológico',
-  location: 'Chubut, Patagonia Argentina · Proyectos Remotos Globales',
-  domain: 'gastonbarea.com.ar',
+  role: 'Consultor y Desarrollador de Proyectos de Base Tecnológica & Bioeconomía',
+  location: 'Chubut, Patagonia Argentina · Dirección de Proyectos & Consultoría Global',
+  domain: 'gastonbarea.com',
   email: 'gastonbarea.com@gmail.com',
 
   social: {
@@ -99,7 +99,7 @@ export const SITE_CONFIG: SiteConfig = {
       getEnvVar('VITE_CAL_COM_URL') ||
       'https://cal.com/gastonbarea/30min',
     defaultDuration: '30 minutos (Google Meet Pro)',
-    meetingTitle: 'Videollamada Google Meet Pro · Diagnóstico Técnico & Arquitectura',
+    meetingTitle: 'Sesión Ejecutiva Google Meet Pro · Proyectos de Base Tecnológica & Bioeconomía',
   },
 
   whatsapp: {
@@ -107,25 +107,24 @@ export const SITE_CONFIG: SiteConfig = {
       getEnvVar('VITE_WHATSAPP_PHONE') ||
       '',
     defaultMessage:
-      'Hola Gastón, estuve viendo tu sitio web (gastonbarea.com.ar) y me gustaría coordinar una videollamada por Google Meet Pro para evaluar nuestra infraestructura.',
+      'Hola Gastón, estuve interactuando con tu Gemelo Digital en gastonbarea.com y me gustaría coordinar una reunión por Google Meet Pro para evaluar un proyecto.',
   },
 
   presentationVideo: {
     youtubeId: 'L_LUpnjgPso',
-    title: 'Nuevos Modelos de Negocio Digitales impulsados por Inteligencia y Stack Moderno',
-    subtitle: 'Presentación ejecutiva sobre arquitectura escalable, resiliencia y operaciones autónomas con IA.',
+    title: 'Proyectos de Base Tecnológica y Bioeconomía: De la Estrategia a la Ejecución Productiva',
+    subtitle: '30 años en el sector tecnológico-productivo y 14 años dirigiendo proyectos estratégicos con clientes.',
     duration: '04:20 min',
-    speaker: 'Gastón Barea · Software Architect',
+    speaker: 'Gastón Barea · Consultor & Director de Proyectos',
     autoplay: true,
-    autoAdvanceSeconds: 15, // Arranca el video y pasa solo al siguiente frame
+    autoAdvanceSeconds: 15,
     frame2: {
       type: 'image',
-      mediaUrl:
-        'https://images.unsplash.com/photo-1558494949-ef010cbdcc31?auto=format&fit=crop&w=1200&q=80',
-      badge: 'FRAME 02 · ECOSISTEMA & ARQUITECTURA',
-      title: 'Topología Desacoplada: Edge Computing + Supabase + Agentes de IA',
+      mediaUrl: '',
+      badge: 'Arquitectura · Bioeconomía · PMO',
+      title: 'Ingeniería de Sistemas, Trazabilidad Bioindustrial y Dirección Ejecutiva',
       description:
-        'Diseñamos infraestructuras resilientes donde el frontend carga en menos de 50ms a nivel global, y los procesos pesados de IA se orquestan en workers dedicados sin afectar la experiencia del cliente.',
+        'Articulamos plataformas digitales B2B2C, ERP Odoo, inteligencia artificial e infraestructura crítica para escalar proyectos tecnológicos y bioeconómicos con retorno real.',
       buttonText: 'Agendar Google Meet Pro (30 min)',
       buttonAction: 'schedule',
     },
