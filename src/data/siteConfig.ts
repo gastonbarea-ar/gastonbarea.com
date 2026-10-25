@@ -111,7 +111,7 @@ export const SITE_CONFIG: SiteConfig = {
   },
 
   presentationVideo: {
-    youtubeId: 'L_LUpnjgPso',
+    youtubeId: 'XVYUP8Pz-hE',
     title: 'Proyectos de Base Tecnológica y Bioeconomía: De la Estrategia a la Ejecución Productiva',
     subtitle: '30 años en el sector tecnológico-productivo y 14 años dirigiendo proyectos estratégicos con clientes.',
     duration: '04:20 min',

@@ -97,7 +97,11 @@ export const Hero: React.FC<HeroProps> = ({
   }, []);
 
   const videoConfig = liveConfig.presentationVideo || SITE_CONFIG.presentationVideo;
-  const primaryYoutubeId = overrideYoutubeId || videoConfig.youtubeId || 'L_LUpnjgPso';
+  const resolvedConfigId =
+    videoConfig.youtubeId && videoConfig.youtubeId !== 'L_LUpnjgPso'
+      ? videoConfig.youtubeId
+      : 'XVYUP8Pz-hE';
+  const primaryYoutubeId = overrideYoutubeId || resolvedConfigId;
   const youtubeChannelUrl = liveConfig.social?.youtube || 'https://www.youtube.com/@gastonbarea';
 
   const channelPlaylist: ChannelVideoItem[] = [

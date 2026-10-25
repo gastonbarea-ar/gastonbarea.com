@@ -41,7 +41,7 @@ export const INITIAL_BLOG_POSTS: BlogPost[] = [
       {
         id: 'b-4',
         type: 'youtube',
-        videoIdOrUrl: 'L_LUpnjgPso',
+        videoIdOrUrl: 'XVYUP8Pz-hE',
         caption: 'Presentación: Arquitectura tecnológica aplicada a sistemas productivos y bioeconómicos.',
       },
       {

@@ -54,13 +54,13 @@ export const MediaBlockRenderer: React.FC<MediaBlockRendererProps> = ({ block })
         const match = trimmed.match(regExp);
         if (match && match[1]) return match[1];
         if (trimmed.length === 11 && !trimmed.includes('/')) return trimmed;
-        return trimmed || 'L_LUpnjgPso';
+        return trimmed || 'XVYUP8Pz-hE';
       };
 
       const videoId = extractVideoId(block.videoIdOrUrl);
 
       return (
-        <figure className="my-8 rounded-2xl overflow-hidden border border-blue-900/15 bg-slate-950 shadow-lg shadow-blue-950/5">
+        <figure className="my-8 rounded-none overflow-hidden border border-black/[0.14] bg-slate-950">
           <div className="relative aspect-video w-full bg-slate-900">
             <iframe
               src={`https://www.youtube-nocookie.com/embed/${videoId}?rel=0&modestbranding=1`}
