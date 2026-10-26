@@ -264,77 +264,99 @@ export const Hero: React.FC<HeroProps> = ({
           </form>
         )}
 
-        {/* Main Full-Bleed Cinema Split */}
+        {/* Main Full-Bleed Cinema Split (Zero Overlap on Mobile & Desktop) */}
         <div className="w-full grid grid-cols-1 lg:grid-cols-12 items-stretch">
-          {/* LEFT / FULL STAGE: YOUTUBE VIDEO STREAM */}
+          {/* LEFT / FULL STAGE: YOUTUBE VIDEO STREAM + NON-OVERLAPPING CONTROL BAR */}
           <div
             className={`${
-              isCinemaExpanded
-                ? 'lg:col-span-12 min-h-[460px] sm:min-h-[600px] lg:min-h-[78vh]'
-                : 'lg:col-span-8 min-h-[420px] sm:min-h-[540px] lg:min-h-[74vh]'
+              isCinemaExpanded ? 'lg:col-span-12' : 'lg:col-span-8'
             } relative bg-black overflow-hidden flex flex-col justify-between transition-all duration-150`}
           >
-            {/* Live YouTube Embed Stream */}
-            <iframe
-              key={`${activeVideo.youtubeId}-${isMuted ? 'muted' : 'sound'}-${selectedVideoIndex}`}
-              src={
-                isMuted
-                  ? `https://www.youtube.com/embed/${activeVideo.youtubeId}?autoplay=1&mute=1&controls=1&loop=1&playlist=${activeVideo.youtubeId}&rel=0&modestbranding=1&playsinline=1`
-                  : `https://www.youtube.com/embed/${activeVideo.youtubeId}?autoplay=1&mute=0&controls=1&rel=0&modestbranding=1&playsinline=1`
-              }
-              title={activeVideo.title}
-              className="absolute inset-0 w-full h-full object-cover"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-              allowFullScreen
-            />
+            {/* Unobstructed 16:9 Responsive YouTube Stream */}
+            <div className="relative w-full aspect-video lg:aspect-auto lg:flex-1 lg:min-h-[480px] bg-black overflow-hidden">
+              <iframe
+                key={`${activeVideo.youtubeId}-${isMuted ? 'muted' : 'sound'}-${selectedVideoIndex}`}
+                src={
+                  isMuted
+                    ? `https://www.youtube.com/embed/${activeVideo.youtubeId}?autoplay=1&mute=1&controls=1&loop=1&playlist=${activeVideo.youtubeId}&rel=0&modestbranding=1&playsinline=1`
+                    : `https://www.youtube.com/embed/${activeVideo.youtubeId}?autoplay=1&mute=0&controls=1&rel=0&modestbranding=1&playsinline=1`
+                }
+                title={activeVideo.title}
+                className="w-full h-full border-0"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+              />
+            </div>
 
-            {/* Clean Measured Scrim Overlay (No wireframe clutter) */}
-            <div
-              className={`relative z-10 flex-1 flex flex-col justify-between p-5 sm:p-8 lg:p-12 transition-opacity duration-200 ${
-                isImmersionActive && !isMuted
-                  ? 'bg-gradient-to-t from-black/80 via-transparent to-black/25 pointer-events-none'
-                  : 'bg-gradient-to-t from-black/90 via-black/40 to-black/30'
-              }`}
-            >
-              {/* Top Quiet Kicker & Controls */}
-              <div className="flex flex-wrap items-center justify-between gap-3 pointer-events-auto">
-                <div className="flex items-center gap-2 text-xs font-mono text-white/80">
-                  <span className="text-emerald-400 font-semibold">CANAL YOUTUBE</span>
-                  <span aria-hidden="true">·</span>
-                  <span>{activeVideo.focusArea}</span>
+            {/* Clean Non-Overlapping Video Control & Episode Bar Below Player (Selector 1) */}
+            <div className="relative z-10 w-full bg-[#0B0B10] px-4 sm:px-6 lg:px-8 py-4 border-t border-white/10 flex flex-col gap-3.5 text-left">
+              {/* Row 1: Active Episode Title + Sound & Stage Controls */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="min-w-0 space-y-0.5">
+                  <div className="flex flex-wrap items-center gap-2 text-[11px] font-mono text-emerald-400">
+                    <span className="font-semibold">CANAL YOUTUBE</span>
+                    <span aria-hidden="true">·</span>
+                    <span>{activeVideo.focusArea}</span>
+                  </div>
+                  <h2 className="font-display text-sm sm:text-base font-bold text-white truncate">
+                    {activeVideo.title}
+                  </h2>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsImmersionActive(true);
+                      setIsMuted(!isMuted);
+                    }}
+                    className="px-3.5 py-2 text-xs font-mono font-bold text-white bg-[#291B64] hover:bg-[#382586] rounded-none transition-colors inline-flex items-center gap-1.5 cursor-pointer"
+                  >
+                    {isMuted ? (
+                      <>
+                        <Volume2 className="w-3.5 h-3.5 text-emerald-300" />
+                        <span>Activar Audio</span>
+                      </>
+                    ) : (
+                      <>
+                        <VolumeX className="w-3.5 h-3.5" />
+                        <span>Silenciar</span>
+                      </>
+                    )}
+                  </button>
+
                   <button
                     type="button"
                     onClick={() => setShowVideoSelector(!showVideoSelector)}
-                    className="px-3 py-1.5 text-xs font-mono text-neutral-300 hover:text-white bg-black/50 hover:bg-black/80 transition-colors inline-flex items-center gap-1.5 cursor-pointer"
+                    className="px-3 py-2 text-xs font-mono text-neutral-300 hover:text-white bg-white/[0.06] hover:bg-white/[0.12] transition-colors inline-flex items-center gap-1.5 cursor-pointer"
                   >
                     <SlidersHorizontal className="w-3.5 h-3.5" />
-                    <span>Video</span>
+                    <span>Cambiar Video</span>
                   </button>
+
                   <button
                     type="button"
                     onClick={() => setIsCinemaExpanded(!isCinemaExpanded)}
-                    className="px-3 py-1.5 text-xs font-mono text-neutral-300 hover:text-white bg-black/50 hover:bg-black/80 transition-colors inline-flex items-center gap-1.5 cursor-pointer"
+                    className="hidden lg:inline-flex px-3 py-2 text-xs font-mono text-neutral-300 hover:text-white bg-white/[0.06] hover:bg-white/[0.12] transition-colors items-center gap-1.5 cursor-pointer"
                   >
                     {isCinemaExpanded ? (
                       <>
                         <Minimize2 className="w-3.5 h-3.5" />
-                        <span className="hidden sm:inline">Vista Split</span>
+                        <span>Vista Split</span>
                       </>
                     ) : (
                       <>
                         <Maximize2 className="w-3.5 h-3.5" />
-                        <span className="hidden sm:inline">Expandir</span>
+                        <span>Expandir</span>
                       </>
                     )}
                   </button>
+
                   <a
                     href={youtubeChannelUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="px-3 py-1.5 text-xs font-mono text-neutral-300 hover:text-white bg-black/50 hover:bg-black/80 transition-colors inline-flex items-center gap-1.5"
+                    className="px-3 py-2 text-xs font-mono text-neutral-300 hover:text-white bg-white/[0.06] hover:bg-white/[0.12] transition-colors inline-flex items-center gap-1.5"
                   >
                     <span>@gastonbarea</span>
                     <ExternalLink className="w-3 h-3" />
@@ -342,88 +364,41 @@ export const Hero: React.FC<HeroProps> = ({
                 </div>
               </div>
 
-              {/* Center Interactive Entrance Trigger */}
-              {(!isImmersionActive || isMuted) && (
-                <div className="my-auto py-8 flex flex-col items-start max-w-2xl space-y-4 pointer-events-auto text-left">
-                  <div className="text-xs font-mono tracking-wider text-emerald-400">
-                    GEMELO DIGITAL INTERACTIVO · GASTÓN BAREA
-                  </div>
-                  <h2
-                    className="font-display text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight text-white leading-tight"
-                    style={{ textWrap: 'balance' }}
-                  >
-                    {activeVideo.title}
-                  </h2>
-                  <p className="text-xs sm:text-sm text-neutral-300 leading-relaxed max-w-xl">
-                    {activeVideo.subtitle}
-                  </p>
-                  <div className="flex flex-wrap items-center gap-3 pt-2">
+              {/* Row 2: Episode Selector Tabs (Clean grid on mobile, inline on desktop) */}
+              <div className="pt-2.5 border-t border-white/10 grid grid-cols-1 sm:grid-cols-3 gap-2">
+                {channelPlaylist.map((vid, idx) => {
+                  const active = selectedVideoIndex === idx;
+                  return (
                     <button
+                      key={vid.id}
                       type="button"
-                      onClick={handleEnterExperience}
-                      className="px-6 py-3.5 text-xs sm:text-sm font-mono font-bold tracking-wider text-white bg-[#291B64] hover:bg-[#382586] rounded-none transition-colors inline-flex items-center gap-3 cursor-pointer"
+                      onClick={() => setSelectedVideoIndex(idx)}
+                      className={`px-3 py-2 text-left transition-colors cursor-pointer flex items-center justify-between gap-2 ${
+                        active
+                          ? 'bg-[#291B64] text-white'
+                          : 'bg-white/[0.04] text-neutral-400 hover:text-white hover:bg-white/[0.08]'
+                      }`}
                     >
-                      <Volume2 className="w-4 h-4 text-emerald-300 shrink-0" />
-                      <span>ACTIVAR SONIDO DEL VIDEO</span>
-                      <ArrowRight className="w-4 h-4 shrink-0" />
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* Bottom Clean Chapter Selector & Audio Toggle (Frameless) */}
-              <div className="pt-4 border-t border-white/15 flex flex-col sm:flex-row sm:items-center justify-between gap-4 pointer-events-auto">
-                <div className="flex flex-wrap items-center gap-4 sm:gap-6">
-                  {channelPlaylist.map((vid, idx) => {
-                    const active = selectedVideoIndex === idx;
-                    return (
-                      <button
-                        key={vid.id}
-                        type="button"
-                        onClick={() => setSelectedVideoIndex(idx)}
-                        className={`text-left transition-colors cursor-pointer py-1 border-b-2 ${
-                          active
-                            ? 'border-emerald-400 text-white'
-                            : 'border-transparent text-neutral-400 hover:text-white'
-                        }`}
-                      >
-                        <span className="text-[11px] font-mono text-emerald-400 mr-1.5">
+                      <div className="truncate">
+                        <span className="text-[11px] font-mono text-emerald-400 mr-1.5 font-bold">
                           {vid.code}.
                         </span>
                         <span className="text-xs font-semibold">{vid.label}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsImmersionActive(true);
-                    setIsMuted(!isMuted);
-                  }}
-                  className="px-4 py-2 text-xs font-mono font-bold text-white bg-[#291B64] hover:bg-[#382586] rounded-none transition-colors inline-flex items-center justify-center gap-2 cursor-pointer self-start sm:self-auto"
-                >
-                  {isMuted ? (
-                    <>
-                      <Volume2 className="w-3.5 h-3.5 text-emerald-300" />
-                      <span>Activar Audio</span>
-                    </>
-                  ) : (
-                    <>
-                      <VolumeX className="w-3.5 h-3.5" />
-                      <span>Silenciar</span>
-                    </>
-                  )}
-                </button>
+                      </div>
+                      <span className="text-[10px] font-mono opacity-75 shrink-0">
+                        {vid.duration}
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
           </div>
 
-          {/* RIGHT EXECUTIVE BIO & DIRECT ACCESS COLUMN (Clean dark surface, no inner boxes) */}
+          {/* RIGHT EXECUTIVE BIO & DIRECT ACCESS COLUMN (Selector 2: Clean responsive stack) */}
           {!isCinemaExpanded && (
-            <div className="lg:col-span-4 p-6 sm:p-10 lg:p-12 flex flex-col justify-between space-y-8 text-left bg-[#0E0E14]">
-              <div className="space-y-5">
+            <div className="lg:col-span-4 p-5 sm:p-8 lg:p-10 flex flex-col justify-between space-y-6 text-left bg-[#0E0E14] border-t lg:border-t-0 lg:border-l border-white/10">
+              <div className="space-y-4">
                 <div className="flex flex-wrap items-center gap-2 text-xs font-mono text-neutral-400">
                   <span>GASTÓN BAREA</span>
                   <span aria-hidden="true">·</span>
@@ -433,48 +408,45 @@ export const Hero: React.FC<HeroProps> = ({
                 </div>
 
                 <h1
-                  className="font-display font-bold tracking-tight text-white leading-[1.1]"
-                  style={{
-                    fontSize: 'clamp(1.65rem, 2.3vw, 2.45rem)',
-                    textWrap: 'balance',
-                  }}
+                  className="font-display text-2xl sm:text-3xl lg:text-[2.1rem] font-bold tracking-tight text-white leading-[1.15]"
+                  style={{ textWrap: 'balance' }}
                 >
                   Consultor y desarrollador de proyectos de base tecnológica, IA Services y bioeconomía.
                 </h1>
 
-                <p className="text-sm text-neutral-300 leading-relaxed">
+                <p className="text-xs sm:text-sm text-neutral-300 leading-relaxed">
                   Toda esta web funciona como mi{' '}
                   <strong className="text-white font-semibold">Gemelo Digital</strong>. Explorá los bloques temáticos del inicio o navegá a cada página dedicada para estructurar tu proyecto e interactuar con mi experiencia.
                 </p>
               </div>
 
               {/* Clean Executive Actions */}
-              <div className="space-y-3 pt-4 border-t border-white/10">
+              <div className="space-y-2.5 pt-4 border-t border-white/10">
                 <button
                   type="button"
                   onClick={() => onScheduleClick('Sesión Ejecutiva Google Meet Pro desde Portada')}
-                  className="w-full px-5 py-3.5 text-xs sm:text-sm font-semibold text-white bg-[#291B64] hover:bg-[#382586] rounded-none transition-colors flex items-center justify-between gap-2 cursor-pointer"
+                  className="w-full px-4 sm:px-5 py-3.5 text-xs sm:text-sm font-semibold text-white bg-[#291B64] hover:bg-[#382586] rounded-none transition-colors flex items-center justify-between gap-2 cursor-pointer"
                 >
                   <span className="inline-flex items-center gap-2">
-                    <Video className="w-4 h-4 text-emerald-300" />
+                    <Video className="w-4 h-4 text-emerald-300 shrink-0" />
                     <span>Agendar Google Meet Pro (30m)</span>
                   </span>
-                  <ArrowRight className="w-4 h-4" />
+                  <ArrowRight className="w-4 h-4 shrink-0" />
                 </button>
 
                 <button
                   type="button"
                   onClick={onDiagnosticoClick}
-                  className="w-full px-5 py-3.5 text-xs sm:text-sm font-semibold text-white bg-white/[0.07] hover:bg-[#291B64] rounded-none transition-colors flex items-center justify-between gap-2 cursor-pointer"
+                  className="w-full px-4 sm:px-5 py-3.5 text-xs sm:text-sm font-semibold text-white bg-white/[0.07] hover:bg-[#291B64] rounded-none transition-colors flex items-center justify-between gap-2 cursor-pointer"
                 >
                   <span className="inline-flex items-center gap-2">
-                    <Play className="w-3.5 h-3.5 text-emerald-400" />
+                    <Play className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
                     <span>Ir a IA Services & Estructurador</span>
                   </span>
-                  <ArrowRight className="w-4 h-4" />
+                  <ArrowRight className="w-4 h-4 shrink-0" />
                 </button>
 
-                <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-neutral-400 pt-3">
+                <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-neutral-400 pt-2">
                   <button
                     type="button"
                     onClick={() => onWhatsAppClick()}
