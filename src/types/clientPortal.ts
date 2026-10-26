@@ -1,4 +1,4 @@
-import { ServiceCategory } from './crm';
+import type { ServiceCategory } from './crm.ts';
 
 export type ProjectStatus =
   | 'kickoff'

@@ -1,4 +1,4 @@
-import { QuoteTemplate, PaymentGatewayConfig, Opportunity, Quote, PaymentRecord } from '../types/crm';
+import type { QuoteTemplate, PaymentGatewayConfig, Opportunity, Quote, PaymentRecord } from '../types/crm.ts';
 
 export const DEFAULT_QUOTE_TEMPLATES: QuoteTemplate[] = [
   {

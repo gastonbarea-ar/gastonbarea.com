@@ -1,4 +1,4 @@
-import { ClientProject, ConsultingInquiry, SupportTicket, ConsultingBooking } from '../types/clientPortal';
+import type { ClientProject, ConsultingInquiry, SupportTicket, ConsultingBooking } from '../types/clientPortal.ts';
 
 export const INITIAL_CLIENT_PROJECTS: ClientProject[] = [
   {
