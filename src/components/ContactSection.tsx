@@ -4,7 +4,6 @@ import {
   Check,
   ChevronDown,
   ChevronUp,
-  Mail,
   MessageSquare,
   Video,
   Linkedin,
@@ -92,30 +91,30 @@ export const ContactSection: React.FC<ContactSectionProps> = ({
   };
 
   return (
-    <section
-      id="contacto"
-      className="py-16 md:py-24 bg-white border-b border-slate-200/80 scroll-mt-16"
-    >
-      <div className="w-full px-4 sm:px-8 lg:px-12 xl:px-16 space-y-12 text-left">
-        {/* Section Header */}
-        <div className="space-y-3 max-w-2xl">
-          <div className="text-xs font-mono text-emerald-900 font-semibold">
-            Contacto Ejecutivo · Respuesta Directa &lt; 24h
+    <section id="contacto" className="w-full bg-white scroll-mt-16">
+      {/* Top Banner Block */}
+      <div className="w-full py-16 md:py-20 bg-[#0D0D12] text-white">
+        <div className="w-full px-4 sm:px-8 lg:px-12 xl:px-16 space-y-3 text-left">
+          <div className="text-xs font-mono text-emerald-400 font-semibold">
+            CONTACTO EJECUTIVO · RESPUESTA DIRECTA &lt; 24H · PROTOCOLO NDA
           </div>
-          <h2
-            className="font-display text-2xl sm:text-4xl font-bold tracking-tight text-slate-900"
+          <h1
+            className="font-display text-3xl sm:text-5xl font-bold tracking-tight text-white leading-[1.08] max-w-3xl"
             style={{ textWrap: 'balance' }}
           >
             Iniciemos la evaluación de su proyecto tecnológico o bioeconómico.
-          </h2>
-          <p className="text-sm sm:text-base text-slate-600 leading-relaxed">
+          </h1>
+          <p className="text-sm sm:text-base text-neutral-300 leading-relaxed max-w-2xl">
             Envíe los detalles de su iniciativa para recibir una devolución ejecutiva o coordine directamente una videollamada de 30 minutos por Google Meet Pro.
           </p>
         </div>
+      </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-start">
+      {/* Main Content Split (Frameless Tonal Surfaces) */}
+      <div className="w-full px-4 sm:px-8 lg:px-12 xl:px-16 py-16 md:py-20 text-left">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-start">
           {/* Left Column (7 cols): Validated Lead Capture Form */}
-          <div className="lg:col-span-7 p-6 sm:p-8 rounded-none bg-[#F5F5F7] border border-black/[0.14]">
+          <div className="lg:col-span-7 p-8 sm:p-10 rounded-none bg-[#F6F6F9]">
             {submitted ? (
               <div className="py-12 text-center space-y-4">
                 <div className="w-12 h-12 rounded-none bg-[#291B64] text-white mx-auto flex items-center justify-center">
@@ -132,7 +131,7 @@ export const ContactSection: React.FC<ContactSectionProps> = ({
                     <button
                       type="button"
                       onClick={onScheduleClick}
-                      className="px-5 py-2.5 text-xs font-semibold text-white bg-[#291B64] hover:bg-[#382586] rounded-none transition-colors inline-flex items-center gap-2 cursor-pointer"
+                      className="px-5 py-3 text-xs font-semibold text-white bg-[#291B64] hover:bg-[#382586] rounded-none transition-colors inline-flex items-center gap-2 cursor-pointer"
                     >
                       <Video className="w-3.5 h-3.5" />
                       <span>Agendar llamada en Google Meet Pro (30m)</span>
@@ -149,7 +148,7 @@ export const ContactSection: React.FC<ContactSectionProps> = ({
               </div>
             ) : (
               <form onSubmit={handleSubmit} className="space-y-5" noValidate>
-                <div className="pb-4 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2">
+                <div className="pb-4 border-b border-black/[0.08] flex flex-wrap items-center justify-between gap-2">
                   <div>
                     <h3 className="font-display text-lg font-bold text-slate-900">
                       Formulario de Requerimiento y Consultoría
@@ -183,7 +182,7 @@ export const ContactSection: React.FC<ContactSectionProps> = ({
                       className={`w-full px-3.5 py-2.5 text-sm bg-white rounded-none border text-slate-900 focus:outline-none ${
                         formErrors.name
                           ? 'border-rose-600'
-                          : 'border-slate-300 focus:border-[#291B64]'
+                          : 'border-black/[0.1] focus:border-[#291B64]'
                       }`}
                     />
                     {formErrors.name && (
@@ -203,7 +202,7 @@ export const ContactSection: React.FC<ContactSectionProps> = ({
                       className={`w-full px-3.5 py-2.5 text-sm bg-white rounded-none border text-slate-900 focus:outline-none ${
                         formErrors.email
                           ? 'border-rose-600'
-                          : 'border-slate-300 focus:border-[#291B64]'
+                          : 'border-black/[0.1] focus:border-[#291B64]'
                       }`}
                     />
                     {formErrors.email && (
@@ -225,7 +224,7 @@ export const ContactSection: React.FC<ContactSectionProps> = ({
                       className={`w-full px-3.5 py-2.5 text-sm bg-white rounded-none border text-slate-900 focus:outline-none ${
                         formErrors.company
                           ? 'border-rose-600'
-                          : 'border-slate-300 focus:border-[#291B64]'
+                          : 'border-black/[0.1] focus:border-[#291B64]'
                       }`}
                     />
                     {formErrors.company && (
@@ -240,7 +239,7 @@ export const ContactSection: React.FC<ContactSectionProps> = ({
                     <select
                       value={serviceArea}
                       onChange={(e) => setServiceArea(e.target.value)}
-                      className="w-full px-3.5 py-2.5 text-sm bg-white rounded-none border border-slate-300 text-slate-900 focus:outline-none focus:border-[#291B64]"
+                      className="w-full px-3.5 py-2.5 text-sm bg-white rounded-none border border-black/[0.1] text-slate-900 focus:outline-none focus:border-[#291B64]"
                     >
                       <option value="Proyectos de Base Tecnológica & Arquitectura">
                         01. Proyectos de Base Tecnológica & Arquitectura
@@ -276,7 +275,7 @@ export const ContactSection: React.FC<ContactSectionProps> = ({
                     className={`w-full px-3.5 py-2.5 text-sm bg-white rounded-none border text-slate-900 focus:outline-none ${
                       formErrors.requirements
                         ? 'border-rose-600'
-                        : 'border-slate-300 focus:border-[#291B64]'
+                        : 'border-black/[0.1] focus:border-[#291B64]'
                     }`}
                   />
                   {formErrors.requirements && (
@@ -287,7 +286,7 @@ export const ContactSection: React.FC<ContactSectionProps> = ({
                 <div className="pt-2 flex flex-wrap items-center justify-between gap-4">
                   <button
                     type="submit"
-                    className="px-6 py-3.5 text-xs sm:text-sm font-semibold text-white bg-[#291B64] hover:bg-[#382586] rounded-none transition-colors inline-flex items-center gap-2 cursor-pointer shadow-xs"
+                    className="px-6 py-4 text-xs sm:text-sm font-semibold text-white bg-[#291B64] hover:bg-[#382586] rounded-none transition-colors inline-flex items-center gap-2 cursor-pointer"
                   >
                     <Send className="w-4 h-4" />
                     <span>Enviar Requerimiento a Gastón Barea</span>
@@ -312,76 +311,77 @@ export const ContactSection: React.FC<ContactSectionProps> = ({
             )}
           </div>
 
-          {/* Right Column (5 cols): Direct Channels & Executive FAQs */}
-          <div className="lg:col-span-5 space-y-6">
-            <div className="p-6 rounded-none bg-[#F5F5F7] border border-black/[0.14] space-y-4">
-              <div className="text-xs font-mono text-slate-500">
-                Canales Ejecutivos Directos
+          {/* Right Column (5 cols): Direct Channels & Unboxed FAQs */}
+          <div className="lg:col-span-5 space-y-8">
+            <div className="p-7 bg-[#F6F6F9] space-y-4">
+              <div className="text-xs font-mono text-[#291B64] font-semibold">
+                CANALES EJECUTIVOS DIRECTOS
               </div>
               <div className="space-y-3 text-xs sm:text-sm">
                 <a
                   href={`mailto:${SITE_CONFIG.email}`}
-                  className="flex items-center justify-between p-3 rounded-none bg-white border border-black/[0.12] hover:border-[#291B64] transition-colors"
+                  className="flex items-center justify-between p-3.5 bg-white hover:bg-[#291B64] hover:text-white transition-colors group"
                 >
-                  <span className="font-semibold text-slate-900">Correo Electrónico</span>
-                  <span className="font-mono text-xs text-slate-600">{SITE_CONFIG.email}</span>
+                  <span className="font-semibold">Correo Electrónico</span>
+                  <span className="font-mono text-xs text-slate-500 group-hover:text-white">
+                    {SITE_CONFIG.email}
+                  </span>
                 </a>
 
-                <div className="grid grid-cols-2 gap-2.5">
+                <div className="grid grid-cols-2 gap-3">
                   <a
                     href={SITE_CONFIG.social.linkedin}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="p-3 rounded-none bg-white border border-black/[0.12] hover:border-[#291B64] transition-colors flex items-center justify-center gap-2 font-semibold text-slate-800 text-xs"
+                    className="p-3.5 bg-white hover:bg-[#291B64] hover:text-white transition-colors flex items-center justify-center gap-2 font-semibold text-slate-800 text-xs"
                   >
-                    <Linkedin className="w-3.5 h-3.5 text-slate-700" />
+                    <Linkedin className="w-3.5 h-3.5" />
                     <span>LinkedIn</span>
                   </a>
                   <a
                     href={SITE_CONFIG.social.github}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="p-3 rounded-none bg-white border border-black/[0.12] hover:border-[#291B64] transition-colors flex items-center justify-center gap-2 font-semibold text-slate-800 text-xs"
+                    className="p-3.5 bg-white hover:bg-[#291B64] hover:text-white transition-colors flex items-center justify-center gap-2 font-semibold text-slate-800 text-xs"
                   >
-                    <Github className="w-3.5 h-3.5 text-slate-700" />
+                    <Github className="w-3.5 h-3.5" />
                     <span>GitHub</span>
                   </a>
                 </div>
               </div>
             </div>
 
-            {/* Accordion FAQs */}
-            <div className="space-y-2.5">
-              <div className="text-xs font-mono text-slate-500 px-1">
-                Preguntas Frecuentes sobre Dirección y Proyectos
+            {/* Accordion FAQs (Divided by hairlines, no heavy frames) */}
+            <div className="space-y-3">
+              <div className="text-xs font-mono text-[#291B64] font-semibold">
+                PREGUNTAS FRECUENTES SOBRE DIRECCIÓN Y PROYECTOS
               </div>
-              {EXECUTIVE_FAQS.map((faq, idx) => {
-                const isOpen = openFaqIndex === idx;
-                return (
-                  <div
-                    key={idx}
-                    className="rounded-none bg-[#F5F5F7] border border-black/[0.14] overflow-hidden"
-                  >
-                    <button
-                      type="button"
-                      onClick={() => setOpenFaqIndex(isOpen ? null : idx)}
-                      className="w-full p-4 text-left text-xs sm:text-sm font-semibold text-slate-900 flex items-center justify-between gap-3 cursor-pointer"
-                    >
-                      <span>{faq.q}</span>
-                      {isOpen ? (
-                        <ChevronUp className="w-4 h-4 shrink-0 text-slate-500" />
-                      ) : (
-                        <ChevronDown className="w-4 h-4 shrink-0 text-slate-500" />
+              <div className="divide-y divide-black/[0.08] border-t border-b border-black/[0.08]">
+                {EXECUTIVE_FAQS.map((faq, idx) => {
+                  const isOpen = openFaqIndex === idx;
+                  return (
+                    <div key={idx} className="py-4">
+                      <button
+                        type="button"
+                        onClick={() => setOpenFaqIndex(isOpen ? null : idx)}
+                        className="w-full text-left text-xs sm:text-sm font-semibold text-slate-900 flex items-center justify-between gap-3 cursor-pointer"
+                      >
+                        <span>{faq.q}</span>
+                        {isOpen ? (
+                          <ChevronUp className="w-4 h-4 shrink-0 text-[#291B64]" />
+                        ) : (
+                          <ChevronDown className="w-4 h-4 shrink-0 text-slate-400" />
+                        )}
+                      </button>
+                      {isOpen && (
+                        <div className="pt-3 text-xs text-slate-600 leading-relaxed">
+                          {faq.a}
+                        </div>
                       )}
-                    </button>
-                    {isOpen && (
-                      <div className="px-4 pb-4 text-xs text-slate-600 leading-relaxed border-t border-slate-200/60 pt-3">
-                        {faq.a}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </div>
         </div>

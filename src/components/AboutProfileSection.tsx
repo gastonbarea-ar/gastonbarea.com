@@ -33,26 +33,27 @@ export const AboutProfileSection: React.FC<AboutProfileSectionProps> = ({
   ];
 
   return (
-    <section
-      id="trayectoria"
-      className="py-16 md:py-24 bg-white border-b border-slate-200/80 scroll-mt-16"
-    >
-      <div className="w-full px-4 sm:px-8 lg:px-12 xl:px-16 space-y-16 text-left">
-        {/* Top Split: Executive Bio + Identity Card */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-12 items-start">
-          {/* Left Column (7 cols): Trajectory & Vision */}
-          <div className="lg:col-span-7 space-y-6">
-            <div className="text-xs font-mono text-emerald-900 font-semibold">
-              Trayectoria Profesional · Gastón Barea · Patagonia & Global
-            </div>
+    <section id="trayectoria" className="w-full bg-white scroll-mt-16">
+      {/* Top Banner Block */}
+      <div className="w-full py-16 md:py-20 bg-[#F6F6F9]">
+        <div className="w-full px-4 sm:px-8 lg:px-12 xl:px-16 space-y-3 text-left">
+          <div className="text-xs font-mono text-[#291B64] font-semibold">
+            TRAYECTORIA PROFESIONAL · GASTÓN BAREA · PATAGONIA & GLOBAL
+          </div>
+          <h1
+            className="font-display text-3xl sm:text-5xl font-bold tracking-tight text-[#1D1D1F] leading-[1.08] max-w-4xl"
+            style={{ textWrap: 'balance' }}
+          >
+            30 años en el sector tecnológico-productivo y 14 años dirigiendo proyectos con clientes.
+          </h1>
+        </div>
+      </div>
 
-            <h2
-              className="font-display text-2xl sm:text-4xl font-bold tracking-tight text-slate-900 leading-tight"
-              style={{ textWrap: 'balance' }}
-            >
-              30 años en el sector tecnológico-productivo y 14 años dirigiendo proyectos con clientes.
-            </h2>
-
+      {/* Main Content Split (Frameless) */}
+      <div className="w-full px-4 sm:px-8 lg:px-12 xl:px-16 py-16 md:py-20 text-left">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 items-start">
+          {/* Left Column (7 cols): Trajectory & Chronology */}
+          <div className="lg:col-span-7 space-y-10">
             <div className="space-y-4 text-sm sm:text-base text-slate-700 leading-relaxed">
               <p>
                 Soy <strong className="font-semibold text-slate-900">Gastón Barea</strong>, consultor y desarrollador de proyectos de base tecnológica y de bioeconomía. Durante tres décadas he trabajado en la intersección donde la ingeniería de software y la tecnología se encuentran con la economía real y la producción sostenible.
@@ -65,21 +66,18 @@ export const AboutProfileSection: React.FC<AboutProfileSectionProps> = ({
               </p>
             </div>
 
-            {/* 3-Decade Timeline */}
-            <div className="pt-4 space-y-4">
-              <div className="text-xs font-mono text-slate-500">
-                Evolución y Respaldo Ejecutivo (1996–2026)
+            {/* 3-Decade Timeline (Open Hairlines, Zero Nested Boxes) */}
+            <div className="space-y-4">
+              <div className="text-xs font-mono text-[#291B64] font-semibold">
+                EVOLUCIÓN Y RESPALDO EJECUTIVO (1996–2026)
               </div>
-              <div className="space-y-3">
+              <div className="divide-y divide-black/[0.08] border-t border-b border-black/[0.08]">
                 {milestones.map((item, idx) => (
-                  <div
-                    key={idx}
-                    className="p-5 rounded-none bg-white border border-slate-200/90 space-y-1.5"
-                  >
-                    <div className="text-xs font-mono font-bold text-emerald-900">
+                  <div key={idx} className="py-6 space-y-1.5">
+                    <div className="text-xs font-mono font-bold text-[#291B64] tabular-nums">
                       {item.period}
                     </div>
-                    <h3 className="font-display text-base sm:text-lg font-bold text-slate-900">
+                    <h3 className="font-display text-lg sm:text-xl font-bold text-slate-900">
                       {item.title}
                     </h3>
                     <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
@@ -91,12 +89,12 @@ export const AboutProfileSection: React.FC<AboutProfileSectionProps> = ({
             </div>
           </div>
 
-          {/* Right Column (5 cols): Executive Profile Summary & Methodology */}
-          <div className="lg:col-span-5 space-y-6">
-            <div className="rounded-none bg-slate-950 text-white p-6 sm:p-8 border border-slate-800 space-y-6">
-              <div className="pb-5 border-b border-slate-800 space-y-1">
+          {/* Right Column (5 cols): Clean Obsidian Executive Card */}
+          <div className="lg:col-span-5">
+            <div className="rounded-none bg-[#0D0D12] text-white p-8 sm:p-10 space-y-6">
+              <div className="pb-5 border-b border-white/10 space-y-1">
                 <div className="text-xs font-mono text-emerald-400">
-                  Ficha Ejecutiva del Consultor
+                  FICHA EJECUTIVA DEL CONSULTOR
                 </div>
                 <h3 className="font-display text-2xl font-bold text-white">
                   {SITE_CONFIG.name}
@@ -107,19 +105,19 @@ export const AboutProfileSection: React.FC<AboutProfileSectionProps> = ({
               </div>
 
               <div className="space-y-3 text-xs font-mono">
-                <div className="flex items-center justify-between py-2 border-b border-slate-800/80">
+                <div className="flex items-center justify-between py-2.5 border-b border-white/10">
                   <span className="text-slate-400">Experiencia Sectorial:</span>
                   <span className="text-white font-semibold tabular-nums">30 Años (1996–2026)</span>
                 </div>
-                <div className="flex items-center justify-between py-2 border-b border-slate-800/80">
+                <div className="flex items-center justify-between py-2.5 border-b border-white/10">
                   <span className="text-slate-400">Dirección de Proyectos:</span>
                   <span className="text-white font-semibold tabular-nums">14 Años (PMO Clientes)</span>
                 </div>
-                <div className="flex items-center justify-between py-2 border-b border-slate-800/80">
+                <div className="flex items-center justify-between py-2.5 border-b border-white/10">
                   <span className="text-slate-400">Verticales Clave:</span>
                   <span className="text-emerald-400 font-semibold">Base Tecnológica & Bioeconomía</span>
                 </div>
-                <div className="flex items-center justify-between py-2 border-b border-slate-800/80">
+                <div className="flex items-center justify-between py-2.5 border-b border-white/10">
                   <span className="text-slate-400">Stack de Ingeniería:</span>
                   <span className="text-white font-semibold">Odoo · React · Linux · IA · IoT</span>
                 </div>
@@ -129,8 +127,7 @@ export const AboutProfileSection: React.FC<AboutProfileSectionProps> = ({
                 </div>
               </div>
 
-              {/* 3-Milestone Governance Box */}
-              <div className="p-4 rounded-none bg-slate-900 border border-slate-800 space-y-2">
+              <div className="p-5 bg-white/[0.05] space-y-2">
                 <div className="text-xs font-mono text-emerald-400">
                   Metodología de Dirección por Hitos
                 </div>
@@ -143,7 +140,7 @@ export const AboutProfileSection: React.FC<AboutProfileSectionProps> = ({
                 <button
                   type="button"
                   onClick={onScheduleClick}
-                  className="w-full py-3.5 px-4 text-xs sm:text-sm font-semibold text-white bg-[#291B64] hover:bg-[#382586] border border-white/15 rounded-none transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-sm"
+                  className="w-full py-3.5 px-4 text-xs sm:text-sm font-semibold text-white bg-[#291B64] hover:bg-[#382586] rounded-none transition-colors flex items-center justify-center gap-2 cursor-pointer"
                 >
                   <Video className="w-4 h-4 text-emerald-300" />
                   <span>Agendar Sesión Google Meet Pro (30m)</span>
@@ -154,7 +151,7 @@ export const AboutProfileSection: React.FC<AboutProfileSectionProps> = ({
                   <button
                     type="button"
                     onClick={onClientPortalClick}
-                    className="w-full py-3 px-4 text-xs font-semibold text-white bg-slate-900 hover:bg-slate-800 border border-slate-700 rounded-none transition-colors flex items-center justify-center gap-2 cursor-pointer"
+                    className="w-full py-3 px-4 text-xs font-semibold text-white bg-white/[0.07] hover:bg-white/[0.12] rounded-none transition-colors flex items-center justify-center gap-2 cursor-pointer"
                   >
                     <UserCheck className="w-4 h-4 text-emerald-400" />
                     <span>Ingresar al Portal de Clientes</span>
@@ -166,7 +163,7 @@ export const AboutProfileSection: React.FC<AboutProfileSectionProps> = ({
                     href={SITE_CONFIG.social.linkedin}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="py-2.5 px-3 text-xs font-semibold text-slate-200 hover:text-white bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-none transition-colors flex items-center justify-center gap-1.5"
+                    className="py-2.5 px-3 text-xs font-semibold text-slate-200 hover:text-white bg-white/[0.05] hover:bg-white/[0.1] rounded-none transition-colors flex items-center justify-center gap-1.5"
                   >
                     <Linkedin className="w-3.5 h-3.5" />
                     <span>LinkedIn</span>
@@ -175,7 +172,7 @@ export const AboutProfileSection: React.FC<AboutProfileSectionProps> = ({
                     href={SITE_CONFIG.social.github}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="py-2.5 px-3 text-xs font-semibold text-slate-200 hover:text-white bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-none transition-colors flex items-center justify-center gap-1.5"
+                    className="py-2.5 px-3 text-xs font-semibold text-slate-200 hover:text-white bg-white/[0.05] hover:bg-white/[0.1] rounded-none transition-colors flex items-center justify-center gap-1.5"
                   >
                     <Github className="w-3.5 h-3.5" />
                     <span>GitHub</span>

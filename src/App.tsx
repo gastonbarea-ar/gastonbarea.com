@@ -4,8 +4,10 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { Header } from './components/Header';
+import { ArrowLeft, ArrowRight } from 'lucide-react';
+import { Header, PageSectionId } from './components/Header';
 import { Hero } from './components/Hero';
+import { HomeBlocksView } from './components/HomeBlocksView';
 import { DigitalTwinSection } from './components/DigitalTwinSection';
 import { ServicesBentoSection } from './components/ServicesBentoSection';
 import { BioeconomyTechSection } from './components/BioeconomyTechSection';
@@ -19,7 +21,28 @@ import { AdminDashboardModal } from './components/admin/AdminDashboardModal';
 import { ClientPortalModal } from './components/client/ClientPortalModal';
 import { SITE_CONFIG } from './data/siteConfig';
 
+const PAGE_LABELS: Record<PageSectionId, string> = {
+  inicio: 'Inicio · Gemelo Digital',
+  servicios: '01. Soluciones & Arquitectura',
+  'ia-services': '02. IA Services & Estructurador',
+  bioeconomia: '03. Bioeconomía & Casos Reales',
+  trayectoria: '04. Trayectoria (30 Años Tech · 14 PMO)',
+  blog: '05. Blog & Publicaciones',
+  contacto: '06. Contacto Ejecutivo & NDA',
+};
+
+const PAGE_ORDER: PageSectionId[] = [
+  'inicio',
+  'servicios',
+  'ia-services',
+  'bioeconomia',
+  'trayectoria',
+  'blog',
+  'contacto',
+];
+
 export default function App() {
+  const [activePage, setActivePage] = useState<PageSectionId>('inicio');
   const [selectedServiceForContact, setSelectedServiceForContact] = useState<string>('');
   const [customMessageForContact, setCustomMessageForContact] = useState<string>('');
   const [digitalTwinPrompt, setDigitalTwinPrompt] = useState<string>('');
@@ -31,22 +54,62 @@ export default function App() {
   const [isAdminOpen, setIsAdminOpen] = useState<boolean>(false);
   const [isClientPortalOpen, setIsClientPortalOpen] = useState<boolean>(false);
 
-  const handleNavigate = (href: string) => {
-    const cleanId = href.replace(/^#/, '');
-    const targetMap: Record<string, string> = {
+  const resolvePageFromHash = (rawHash: string): PageSectionId => {
+    const cleanId = rawHash.replace(/^#/, '').split('/')[0].toLowerCase();
+    const targetMap: Record<string, PageSectionId> = {
+      inicio: 'inicio',
+      home: 'inicio',
+      servicios: 'servicios',
+      soluciones: 'servicios',
+      innovacion: 'servicios',
+      odoo: 'servicios',
+      'ecommerce-b2b2c': 'servicios',
+      'ia-services': 'ia-services',
       'diagnostico-ia': 'ia-services',
       'gemelo-digital': 'ia-services',
-      'innovacion': 'servicios',
-      'odoo': 'servicios',
-      'ecommerce-b2b2c': 'servicios',
+      bioeconomia: 'bioeconomia',
+      casos: 'bioeconomia',
+      trayectoria: 'trayectoria',
       'project-manager': 'trayectoria',
-      'perfil': 'trayectoria',
-      'casos': 'bioeconomia',
+      perfil: 'trayectoria',
+      blog: 'blog',
+      publicaciones: 'blog',
+      contacto: 'contacto',
     };
-    const finalId = targetMap[cleanId] || cleanId;
-    const el = document.getElementById(finalId);
-    if (el) {
-      el.scrollIntoView({ behavior: 'smooth' });
+    return targetMap[cleanId] || 'inicio';
+  };
+
+  const handleNavigate = (href: string) => {
+    const clean = href.replace(/^#/, '');
+    if (clean === 'admin' || clean === 'crm') {
+      setIsAdminOpen(true);
+      return;
+    }
+    if (clean === 'portal' || clean === 'cliente' || clean === 'clientes') {
+      setIsClientPortalOpen(true);
+      return;
+    }
+    const targetPage = resolvePageFromHash(clean);
+    setActivePage(targetPage);
+    window.history.pushState(null, '', `#${targetPage}`);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleNavigatePage = (page: PageSectionId, serviceCode?: string) => {
+    if (serviceCode) {
+      setHighlightedServiceCode(serviceCode);
+    }
+    setActivePage(page);
+    window.history.pushState(null, '', `#${page}`);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+
+    if (serviceCode && page === 'servicios') {
+      setTimeout(() => {
+        const cardEl = document.getElementById(`service-card-${serviceCode}`);
+        if (cardEl) {
+          cardEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }, 150);
     }
   };
 
@@ -57,16 +120,12 @@ export default function App() {
   ) => {
     if (serviceCode) {
       setHighlightedServiceCode(serviceCode);
-      const cardEl = document.getElementById(`service-card-${serviceCode}`);
-      if (cardEl && sectionId === '#servicios') {
-        cardEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        return;
-      }
     }
     if (promptContext) {
       setCustomMessageForContact(promptContext);
     }
-    handleNavigate(sectionId);
+    const targetPage = resolvePageFromHash(sectionId);
+    handleNavigatePage(targetPage, serviceCode);
   };
 
   useEffect(() => {
@@ -77,7 +136,9 @@ export default function App() {
       } else if (hash === '#portal' || hash === '#cliente' || hash === '#clientes') {
         setIsClientPortalOpen(true);
       } else if (hash) {
-        handleNavigate(hash);
+        const page = resolvePageFromHash(hash);
+        setActivePage(page);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
       }
     };
     handleHash();
@@ -105,12 +166,12 @@ export default function App() {
     setCustomMessageForContact(
       `Hola Gastón, me contacto desde gastonbarea.com para evaluar la solución "${serviceName}". Buscamos coordinar una reunión técnica para relevar objetivos y alcances.`
     );
-    handleNavigate('#contacto');
+    handleNavigatePage('contacto');
   };
 
   const handleAskDigitalTwin = (prompt: string) => {
     setDigitalTwinPrompt(prompt + ' [' + new Date().toLocaleTimeString() + ']');
-    handleNavigate('#ia-services');
+    handleNavigatePage('ia-services');
   };
 
   const handleSelectCase = (caseTitle: string) => {
@@ -118,20 +179,27 @@ export default function App() {
     setCustomMessageForContact(
       `Hola Gastón, revisé el caso de impacto "${caseTitle}" en tu plataforma y nuestra organización tiene un proyecto con desafíos similares.`
     );
-    handleNavigate('#contacto');
+    handleNavigatePage('contacto');
   };
 
   const handleScheduleWithAiProposal = (proposalSummary: string, serviceTitle: string) => {
     const contextText = `[SÍNTESIS GENERADA CON LA IA DE LA WEB]\nProyecto: ${serviceTitle}\n${proposalSummary}`;
-    setSelectedServiceForContact(serviceTitle || 'Proyectos de Base Tecnológica, IA Services & Bioeconomía');
+    setSelectedServiceForContact(
+      serviceTitle || 'Proyectos de Base Tecnológica, IA Services & Bioeconomía'
+    );
     setCustomMessageForContact(contextText);
     openScheduleModal(contextText);
   };
 
+  const currentIndex = PAGE_ORDER.indexOf(activePage);
+  const nextPage: PageSectionId =
+    PAGE_ORDER[(currentIndex + 1) % PAGE_ORDER.length] || 'servicios';
+
   return (
     <div className="min-h-screen bg-white text-[#1D1D1F] flex flex-col font-sans selection:bg-[#291B64]/15 selection:text-[#291B64] antialiased pb-16">
-      {/* 1. Apple Cupertino 3-Zone Top Bar */}
+      {/* 1. Full-Width Top Navigation Bar (Includes Inicio, Soluciones, IA Services, Bioeconomía, Trayectoria, Blog, Contacto) */}
       <Header
+        activePage={activePage}
         onScheduleClick={() => openScheduleModal()}
         onWhatsAppClick={handleOpenWhatsApp}
         onNavigate={handleNavigate}
@@ -140,69 +208,131 @@ export default function App() {
       />
 
       <main className="flex-1">
-        {/* 2. Apple Keynote YouTube Channel Stage + Integrated AI Solution Finder */}
-        <Hero
-          onExploreServices={() => handleNavigate('#servicios')}
-          onScheduleClick={openScheduleModal}
-          onWhatsAppClick={handleOpenWhatsApp}
-          onDiagnosticoClick={() => handleNavigate('#ia-services')}
-          onClientPortalClick={() => setIsClientPortalOpen(true)}
-          onNavigateToSolution={handleNavigateToSolution}
-        />
+        {activePage === 'inicio' ? (
+          <>
+            {/* HOME BLOCK 1 & 2: Full-Width YouTube Showreel Stage + Frameless AI Solution Finder */}
+            <Hero
+              onExploreServices={() => handleNavigatePage('servicios')}
+              onScheduleClick={openScheduleModal}
+              onWhatsAppClick={handleOpenWhatsApp}
+              onDiagnosticoClick={() => handleNavigatePage('ia-services')}
+              onClientPortalClick={() => setIsClientPortalOpen(true)}
+              onNavigateToSolution={handleNavigateToSolution}
+            />
 
-        {/* 3. Core Solutions Bento Grid (01-06: Tech, IA Services & Digital Twins, Bioeconomy, 14-Year PMO, Odoo/B2B2C, Linux/Docker) */}
-        <ServicesBentoSection
-          onSelectService={handleSelectService}
-          onAskDigitalTwin={handleAskDigitalTwin}
-          onScheduleClick={openScheduleModal}
-          highlightedServiceCode={highlightedServiceCode}
-        />
+            {/* HOME BLOCKS 3 TO 8: Customized Architectural Blocks (Soluciones, IA Services, Bioeconomía, Trayectoria, Blog, Contacto) */}
+            <HomeBlocksView
+              onNavigatePage={handleNavigatePage}
+              onSelectService={handleSelectService}
+              onAskDigitalTwin={handleAskDigitalTwin}
+              onScheduleClick={openScheduleModal}
+              onWhatsAppClick={handleOpenWhatsApp}
+              onClientPortalClick={() => setIsClientPortalOpen(true)}
+            />
+          </>
+        ) : (
+          <div className="pt-16">
+            {/* Inner Page Sub-Header Bar (Return to Home + Section Switcher) */}
+            <div className="w-full bg-white border-b border-black/[0.06] px-4 sm:px-8 lg:px-12 xl:px-16 py-3.5 flex flex-wrap items-center justify-between gap-4">
+              <button
+                type="button"
+                onClick={() => handleNavigatePage('inicio')}
+                className="inline-flex items-center gap-2 text-xs font-mono font-bold text-[#291B64] hover:underline cursor-pointer"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                <span>Volver al Inicio (Bloques)</span>
+              </button>
 
-        {/* 4. IA Services & Interactive Project Structurer (#ia-services) */}
-        <DigitalTwinSection
-          onScheduleWithProposal={handleScheduleWithAiProposal}
-          onWhatsAppWithProposal={handleOpenWhatsApp}
-          onClientPortalClick={() => setIsClientPortalOpen(true)}
-          onNavigateToSolution={handleNavigateToSolution}
-          initialPrompt={digitalTwinPrompt.replace(/\s*\[[^\]]*\]$/, '')}
-        />
+              <div className="flex flex-wrap items-center gap-4 text-xs font-mono text-slate-500">
+                <span>Sección activa:</span>
+                <strong className="text-[#1D1D1F]">{PAGE_LABELS[activePage]}</strong>
+              </div>
+            </div>
 
-        {/* 5. Bioeconomy + Productive Technology Convergence & Quantified Case Studies */}
-        <BioeconomyTechSection
-          onAskDigitalTwin={handleAskDigitalTwin}
-          onSelectCase={handleSelectCase}
-        />
+            {/* Render Selected Dedicated Section Page */}
+            {activePage === 'servicios' && (
+              <ServicesBentoSection
+                onSelectService={handleSelectService}
+                onAskDigitalTwin={handleAskDigitalTwin}
+                onScheduleClick={openScheduleModal}
+                highlightedServiceCode={highlightedServiceCode}
+              />
+            )}
 
-        {/* 6. Professional Trajectory (30 Years Productive Tech / 14 Years Client Project Direction) */}
-        <AboutProfileSection
-          onScheduleClick={() => openScheduleModal()}
-          onClientPortalClick={() => setIsClientPortalOpen(true)}
-        />
+            {activePage === 'ia-services' && (
+              <DigitalTwinSection
+                onScheduleWithProposal={handleScheduleWithAiProposal}
+                onWhatsAppWithProposal={handleOpenWhatsApp}
+                onClientPortalClick={() => setIsClientPortalOpen(true)}
+                onNavigateToSolution={handleNavigateToSolution}
+                initialPrompt={digitalTwinPrompt.replace(/\s*\[[^\]]*\]$/, '')}
+              />
+            )}
 
-        {/* 7. Technical & Bioeconomic Publications */}
-        <BlogSection
-          onScheduleClick={() => openScheduleModal()}
-          onWhatsAppClick={handleOpenWhatsApp}
-        />
+            {activePage === 'bioeconomia' && (
+              <BioeconomyTechSection
+                onAskDigitalTwin={handleAskDigitalTwin}
+                onSelectCase={handleSelectCase}
+              />
+            )}
 
-        {/* 8. Direct Executive Contact & NDA Inquiry Form */}
-        <ContactSection
-          initialService={selectedServiceForContact}
-          initialMessage={customMessageForContact}
-          onWhatsAppClick={handleOpenWhatsApp}
-          onScheduleClick={() => openScheduleModal()}
-        />
+            {activePage === 'trayectoria' && (
+              <AboutProfileSection
+                onScheduleClick={() => openScheduleModal()}
+                onClientPortalClick={() => setIsClientPortalOpen(true)}
+              />
+            )}
+
+            {activePage === 'blog' && (
+              <BlogSection
+                onScheduleClick={() => openScheduleModal()}
+                onWhatsAppClick={handleOpenWhatsApp}
+              />
+            )}
+
+            {activePage === 'contacto' && (
+              <ContactSection
+                initialService={selectedServiceForContact}
+                initialMessage={customMessageForContact}
+                onWhatsAppClick={handleOpenWhatsApp}
+                onScheduleClick={() => openScheduleModal()}
+              />
+            )}
+
+            {/* Clean Bottom Page-to-Page Navigation Strip */}
+            <div className="w-full bg-[#F6F6F9] px-4 sm:px-8 lg:px-12 xl:px-16 py-10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <button
+                type="button"
+                onClick={() => handleNavigatePage('inicio')}
+                className="px-5 py-3 text-xs font-mono font-bold text-[#1D1D1F] bg-white hover:bg-black/[0.05] rounded-none transition-colors inline-flex items-center gap-2 cursor-pointer"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                <span>Volver al Inicio por Bloques</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleNavigatePage(nextPage)}
+                className="px-6 py-3.5 text-xs font-mono font-bold text-white bg-[#291B64] hover:bg-[#382586] rounded-none transition-colors inline-flex items-center gap-2 cursor-pointer"
+              >
+                <span>Siguiente Página: {PAGE_LABELS[nextPage]}</span>
+                <ArrowRight className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        )}
       </main>
 
-      {/* 9. Quiet Architectural Footer with Portal & CRM Access */}
+      {/* Quiet Architectural Footer with Multi-Page Links, Portal & CRM Access */}
       <Footer
+        onNavigate={handleNavigate}
         onWhatsAppClick={() => handleOpenWhatsApp()}
         onScheduleClick={() => openScheduleModal()}
         onAdminClick={() => setIsAdminOpen(true)}
         onClientPortalClick={() => setIsClientPortalOpen(true)}
       />
 
-      {/* 10. Persistent Apple-Spotlight AI Solution Guide Dock */}
+      {/* Persistent AI Solution Guide Dock */}
       <AiWebNavigatorDock
         onNavigateToSolution={handleNavigateToSolution}
         onScheduleClick={openScheduleModal}
@@ -215,7 +345,7 @@ export default function App() {
         proposalContext={scheduleContext}
         onNavigateToForm={() => {
           setIsScheduleOpen(false);
-          handleNavigate('#contacto');
+          handleNavigatePage('contacto');
         }}
         onWhatsAppClick={handleOpenWhatsApp}
       />

@@ -3,20 +3,15 @@ import {
   ArrowLeft,
   Calendar,
   Clock,
-  Share2,
-  Bookmark,
   Check,
   Linkedin,
-  Twitter,
   MessageCircle,
   Copy,
   Sparkles,
   ArrowRight,
-  UserCheck
 } from 'lucide-react';
 import { BlogPost } from '../../types/blog';
 import { MediaBlockRenderer } from './MediaBlockRenderer';
-import { SITE_CONFIG } from '../../data/siteConfig';
 
 interface ArticleReaderModalProps {
   post: BlogPost | null;
@@ -36,11 +31,8 @@ export const ArticleReaderModal: React.FC<ArticleReaderModalProps> = ({
 
   useEffect(() => {
     if (!post) return;
-
-    // Prevent body scrolling when reader is open
     const originalOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
-
     return () => {
       document.body.style.overflow = originalOverflow;
     };
@@ -55,62 +47,62 @@ export const ArticleReaderModal: React.FC<ArticleReaderModalProps> = ({
   };
 
   const handleCopyLink = () => {
-    const url = `${window.location.origin}/#blog/${post.slug}`;
+    const url = `${window.location.origin}/#blog`;
     navigator.clipboard.writeText(url);
     setCopiedLink(true);
     setTimeout(() => setCopiedLink(false), 2000);
   };
 
   const handleShareWhatsApp = () => {
-    const text = `Te comparto este análisis técnico de Gastón Barea: "${post.title}" - ${window.location.origin}/#blog/${post.slug}`;
+    const text = `Te comparto este análisis técnico de Gastón Barea: "${post.title}" - ${window.location.origin}/#blog`;
     window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
   };
 
   const handleShareLinkedIn = () => {
-    const url = `${window.location.origin}/#blog/${post.slug}`;
-    window.open(`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}`, '_blank');
-  };
-
-  const handleShareTwitter = () => {
-    const text = `Leyendo "${post.title}" por @gastonbarea`;
-    const url = `${window.location.origin}/#blog/${post.slug}`;
-    window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`, '_blank');
+    const url = `${window.location.origin}/#blog`;
+    window.open(
+      `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}`,
+      '_blank'
+    );
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex flex-col justify-start overflow-hidden animate-in fade-in duration-200">
-      
+    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex flex-col justify-start overflow-hidden">
       {/* Top Header Sticky Bar */}
-      <header className="w-full bg-white/95 backdrop-blur-xl border-b border-blue-900/10 px-4 sm:px-8 py-3 flex items-center justify-between gap-4 z-20 shrink-0">
+      <header className="w-full bg-white border-b border-black/[0.08] px-4 sm:px-8 py-3.5 flex items-center justify-between gap-4 z-20 shrink-0">
         <button
           type="button"
           onClick={onClose}
-          className="inline-flex items-center gap-2 text-xs sm:text-sm font-semibold text-blue-950 hover:text-blue-600 transition-colors py-1 px-3 rounded-full bg-slate-100 hover:bg-blue-50 cursor-pointer"
+          className="inline-flex items-center gap-2 text-xs font-mono font-bold text-[#1D1D1F] hover:text-white py-2 px-4 rounded-none bg-[#F5F5F7] hover:bg-[#291B64] transition-colors cursor-pointer"
         >
           <ArrowLeft className="w-4 h-4" />
-          <span>Volver al Blog</span>
+          <span>Volver a Publicaciones</span>
         </button>
 
         <div className="hidden md:flex items-center gap-2 max-w-md truncate text-xs font-mono text-slate-500">
-          <span className="font-bold text-blue-700">{post.category}</span>
+          <span className="font-bold text-[#291B64]">{post.category}</span>
           <span>·</span>
           <span className="truncate">{post.title}</span>
         </div>
 
-        {/* Share buttons */}
-        <div className="flex items-center gap-1.5 sm:gap-2">
+        {/* Share & Schedule buttons */}
+        <div className="flex items-center gap-2">
           <button
             type="button"
             onClick={handleCopyLink}
-            className="p-2 rounded-full hover:bg-slate-100 text-slate-700 transition-colors cursor-pointer"
+            className="p-2 rounded-none hover:bg-[#F5F5F7] text-slate-700 transition-colors cursor-pointer"
             title="Copiar enlace"
           >
-            {copiedLink ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4" />}
+            {copiedLink ? (
+              <Check className="w-4 h-4 text-emerald-700" />
+            ) : (
+              <Copy className="w-4 h-4" />
+            )}
           </button>
           <button
             type="button"
             onClick={handleShareWhatsApp}
-            className="p-2 rounded-full hover:bg-emerald-50 text-emerald-600 transition-colors cursor-pointer"
+            className="p-2 rounded-none hover:bg-[#F5F5F7] text-emerald-800 transition-colors cursor-pointer"
             title="Compartir en WhatsApp"
           >
             <MessageCircle className="w-4 h-4" />
@@ -118,7 +110,7 @@ export const ArticleReaderModal: React.FC<ArticleReaderModalProps> = ({
           <button
             type="button"
             onClick={handleShareLinkedIn}
-            className="p-2 rounded-full hover:bg-blue-50 text-blue-700 transition-colors cursor-pointer"
+            className="p-2 rounded-none hover:bg-[#F5F5F7] text-[#291B64] transition-colors cursor-pointer"
             title="Compartir en LinkedIn"
           >
             <Linkedin className="w-4 h-4" />
@@ -126,9 +118,9 @@ export const ArticleReaderModal: React.FC<ArticleReaderModalProps> = ({
           <button
             type="button"
             onClick={onScheduleClick}
-            className="hidden sm:inline-flex px-3.5 py-1.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-full transition-all shadow-xs cursor-pointer"
+            className="hidden sm:inline-flex px-4 py-2 text-xs font-mono font-bold text-white bg-[#291B64] hover:bg-[#382586] rounded-none transition-colors cursor-pointer"
           >
-            Agendar Reunión (30m)
+            Agendar Meet Pro (30m)
           </button>
         </div>
       </header>
@@ -136,7 +128,7 @@ export const ArticleReaderModal: React.FC<ArticleReaderModalProps> = ({
       {/* Reading Progress Line */}
       <div className="w-full h-1 bg-slate-200">
         <div
-          className="h-full bg-gradient-to-r from-blue-600 via-indigo-600 to-sky-400 transition-all duration-75"
+          className="h-full bg-[#291B64] transition-all duration-75"
           style={{ width: `${scrollProgress}%` }}
         />
       </div>
@@ -144,64 +136,64 @@ export const ArticleReaderModal: React.FC<ArticleReaderModalProps> = ({
       {/* Scrollable Article Body */}
       <div
         onScroll={handleScroll}
-        className="flex-1 overflow-y-auto bg-[#F8FAFC] py-8 sm:py-12 px-4 sm:px-6"
+        className="flex-1 overflow-y-auto bg-[#F7F7FA] py-8 sm:py-12 px-4 sm:px-6"
       >
-        <article className="max-w-3xl mx-auto bg-white rounded-3xl border border-slate-200/90 shadow-xl shadow-slate-900/5 overflow-hidden">
-          
-          {/* Cover Image if present */}
+        <article className="max-w-3xl mx-auto bg-white rounded-none overflow-hidden text-left">
           {post.coverImage && (
             <div className="relative aspect-[21/9] w-full overflow-hidden bg-slate-900">
               <img
                 src={post.coverImage}
                 alt={post.title}
+                referrerPolicy="no-referrer"
                 className="w-full h-full object-cover"
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
             </div>
           )}
 
           <div className="p-6 sm:p-12 space-y-6">
-            
-            {/* Metadata Badge */}
-            <div className="flex flex-wrap items-center gap-2.5 text-xs font-mono">
-              <span className="px-3 py-1 rounded-full bg-blue-100 text-blue-800 font-bold border border-blue-200">
-                {post.category}
-              </span>
-              <span className="text-slate-400">·</span>
-              <span className="flex items-center gap-1 text-slate-500">
+            {/* Unboxed Metadata */}
+            <div className="flex flex-wrap items-center gap-2.5 text-xs font-mono text-slate-500">
+              <span className="text-[#291B64] font-bold">{post.category}</span>
+              <span aria-hidden="true">·</span>
+              <span className="flex items-center gap-1">
                 <Calendar className="w-3.5 h-3.5" />
                 {post.publishedAt}
               </span>
-              <span className="text-slate-400">·</span>
-              <span className="flex items-center gap-1 text-slate-500">
+              <span aria-hidden="true">·</span>
+              <span className="flex items-center gap-1">
                 <Clock className="w-3.5 h-3.5" />
                 {post.readTime} de lectura
               </span>
             </div>
 
             {/* Title */}
-            <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold text-blue-950 tracking-tight leading-[1.15] [text-wrap:balance]">
+            <h1
+              className="font-display text-2xl sm:text-4xl font-bold text-[#1D1D1F] tracking-tight leading-[1.15]"
+              style={{ textWrap: 'balance' }}
+            >
               {post.title}
             </h1>
 
-            {/* Excerpt */}
-            <p className="text-lg sm:text-xl text-slate-600 font-normal leading-relaxed border-l-4 border-blue-500 pl-4 py-1 italic">
+            {/* Excerpt (No border-l-4, clean tonal surface) */}
+            <p className="text-base sm:text-lg text-[#515154] leading-relaxed p-5 bg-[#F7F7FA]">
               {post.excerpt}
             </p>
 
             {/* Author Profile Strip */}
-            <div className="flex items-center justify-between py-4 border-y border-slate-100 my-6">
+            <div className="flex items-center justify-between py-4 border-y border-black/[0.08] my-6">
               <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-xl bg-gradient-to-tr from-blue-700 via-indigo-700 to-blue-900 text-white flex items-center justify-center font-bold font-mono text-sm shadow-xs">
+                <div className="w-11 h-11 rounded-none bg-[#291B64] text-white flex items-center justify-center font-bold font-mono text-sm">
                   GB
                 </div>
                 <div>
-                  <div className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
+                  <div className="text-sm font-bold text-[#1D1D1F] flex items-center gap-1.5">
                     <span>{post.author.name}</span>
-                    <span className="text-blue-600 text-xs font-normal">· Autor Único</span>
+                    <span className="text-[#291B64] text-xs font-mono">
+                      · 30 Años Tech · 14 Años PMO
+                    </span>
                   </div>
                   <div className="text-xs text-slate-500 font-mono">
-                    {post.author.role} · Patagonia Argentina
+                    {post.author.role}
                   </div>
                 </div>
               </div>
@@ -214,60 +206,56 @@ export const ArticleReaderModal: React.FC<ArticleReaderModalProps> = ({
               ))}
             </div>
 
-            {/* Tags */}
+            {/* Unboxed Tags */}
             {post.tags && post.tags.length > 0 && (
-              <div className="pt-8 border-t border-slate-100 flex flex-wrap items-center gap-2">
-                <span className="text-xs font-mono text-slate-400 mr-2 font-bold">TAGS:</span>
-                {post.tags.map((tag) => (
-                  <span
-                    key={tag}
-                    className="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-700 text-xs font-mono font-medium"
-                  >
-                    #{tag}
-                  </span>
+              <div className="pt-6 border-t border-black/[0.08] flex flex-wrap items-center gap-3 text-xs font-mono text-slate-500">
+                <span className="font-bold text-[#1D1D1F]">Temáticas:</span>
+                {post.tags.map((tag, idx) => (
+                  <React.Fragment key={tag}>
+                    {idx > 0 && <span aria-hidden="true">·</span>}
+                    <span>#{tag}</span>
+                  </React.Fragment>
                 ))}
               </div>
             )}
 
-            {/* Bottom Executive CTA Box */}
-            <div className="mt-12 p-6 sm:p-8 rounded-2xl bg-gradient-to-br from-blue-950 via-slate-900 to-indigo-950 text-white shadow-xl space-y-4">
-              <div className="flex items-center gap-2 text-xs font-mono uppercase tracking-wider text-sky-400 font-bold">
+            {/* Bottom Executive CTA Block */}
+            <div className="mt-10 p-6 sm:p-8 rounded-none bg-[#160E3B] text-white space-y-4">
+              <div className="flex items-center gap-2 text-xs font-mono text-emerald-400 font-bold">
                 <Sparkles className="w-4 h-4" />
                 <span>CONSULTORÍA DIRECTA CON GASTÓN BAREA</span>
               </div>
-              <h3 className="text-xl sm:text-2xl font-bold tracking-tight text-white">
-                ¿Quieres implementar esta arquitectura o evaluar la viabilidad de tu caso?
+              <h3 className="font-display text-xl sm:text-2xl font-bold tracking-tight text-white">
+                ¿Quiere implementar esta arquitectura o evaluar la viabilidad de su caso?
               </h3>
-              <p className="text-xs sm:text-sm text-slate-300 leading-relaxed max-w-xl">
-                Revisemos tu infraestructura actual, cuellos de botella y oportunidades de nuevos ingresos en una llamada técnica de 30 minutos sin cargo.
+              <p className="text-xs sm:text-sm text-neutral-300 leading-relaxed max-w-xl">
+                Revisemos su operación actual, cuellos de botella y oportunidades de escala en una sesión técnica de 30 minutos por Google Meet Pro.
               </p>
               <div className="pt-2 flex flex-wrap items-center gap-3">
                 <button
                   type="button"
                   onClick={onScheduleClick}
-                  className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs flex items-center gap-2 transition-all shadow-md cursor-pointer"
+                  className="px-5 py-3 rounded-none bg-[#291B64] hover:bg-[#382586] text-white font-mono font-bold text-xs flex items-center gap-2 transition-colors cursor-pointer"
                 >
-                  <span>Agendar Consulta de 30 min</span>
+                  <span>Agendar Google Meet Pro (30m)</span>
                   <ArrowRight className="w-4 h-4" />
                 </button>
                 <button
                   type="button"
                   onClick={() =>
                     onWhatsAppClick(
-                      `Hola Gastón, leí tu artículo "${post.title}" y me gustaría consultarte cómo podemos aplicar este enfoque en nuestra organización.`
+                      `Hola Gastón, leí tu artículo "${post.title}" en el Blog y me gustaría consultarte cómo podemos aplicar este enfoque en nuestra organización.`
                     )
                   }
-                  className="px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white font-semibold text-xs transition-colors cursor-pointer"
+                  className="px-4 py-3 rounded-none bg-white/10 hover:bg-white/20 text-white font-semibold text-xs transition-colors cursor-pointer"
                 >
                   WhatsApp Directo
                 </button>
               </div>
             </div>
-
           </div>
         </article>
       </div>
-
     </div>
   );
 };

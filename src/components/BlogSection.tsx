@@ -5,6 +5,8 @@ import {
   ArrowRight,
   Edit,
   Trash2,
+  Play,
+  BookOpen,
 } from 'lucide-react';
 import { BlogPost, BlogCategory } from '../types/blog';
 import { INITIAL_BLOG_POSTS } from '../data/blogData';
@@ -91,24 +93,30 @@ export const BlogSection: React.FC<BlogSectionProps> = ({
     return matchesCategory && matchesSearch;
   });
 
+  const featuredArticle =
+    activeCategory === 'Todos' && !searchQuery.trim()
+      ? filteredPosts.find((p) => p.featured) || filteredPosts[0]
+      : null;
+
   return (
-    <section
-      id="blog"
-      className="py-16 md:py-24 bg-white border-b border-slate-200/80 scroll-mt-16"
-    >
-      <div className="w-full px-4 sm:px-8 lg:px-12 xl:px-16 space-y-10 text-left">
-        {/* Section Header */}
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-          <div className="space-y-3 max-w-2xl">
-            <div className="text-xs font-mono text-emerald-900 font-semibold">
-              Publicaciones & Notas Ejecutivas · Autor: Gastón Barea
+    <section id="blog" className="w-full bg-white scroll-mt-16">
+      {/* Top Editorial Banner Block (Frameless) */}
+      <div className="w-full py-16 md:py-20 bg-[#130D33] text-white">
+        <div className="w-full px-4 sm:px-8 lg:px-12 xl:px-16 flex flex-col lg:flex-row lg:items-end justify-between gap-8 text-left">
+          <div className="space-y-4 max-w-3xl">
+            <div className="flex items-center gap-2 text-xs font-mono text-emerald-400 font-semibold">
+              <BookOpen className="w-4 h-4" />
+              <span>BLOG & PUBLICACIONES EJECUTIVAS · GASTÓN BAREA</span>
             </div>
-            <h2
-              className="font-display text-2xl sm:text-4xl font-bold tracking-tight text-slate-900"
+            <h1
+              className="font-display text-3xl sm:text-5xl font-bold tracking-tight text-white leading-[1.08]"
               style={{ textWrap: 'balance' }}
             >
-              Perspectivas sobre tecnología productiva, bioeconomía y dirección de proyectos.
-            </h2>
+              Perspectivas sobre tecnología productiva, IA Services, bioeconomía y dirección de proyectos.
+            </h1>
+            <p className="text-sm sm:text-base text-neutral-300 leading-relaxed max-w-2xl">
+              Análisis técnico, casos reales y aprendizajes acumulados en 30 años dentro del sector tecnológico-productivo y 14 años dirigiendo proyectos con clientes.
+            </p>
           </div>
 
           <button
@@ -117,26 +125,74 @@ export const BlogSection: React.FC<BlogSectionProps> = ({
               setPostToEdit(null);
               setIsEditorOpen(true);
             }}
-            className="px-4 py-2.5 rounded-none bg-[#291B64] hover:bg-[#382586] text-white font-semibold text-xs inline-flex items-center gap-2 cursor-pointer transition-colors self-start md:self-auto whitespace-nowrap shadow-xs"
+            className="px-6 py-3.5 rounded-none bg-[#291B64] hover:bg-[#382586] text-white font-mono font-bold text-xs inline-flex items-center gap-2 cursor-pointer transition-colors self-start lg:self-auto whitespace-nowrap shrink-0"
           >
-            <PlusCircle className="w-4 h-4" />
-            <span>Nueva Publicación</span>
+            <PlusCircle className="w-4 h-4 text-emerald-300" />
+            <span>Crear Nueva Publicación</span>
           </button>
         </div>
+      </div>
 
-        {/* Filter & Search Bar */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-200">
-          {/* Interactive Category Filter Buttons */}
-          <div className="flex flex-wrap items-center gap-1 p-1 bg-white rounded-none border border-slate-200/90">
+      {/* Main Blog Content Area */}
+      <div className="w-full px-4 sm:px-8 lg:px-12 xl:px-16 py-14 md:py-20 space-y-14 text-left">
+        {/* Featured Lead Article Block (When showing all posts) */}
+        {featuredArticle && (
+          <div
+            onClick={() => setSelectedPostForReading(featuredArticle)}
+            className="group p-8 sm:p-12 bg-[#F6F6F9] hover:bg-[#18103C] transition-colors cursor-pointer grid grid-cols-1 lg:grid-cols-12 gap-8 items-center"
+          >
+            <div className="lg:col-span-8 space-y-4">
+              <div className="flex flex-wrap items-center gap-2 text-xs font-mono text-[#291B64] group-hover:text-emerald-400">
+                <span className="font-bold">PUBLICACIÓN DESTACADA</span>
+                <span aria-hidden="true">·</span>
+                <span>{featuredArticle.category}</span>
+                <span aria-hidden="true">·</span>
+                <span>{featuredArticle.publishedAt}</span>
+                <span aria-hidden="true">·</span>
+                <span>{featuredArticle.readTime} de lectura</span>
+              </div>
+
+              <h2 className="font-display text-2xl sm:text-4xl font-bold text-[#1D1D1F] group-hover:text-white leading-tight transition-colors">
+                {featuredArticle.title}
+              </h2>
+
+              <p className="text-sm sm:text-base text-[#515154] group-hover:text-neutral-300 leading-relaxed max-w-3xl">
+                {featuredArticle.excerpt}
+              </p>
+
+              <div className="flex flex-wrap items-center gap-3 pt-2 text-xs font-mono text-[#515154] group-hover:text-neutral-400">
+                {featuredArticle.tags?.map((t) => (
+                  <span key={t}>#{t}</span>
+                ))}
+              </div>
+            </div>
+
+            <div className="lg:col-span-4 flex flex-col justify-between lg:items-end space-y-6">
+              <div className="inline-flex items-center gap-2 text-xs font-mono font-semibold text-[#291B64] group-hover:text-emerald-300">
+                <Play className="w-4 h-4" />
+                <span>Incluye Video YouTube embebido</span>
+              </div>
+
+              <span className="px-6 py-3.5 text-xs font-mono font-bold text-white bg-[#291B64] group-hover:bg-white group-hover:text-[#18103C] transition-colors inline-flex items-center gap-2 self-start lg:self-end">
+                <span>Leer Artículo Completo</span>
+                <ArrowRight className="w-4 h-4" />
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* Filter & Search Bar (Clean, no nested boxes) */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-black/[0.08]">
+          <div className="flex flex-wrap items-center gap-1.5">
             {CATEGORIES.map((cat) => (
               <button
                 key={cat}
                 type="button"
                 onClick={() => setActiveCategory(cat)}
-                className={`px-3 py-1.5 rounded-none text-xs font-medium transition-colors cursor-pointer whitespace-nowrap ${
+                className={`px-4 py-2 rounded-none text-xs font-semibold transition-colors cursor-pointer whitespace-nowrap ${
                   activeCategory === cat
                     ? 'bg-[#291B64] text-white'
-                    : 'text-slate-600 hover:text-slate-900'
+                    : 'bg-[#F5F5F7] text-[#515154] hover:text-[#1D1D1F]'
                 }`}
               >
                 {cat}
@@ -144,22 +200,21 @@ export const BlogSection: React.FC<BlogSectionProps> = ({
             ))}
           </div>
 
-          {/* Search Input */}
-          <div className="relative w-full md:w-72">
+          <div className="relative w-full md:w-80">
             <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Buscar artículo o temática..."
-              className="w-full pl-9 pr-4 py-2 bg-white border border-slate-300 rounded-none text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-[#291B64]"
+              placeholder="Buscar artículo, tag o temática..."
+              className="w-full pl-10 pr-4 py-2.5 bg-[#F5F5F7] rounded-none text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:bg-white focus:ring-1 focus:ring-[#291B64]"
             />
           </div>
         </div>
 
-        {/* Posts Grid */}
+        {/* Posts Grid (Frameless Tonal Cards & Hairlines) */}
         {filteredPosts.length === 0 ? (
-          <div className="p-12 rounded-none bg-white border border-slate-200 text-center space-y-3">
+          <div className="py-16 text-center space-y-4 bg-[#F7F7FA]">
             <p className="text-sm text-slate-600">
               No se encontraron artículos para el criterio seleccionado.
             </p>
@@ -169,40 +224,39 @@ export const BlogSection: React.FC<BlogSectionProps> = ({
                 setActiveCategory('Todos');
                 setSearchQuery('');
               }}
-              className="px-4 py-2 rounded-none bg-[#291B64] hover:bg-[#382586] text-white text-xs font-semibold cursor-pointer"
+              className="px-5 py-2.5 rounded-none bg-[#291B64] hover:bg-[#382586] text-white text-xs font-semibold cursor-pointer"
             >
               Restablecer filtros
             </button>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-10 gap-y-12">
             {filteredPosts.map((post, idx) => (
               <article
                 key={post.id}
                 onClick={() => setSelectedPostForReading(post)}
-                className="group rounded-none bg-white border border-slate-200/90 hover:border-slate-400 p-6 flex flex-col justify-between transition-colors cursor-pointer space-y-6"
+                className="group pt-6 border-t border-black/[0.1] hover:border-[#291B64] flex flex-col justify-between transition-colors cursor-pointer space-y-6"
               >
-                <div className="space-y-3">
-                  {/* Quiet Unboxed Metadata */}
+                <div className="space-y-3.5">
                   <div className="flex flex-wrap items-center gap-2 text-xs font-mono text-slate-500">
-                    <span className="text-emerald-900 font-semibold">{post.category}</span>
+                    <span className="text-[#291B64] font-semibold">{post.category}</span>
                     <span aria-hidden="true">·</span>
                     <span>{post.publishedAt}</span>
                     <span aria-hidden="true">·</span>
                     <span>{post.readTime}</span>
                   </div>
 
-                  <h3 className="font-display text-lg font-bold text-slate-900 group-hover:text-emerald-900 transition-colors leading-snug">
+                  <h3 className="font-display text-xl font-bold text-[#1D1D1F] group-hover:text-[#291B64] transition-colors leading-snug">
                     0{idx + 1}. {post.title}
                   </h3>
 
-                  <p className="text-xs sm:text-sm text-slate-600 leading-relaxed line-clamp-3">
+                  <p className="text-sm text-[#515154] leading-relaxed line-clamp-3">
                     {post.excerpt}
                   </p>
                 </div>
 
-                <div className="pt-4 border-t border-slate-100 flex items-center justify-between gap-2">
-                  <div className="text-xs font-mono text-slate-500 truncate">
+                <div className="pt-4 flex items-center justify-between gap-2">
+                  <div className="text-xs font-mono text-slate-400 truncate">
                     {post.tags?.slice(0, 3).join(' · ')}
                   </div>
 
@@ -210,7 +264,7 @@ export const BlogSection: React.FC<BlogSectionProps> = ({
                     <button
                       type="button"
                       onClick={(e) => handleOpenEdit(post, e)}
-                      className="p-1.5 text-slate-400 hover:text-slate-900 rounded-none transition-colors"
+                      className="p-1.5 text-slate-400 hover:text-[#291B64] rounded-none transition-colors"
                       title="Editar publicación"
                     >
                       <Edit className="w-3.5 h-3.5" />
@@ -223,7 +277,7 @@ export const BlogSection: React.FC<BlogSectionProps> = ({
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
-                    <span className="text-xs font-semibold text-slate-900 group-hover:translate-x-0.5 transition-transform inline-flex items-center gap-1">
+                    <span className="text-xs font-mono font-bold text-[#291B64] group-hover:translate-x-0.5 transition-transform inline-flex items-center gap-1">
                       <span>Leer</span>
                       <ArrowRight className="w-3.5 h-3.5" />
                     </span>

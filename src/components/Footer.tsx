@@ -15,6 +15,7 @@ import {
 import { SITE_CONFIG, SiteConfig } from '../data/siteConfig';
 
 interface FooterProps {
+  onNavigate?: (href: string) => void;
   onWhatsAppClick: () => void;
   onScheduleClick?: () => void;
   onAdminClick?: () => void;
@@ -22,6 +23,7 @@ interface FooterProps {
 }
 
 export const Footer: React.FC<FooterProps> = ({
+  onNavigate,
   onWhatsAppClick,
   onScheduleClick,
   onAdminClick,
@@ -44,30 +46,37 @@ export const Footer: React.FC<FooterProps> = ({
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  const handleLinkClick = (e: React.MouseEvent<HTMLAnchorElement>, href: string) => {
+    if (onNavigate) {
+      e.preventDefault();
+      onNavigate(href);
+    }
+  };
+
   return (
-    <footer className="bg-white border-t border-slate-200/90 text-slate-600 text-xs">
+    <footer className="bg-white border-t border-black/[0.06] text-slate-600 text-xs">
       <div className="w-full px-4 sm:px-8 lg:px-12 xl:px-16 py-16">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-10 pb-12 border-b border-slate-200/90 text-left">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-10 pb-12 border-b border-black/[0.06] text-left">
           {/* Brand & Identity (5 cols) */}
           <div className="lg:col-span-5 space-y-3.5">
             <div className="font-display text-base font-bold text-slate-900 tracking-tight">
               {liveConfig.name} · {liveConfig.domain}
             </div>
             <p className="text-xs text-slate-600 leading-relaxed max-w-md">
-              Consultor y Desarrollador de Proyectos de Base Tecnológica y Bioeconomía. 30 años de experiencia en el sector tecnológico-productivo y 14 años dirigiendo proyectos estratégicos con clientes.
+              Consultor y Desarrollador de Proyectos de Base Tecnológica, IA Services y Bioeconomía. 30 años de experiencia en el sector tecnológico-productivo y 14 años dirigiendo proyectos estratégicos con clientes.
             </p>
             <div className="text-xs font-mono text-slate-500">
               {liveConfig.location}
             </div>
 
-            {/* Social Links Managed from Backend CRM */}
+            {/* Social Links */}
             <div className="flex flex-wrap items-center gap-3 pt-2 text-xs">
               {liveConfig.social.linkedin && (
                 <a
                   href={liveConfig.social.linkedin}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 text-slate-700 hover:text-slate-900 font-medium transition-colors"
+                  className="inline-flex items-center gap-1.5 text-slate-700 hover:text-[#291B64] font-medium transition-colors"
                 >
                   <Linkedin className="w-3.5 h-3.5" />
                   <span>LinkedIn</span>
@@ -80,7 +89,7 @@ export const Footer: React.FC<FooterProps> = ({
                     href={liveConfig.social.github}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 text-slate-700 hover:text-slate-900 font-medium transition-colors"
+                    className="inline-flex items-center gap-1.5 text-slate-700 hover:text-[#291B64] font-medium transition-colors"
                   >
                     <Github className="w-3.5 h-3.5" />
                     <span>GitHub</span>
@@ -94,7 +103,7 @@ export const Footer: React.FC<FooterProps> = ({
                     href={liveConfig.social.youtube}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 text-slate-700 hover:text-slate-900 font-medium transition-colors"
+                    className="inline-flex items-center gap-1.5 text-slate-700 hover:text-[#291B64] font-medium transition-colors"
                   >
                     <Youtube className="w-3.5 h-3.5" />
                     <span>YouTube</span>
@@ -108,7 +117,7 @@ export const Footer: React.FC<FooterProps> = ({
                     href={liveConfig.social.twitter}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 text-slate-700 hover:text-slate-900 font-medium transition-colors"
+                    className="inline-flex items-center gap-1.5 text-slate-700 hover:text-[#291B64] font-medium transition-colors"
                   >
                     <Twitter className="w-3.5 h-3.5" />
                     <span>X</span>
@@ -122,7 +131,7 @@ export const Footer: React.FC<FooterProps> = ({
                     href={liveConfig.social.instagram}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 text-slate-700 hover:text-slate-900 font-medium transition-colors"
+                    className="inline-flex items-center gap-1.5 text-slate-700 hover:text-[#291B64] font-medium transition-colors"
                   >
                     <Instagram className="w-3.5 h-3.5" />
                     <span>Instagram</span>
@@ -132,45 +141,73 @@ export const Footer: React.FC<FooterProps> = ({
             </div>
           </div>
 
-          {/* Navigation Mirror (3 cols) */}
+          {/* Navigation Mirror: Multi-Page Section Links (3 cols) */}
           <div className="lg:col-span-3 space-y-3">
             <div className="text-xs font-mono font-semibold text-slate-900">
-              Secciones de la Plataforma
+              Páginas de la Plataforma
             </div>
             <ul className="space-y-2 text-xs text-slate-600">
               <li>
-                <a href="#inicio" className="hover:text-[#291B64] transition-colors">
-                  Portada & Experiencia en Video
+                <a
+                  href="#inicio"
+                  onClick={(e) => handleLinkClick(e, '#inicio')}
+                  className="hover:text-[#291B64] transition-colors"
+                >
+                  01. Inicio · Gemelo Digital & Bloques
                 </a>
               </li>
               <li>
-                <a href="#servicios" className="hover:text-[#291B64] transition-colors">
-                  Soluciones de Base Tecnológica & Bioeconomía
+                <a
+                  href="#servicios"
+                  onClick={(e) => handleLinkClick(e, '#servicios')}
+                  className="hover:text-[#291B64] transition-colors"
+                >
+                  02. Soluciones & Arquitectura
                 </a>
               </li>
               <li>
-                <a href="#ia-services" className="hover:text-[#291B64] transition-colors">
-                  IA Services & Estructurador de Proyectos
+                <a
+                  href="#ia-services"
+                  onClick={(e) => handleLinkClick(e, '#ia-services')}
+                  className="hover:text-[#291B64] transition-colors"
+                >
+                  03. IA Services & Estructurador
                 </a>
               </li>
               <li>
-                <a href="#bioeconomia" className="hover:text-[#291B64] transition-colors">
-                  Trazabilidad Bioeconómica & Casos Reales
+                <a
+                  href="#bioeconomia"
+                  onClick={(e) => handleLinkClick(e, '#bioeconomia')}
+                  className="hover:text-[#291B64] transition-colors"
+                >
+                  04. Bioeconomía & Casos Reales
                 </a>
               </li>
               <li>
-                <a href="#trayectoria" className="hover:text-[#291B64] transition-colors">
-                  Trayectoria (30 Años Tech · 14 Años PMO)
+                <a
+                  href="#trayectoria"
+                  onClick={(e) => handleLinkClick(e, '#trayectoria')}
+                  className="hover:text-[#291B64] transition-colors"
+                >
+                  05. Trayectoria (30 Años Tech · 14 PMO)
                 </a>
               </li>
               <li>
-                <a href="#blog" className="hover:text-[#291B64] transition-colors">
-                  Publicaciones & Artículos
+                <a
+                  href="#blog"
+                  onClick={(e) => handleLinkClick(e, '#blog')}
+                  className="hover:text-[#291B64] font-semibold text-[#291B64] transition-colors"
+                >
+                  06. Blog & Publicaciones
                 </a>
               </li>
               <li>
-                <a href="#contacto" className="hover:text-[#291B64] transition-colors">
-                  Contacto Ejecutivo
+                <a
+                  href="#contacto"
+                  onClick={(e) => handleLinkClick(e, '#contacto')}
+                  className="hover:text-[#291B64] transition-colors"
+                >
+                  07. Contacto Ejecutivo & NDA
                 </a>
               </li>
             </ul>

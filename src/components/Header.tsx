@@ -9,10 +9,21 @@ import {
   MessageSquare,
   Youtube,
   Compass,
+  BookOpen,
 } from 'lucide-react';
 import { SITE_CONFIG } from '../data/siteConfig';
 
+export type PageSectionId =
+  | 'inicio'
+  | 'servicios'
+  | 'ia-services'
+  | 'bioeconomia'
+  | 'trayectoria'
+  | 'blog'
+  | 'contacto';
+
 interface HeaderProps {
+  activePage?: PageSectionId;
   onScheduleClick: () => void;
   onWhatsAppClick: (customText?: string) => void;
   onNavigate?: (href: string) => void;
@@ -22,6 +33,7 @@ interface HeaderProps {
 
 interface FwaMenuItem {
   index: string;
+  id: PageSectionId;
   label: string;
   href: string;
   category: string;
@@ -33,23 +45,25 @@ interface FwaMenuItem {
 const FWA_MENU_SECTIONS: FwaMenuItem[] = [
   {
     index: '01',
-    label: 'Portada & Reel Interactivo',
+    id: 'inicio',
+    label: 'Inicio · Gemelo Digital',
     href: '#inicio',
-    category: 'Experiencia en Video Full-Width · Canal YouTube & Buscador IA',
+    category: 'Experiencia en Video Full-Width · Bloques Personalizados & Buscador IA',
     description:
-      'Escenario audiovisual a ancho completo desde el canal de Gastón Barea integrado con el menú superior y el buscador de soluciones asistido por Inteligencia Artificial.',
+      'Portada principal diseñada por bloques personalizados: escenario audiovisual desde el canal de YouTube de Gastón Barea, buscador de soluciones con IA y resumen interactivo de cada área.',
     metrics: 'Canal @gastonbarea · IA en Vivo',
     featuredItems: [
       'Showreel interactivo full-width de proyectos tecnológicos y bioeconomía',
-      'Selector de episodios del canal de YouTube en primer plano',
       'Buscador inteligente que enruta cada consulta a su solución web',
+      'Recorrido por bloques personalizados sin recarga visual',
     ],
   },
   {
     index: '02',
+    id: 'servicios',
     label: 'Soluciones & Arquitectura',
     href: '#servicios',
-    category: 'Matriz de 6 Verticales de Ingeniería & Negocios',
+    category: 'Página Dedicada · 6 Verticales de Ingeniería & Negocios',
     description:
       'Desarrollo de proyectos de base tecnológica, IA Services, trazabilidad bioeconómica, dirección PMO, Odoo ERP v18 y servidores Linux/Docker.',
     metrics: '6 Ejes Productivos · Hitos 40·40·20',
@@ -64,9 +78,10 @@ const FWA_MENU_SECTIONS: FwaMenuItem[] = [
   },
   {
     index: '03',
+    id: 'ia-services',
     label: 'IA Services & Estructurador',
     href: '#ia-services',
-    category: 'Gemelos Digitales Corporativos & Blueprint Técnico',
+    category: 'Página Dedicada · Gemelos Digitales Corporativos & Blueprint Técnico',
     description:
       'Convertimos portales corporativos y operaciones industriales en Gemelos Digitales interactivos. Probá en vivo el estructurador de proyectos en 3 fases.',
     metrics: '3 a 6 Semanas · Arquitectura Viva',
@@ -78,9 +93,10 @@ const FWA_MENU_SECTIONS: FwaMenuItem[] = [
   },
   {
     index: '04',
+    id: 'bioeconomia',
     label: 'Bioeconomía & Casos Reales',
     href: '#bioeconomia',
-    category: 'Convergencia Tecnológica-Productiva & Evidencia',
+    category: 'Página Dedicada · Convergencia Tecnológica-Productiva & Evidencia',
     description:
       'Digitalización de bioprocesos, valorización de biomasa, economía circular y casos de impacto auditables en agroindustria, distribución y energía.',
     metrics: '-42% Mermas · 100% Trazabilidad',
@@ -92,9 +108,10 @@ const FWA_MENU_SECTIONS: FwaMenuItem[] = [
   },
   {
     index: '05',
+    id: 'trayectoria',
     label: 'Trayectoria (30 Años)',
     href: '#trayectoria',
-    category: '30 Años Sector Tecnológico · 14 Años Dirección PMO',
+    category: 'Página Dedicada · 30 Años Sector Tecnológico · 14 Años Dirección PMO',
     description:
       'Tres décadas desarrollando tecnología aplicada a la producción real (1996–2026) y 14 años liderando proyectos estratégicos directamente junto a clientes.',
     metrics: '1996–2026 · Patagonia & Global',
@@ -106,21 +123,38 @@ const FWA_MENU_SECTIONS: FwaMenuItem[] = [
   },
   {
     index: '06',
-    label: 'Publicaciones & Contacto',
-    href: '#contacto',
-    category: 'Notas Ejecutivas, Canal Directo & Protocolo NDA',
+    id: 'blog',
+    label: 'Blog & Publicaciones',
+    href: '#blog',
+    category: 'Página Dedicada · Artículos Técnicos, Videos & Análisis Ejecutivo',
     description:
-      'Artículos de análisis técnico e inicio inmediato de evaluación de proyectos bajo acuerdo de confidencialidad o sesión en Google Meet Pro.',
+      'Publicaciones de Gastón Barea sobre bioeconomía, trazabilidad digital, dirección de proyectos PMO, Gemelos Digitales con IA y arquitectura Odoo/Linux.',
+    metrics: 'Lectura Interactiva · Editor Integrado',
+    featuredItems: [
+      'Artículos completos con bloques multimedia y videos de YouTube integrados',
+      'Filtro por categorías: Innovación, Operaciones con IA, Modern Tech Stack y Linux',
+      'Editor de publicaciones integrado para crear y actualizar artículos',
+    ],
+  },
+  {
+    index: '07',
+    id: 'contacto',
+    label: 'Contacto Ejecutivo',
+    href: '#contacto',
+    category: 'Página Dedicada · Canal Directo, Google Meet Pro & Protocolo NDA',
+    description:
+      'Inicio inmediato de evaluación de proyectos bajo acuerdo de confidencialidad (NDA), formulario de requerimiento técnico y preguntas frecuentes.',
     metrics: 'Respuesta < 24h · NDA Garantizado',
     featuredItems: [
       'Formulario ejecutivo de relevamiento de proyectos',
       'Agenda directa de videollamada en Google Meet Pro (30 min)',
-      'Acceso a publicaciones sobre IA, Bioeconomía y Modern Tech Stack',
+      'Preguntas frecuentes sobre metodología 40·40·20 y Portal de Clientes',
     ],
   },
 ];
 
 export const Header: React.FC<HeaderProps> = ({
+  activePage = 'inicio',
   onScheduleClick,
   onWhatsAppClick,
   onNavigate,
@@ -133,7 +167,7 @@ export const Header: React.FC<HeaderProps> = ({
   // Detect scroll to transition header from integrated video overlay to crisp white bar
   useEffect(() => {
     const handleScroll = () => {
-      const threshold = window.innerHeight * 0.65;
+      const threshold = window.innerHeight * 0.55;
       setIsScrolledPastVideo(window.scrollY > threshold);
     };
     handleScroll();
@@ -167,33 +201,34 @@ export const Header: React.FC<HeaderProps> = ({
   const handleNavClick = (e: React.MouseEvent<HTMLAnchorElement>, href: string) => {
     e.preventDefault();
     setFwaMenuOpen(false);
-    if (href === '#inicio') {
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-      return;
-    }
     if (onNavigate) {
       onNavigate(href);
-    } else {
-      const element = document.querySelector(href);
-      if (element) {
-        element.scrollIntoView({ behavior: 'smooth' });
-      }
     }
   };
 
   const activePreview = FWA_MENU_SECTIONS[hoveredIndex] || FWA_MENU_SECTIONS[0];
 
-  // When on top of the Hero video (or when FWA menu is open), use dark glass integrated into the video stage
-  const isOverDarkStage = !isScrolledPastVideo || fwaMenuOpen;
+  // Dark glass header when on Inicio above the video stage or when FWA menu is open
+  const isOverDarkStage = (activePage === 'inicio' && !isScrolledPastVideo) || fwaMenuOpen;
+
+  const topNavItems: { id: PageSectionId; label: string; href: string }[] = [
+    { id: 'inicio', label: 'Inicio', href: '#inicio' },
+    { id: 'servicios', label: 'Soluciones', href: '#servicios' },
+    { id: 'ia-services', label: 'IA Services', href: '#ia-services' },
+    { id: 'bioeconomia', label: 'Bioeconomía', href: '#bioeconomia' },
+    { id: 'trayectoria', label: 'Trayectoria', href: '#trayectoria' },
+    { id: 'blog', label: 'Blog', href: '#blog' },
+    { id: 'contacto', label: 'Contacto', href: '#contacto' },
+  ];
 
   return (
     <>
-      {/* FULL-WIDTH INTEGRATED FWA TOP BAR (Sits directly inside the video stage at top=0) */}
+      {/* FULL-WIDTH TOP BAR (3-Zone Contract, frameless clean aesthetic) */}
       <header
         className={`fixed top-0 left-0 right-0 z-50 w-full transition-colors duration-200 border-b ${
           isOverDarkStage
-            ? 'bg-black/65 backdrop-blur-md text-white border-white/15'
-            : 'bg-white/95 backdrop-blur-md text-[#1D1D1F] border-black/[0.14]'
+            ? 'bg-[#08080C]/80 backdrop-blur-md text-white border-white/10'
+            : 'bg-white/95 backdrop-blur-md text-[#1D1D1F] border-black/[0.06]'
         }`}
       >
         <div className="w-full flex items-center justify-between gap-4 sm:gap-8 px-4 sm:px-8 lg:px-12 h-16">
@@ -202,18 +237,18 @@ export const Header: React.FC<HeaderProps> = ({
             <button
               type="button"
               onClick={() => setFwaMenuOpen(!fwaMenuOpen)}
-              className={`px-3 sm:px-4 py-2 text-xs font-mono font-bold tracking-wider border transition-colors inline-flex items-center gap-2 cursor-pointer rounded-none whitespace-nowrap ${
+              className={`px-3.5 py-2 text-xs font-mono font-bold tracking-wider transition-colors inline-flex items-center gap-2 cursor-pointer rounded-none whitespace-nowrap ${
                 fwaMenuOpen
-                  ? 'bg-[#291B64] text-white border-white/30'
+                  ? 'bg-[#291B64] text-white'
                   : isOverDarkStage
-                  ? 'bg-white/10 text-white border-white/25 hover:bg-[#291B64] hover:border-white/40'
-                  : 'bg-white text-[#1D1D1F] border-black/[0.18] hover:bg-[#0A0A0C] hover:text-white'
+                  ? 'bg-white/10 text-white hover:bg-[#291B64]'
+                  : 'bg-[#F5F5F7] text-[#1D1D1F] hover:bg-[#291B64] hover:text-white'
               }`}
               aria-expanded={fwaMenuOpen}
-              aria-label="Alternar menú principal estilo FWA"
+              aria-label="Alternar menú principal de secciones"
             >
               {fwaMenuOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
-              <span>{fwaMenuOpen ? 'CERRAR' : 'MENÚ'}</span>
+              <span>{fwaMenuOpen ? 'CERRAR' : 'SECCIONES'}</span>
             </button>
 
             <a
@@ -227,63 +262,36 @@ export const Header: React.FC<HeaderProps> = ({
             </a>
           </div>
 
-          {/* Zone 2: 5 Clean Single-Line Architectural Links */}
+          {/* Zone 2: Direct Multi-Page Section Navigation (Includes Blog prominently) */}
           <nav
-            className={`hidden xl:flex items-center gap-7 text-xs font-mono font-semibold ${
+            className={`hidden xl:flex items-center gap-6 text-xs font-mono font-semibold ${
               isOverDarkStage ? 'text-neutral-300' : 'text-[#515154]'
             }`}
           >
-            <a
-              href="#servicios"
-              onClick={(e) => handleNavClick(e, '#servicios')}
-              className={`underline-offset-4 hover:underline transition-colors whitespace-nowrap shrink-0 ${
-                isOverDarkStage ? 'hover:text-white' : 'hover:text-[#291B64]'
-              }`}
-            >
-              01. Soluciones
-            </a>
-            <a
-              href="#ia-services"
-              onClick={(e) => handleNavClick(e, '#ia-services')}
-              className={`underline-offset-4 hover:underline transition-colors whitespace-nowrap shrink-0 ${
-                isOverDarkStage ? 'hover:text-white' : 'hover:text-[#291B64]'
-              }`}
-            >
-              02. IA Services
-            </a>
-            <a
-              href="#bioeconomia"
-              onClick={(e) => handleNavClick(e, '#bioeconomia')}
-              className={`underline-offset-4 hover:underline transition-colors whitespace-nowrap shrink-0 ${
-                isOverDarkStage ? 'hover:text-white' : 'hover:text-[#291B64]'
-              }`}
-            >
-              03. Bioeconomía & Tech
-            </a>
-            <a
-              href="#trayectoria"
-              onClick={(e) => handleNavClick(e, '#trayectoria')}
-              className={`underline-offset-4 hover:underline transition-colors whitespace-nowrap shrink-0 ${
-                isOverDarkStage ? 'hover:text-white' : 'hover:text-[#291B64]'
-              }`}
-            >
-              04. Trayectoria
-            </a>
-            <button
-              type="button"
-              onClick={() => {
-                setFwaMenuOpen(false);
-                if (onClientPortalClick) onClientPortalClick();
-              }}
-              className={`underline-offset-4 hover:underline transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
-                isOverDarkStage ? 'hover:text-white' : 'hover:text-[#291B64]'
-              }`}
-            >
-              05. Portal Clientes
-            </button>
+            {topNavItems.map((nav) => {
+              const isCurrent = activePage === nav.id;
+              return (
+                <a
+                  key={nav.id}
+                  href={nav.href}
+                  onClick={(e) => handleNavClick(e, nav.href)}
+                  className={`py-1 transition-colors whitespace-nowrap shrink-0 border-b-2 ${
+                    isCurrent
+                      ? isOverDarkStage
+                        ? 'text-white border-emerald-400 font-bold'
+                        : 'text-[#291B64] border-[#291B64] font-bold'
+                      : isOverDarkStage
+                      ? 'border-transparent hover:text-white'
+                      : 'border-transparent hover:text-[#291B64]'
+                  }`}
+                >
+                  {nav.label}
+                </a>
+              );
+            })}
           </nav>
 
-          {/* Zone 3: 1 Primary Action */}
+          {/* Zone 3: Primary Action */}
           <div className="flex items-center gap-2 sm:gap-3 shrink-0">
             <button
               type="button"
@@ -291,7 +299,7 @@ export const Header: React.FC<HeaderProps> = ({
                 setFwaMenuOpen(false);
                 onScheduleClick();
               }}
-              className="px-3.5 sm:px-5 py-2 sm:py-2.5 text-xs font-mono font-bold text-white bg-[#291B64] border border-white/20 rounded-none hover:bg-[#382586] transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+              className="px-4 sm:px-5 py-2.5 text-xs font-mono font-bold text-white bg-[#291B64] rounded-none hover:bg-[#382586] transition-colors whitespace-nowrap shrink-0 cursor-pointer"
             >
               <span className="hidden sm:inline">Agendar Google Meet Pro</span>
               <span className="sm:hidden">Meet Pro</span>
@@ -300,15 +308,16 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
       </header>
 
-      {/* THE FWA FULL-SCREEN ARCHITECTURAL MEGA-MENU OVERLAY (100% FULL WIDTH) */}
+      {/* THE FWA FULL-SCREEN ARCHITECTURAL MEGA-MENU OVERLAY (Clean, no nested boxes) */}
       {fwaMenuOpen && (
-        <div className="fixed inset-0 top-16 z-40 w-full bg-[#0A0A0C] text-white overflow-y-auto border-t border-white/15">
-          <div className="w-full min-h-[calc(100vh-4rem)] grid grid-cols-1 lg:grid-cols-12 divide-y lg:divide-y-0 lg:divide-x divide-white/15">
+        <div className="fixed inset-0 top-16 z-40 w-full bg-[#0A0A0C] text-white overflow-y-auto border-t border-white/10">
+          <div className="w-full min-h-[calc(100vh-4rem)] grid grid-cols-1 lg:grid-cols-12">
             {/* LEFT COLUMN (7 COLS): FWA OVERSIZED EDITORIAL INDEX */}
-            <div className="lg:col-span-7 flex flex-col justify-between">
-              <div className="divide-y divide-white/15">
+            <div className="lg:col-span-7 flex flex-col justify-between border-b lg:border-b-0 lg:border-r border-white/10">
+              <div className="divide-y divide-white/[0.07]">
                 {FWA_MENU_SECTIONS.map((item, idx) => {
                   const isActive = hoveredIndex === idx;
+                  const isCurrentPage = activePage === item.id;
                   return (
                     <a
                       key={item.index}
@@ -316,11 +325,11 @@ export const Header: React.FC<HeaderProps> = ({
                       onMouseEnter={() => setHoveredIndex(idx)}
                       onFocus={() => setHoveredIndex(idx)}
                       onClick={(e) => handleNavClick(e, item.href)}
-                      className={`group px-4 sm:px-8 lg:px-12 py-5 sm:py-7 flex items-center justify-between gap-4 sm:gap-6 transition-colors ${
-                        isActive ? 'bg-[#291B64] text-white' : 'bg-[#0A0A0C] hover:bg-white/[0.04]'
+                      className={`group px-4 sm:px-8 lg:px-12 py-4 sm:py-6 flex items-center justify-between gap-4 sm:gap-6 transition-colors ${
+                        isActive ? 'bg-[#291B64] text-white' : 'bg-[#0A0A0C] hover:bg-white/[0.03]'
                       }`}
                     >
-                      <div className="flex items-baseline gap-4 sm:gap-7 text-left min-w-0">
+                      <div className="flex items-baseline gap-4 sm:gap-6 text-left min-w-0">
                         <span
                           className={`text-xs sm:text-sm font-mono font-bold tabular-nums shrink-0 ${
                             isActive ? 'text-emerald-300' : 'text-neutral-500'
@@ -329,8 +338,15 @@ export const Header: React.FC<HeaderProps> = ({
                           {item.index}
                         </span>
                         <div className="space-y-1 min-w-0">
-                          <div className="font-display text-xl sm:text-3xl lg:text-4xl font-bold tracking-tight text-white truncate">
-                            {item.label}
+                          <div className="flex items-center gap-3">
+                            <span className="font-display text-xl sm:text-2xl lg:text-3xl font-bold tracking-tight text-white truncate">
+                              {item.label}
+                            </span>
+                            {isCurrentPage && (
+                              <span className="text-[11px] font-mono text-emerald-400 shrink-0">
+                                · PÁGINA ACTUAL
+                              </span>
+                            )}
                           </div>
                           <div
                             className={`text-xs font-mono line-clamp-1 ${
@@ -347,7 +363,7 @@ export const Header: React.FC<HeaderProps> = ({
                           {item.metrics}
                         </span>
                         <ArrowUpRight
-                          className={`w-5 h-5 sm:w-6 sm:h-6 transition-transform duration-150 ${
+                          className={`w-5 h-5 transition-transform duration-150 ${
                             isActive ? 'translate-x-0.5 -translate-y-0.5 text-white' : 'text-neutral-500'
                           }`}
                         />
@@ -358,7 +374,7 @@ export const Header: React.FC<HeaderProps> = ({
               </div>
 
               {/* Bottom Quick Index Strip */}
-              <div className="px-4 sm:px-8 lg:px-12 py-5 bg-[#111115] border-t border-white/15 flex flex-wrap items-center justify-between gap-4 text-xs font-mono text-neutral-400">
+              <div className="px-4 sm:px-8 lg:px-12 py-5 bg-[#0E0E12] border-t border-white/10 flex flex-wrap items-center justify-between gap-4 text-xs font-mono text-neutral-400">
                 <div>
                   <span>GASTÓN BAREA · GEMELO DIGITAL INTERACTIVO</span>
                 </div>
@@ -392,71 +408,68 @@ export const Header: React.FC<HeaderProps> = ({
               </div>
             </div>
 
-            {/* RIGHT COLUMN (5 COLS): DYNAMIC INTERACTIVE PREVIEW & DIRECT ACTIONS */}
-            <div className="lg:col-span-5 p-5 sm:p-8 lg:p-12 bg-[#101014] flex flex-col justify-between space-y-8 text-left">
-              {/* Dynamic Section Inspector */}
+            {/* RIGHT COLUMN (5 COLS): CLEAN TYPOGRAPHIC PREVIEW WITHOUT HEAVY FRAMES */}
+            <div className="lg:col-span-5 p-6 sm:p-10 lg:p-14 bg-[#101015] flex flex-col justify-between space-y-10 text-left">
               <div className="space-y-6">
-                <div className="pb-4 border-b border-white/15 flex flex-wrap items-center justify-between gap-2 text-xs font-mono">
-                  <span className="text-emerald-400">
-                    SECCIÓN {activePreview.index} · VISTA PREVIA
-                  </span>
+                <div className="flex flex-wrap items-center justify-between gap-2 text-xs font-mono text-emerald-400">
+                  <span>SECCIÓN {activePreview.index} · PÁGINA DEDICADA</span>
                   <span className="text-neutral-400">{activePreview.metrics}</span>
                 </div>
 
                 <div className="space-y-3">
-                  <h3 className="font-display text-xl sm:text-3xl font-bold text-white leading-tight">
+                  <h3 className="font-display text-2xl sm:text-3xl font-bold text-white leading-tight">
                     {activePreview.label}
                   </h3>
-                  <p className="text-xs sm:text-sm text-neutral-300 leading-relaxed">
+                  <p className="text-sm text-neutral-300 leading-relaxed">
                     {activePreview.description}
                   </p>
                 </div>
 
-                <div className="space-y-3 pt-2">
+                <div className="space-y-3 pt-4 border-t border-white/10">
                   <div className="text-xs font-mono text-neutral-400">
-                    Contenido y capacidades en esta sección:
+                    Contenido de esta página:
                   </div>
-                  <div className="space-y-2">
+                  <ul className="space-y-2.5">
                     {activePreview.featuredItems.map((feat, i) => (
-                      <div
+                      <li
                         key={i}
-                        className="p-3 bg-black/50 border border-white/10 text-xs text-neutral-200 flex items-start gap-2.5"
+                        className="text-xs sm:text-sm text-neutral-200 flex items-start gap-3"
                       >
-                        <span className="font-mono text-emerald-400 font-bold">
-                          0{i + 1}
+                        <span className="font-mono text-emerald-400 font-bold shrink-0">
+                          0{i + 1}.
                         </span>
                         <span>{feat}</span>
-                      </div>
+                      </li>
                     ))}
-                  </div>
+                  </ul>
                 </div>
 
-                <div className="pt-2">
+                <div className="pt-4">
                   <a
                     href={activePreview.href}
                     onClick={(e) => handleNavClick(e, activePreview.href)}
-                    className="px-5 py-3 text-xs font-mono font-bold text-white bg-[#291B64] hover:bg-[#382586] border border-white/15 rounded-none inline-flex items-center gap-2 transition-colors"
+                    className="px-6 py-3.5 text-xs font-mono font-bold text-white bg-[#291B64] hover:bg-[#382586] rounded-none inline-flex items-center gap-2 transition-colors"
                   >
-                    <span>Ir a {activePreview.label}</span>
+                    <span>Abrir página: {activePreview.label}</span>
                     <ArrowRight className="w-3.5 h-3.5" />
                   </a>
                 </div>
               </div>
 
-              {/* Direct Platform Utilities Box */}
-              <div className="pt-6 border-t border-white/15 space-y-4">
+              {/* Direct Platform Utilities (Frameless clean buttons) */}
+              <div className="pt-6 border-t border-white/10 space-y-4">
                 <div className="text-xs font-mono text-neutral-400">
-                  Accesos Ejecutivos Directos · 30 Años Tech · 14 Años PMO
+                  Accesos Directos · 30 Años Tech · 14 Años PMO
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                   <button
                     type="button"
                     onClick={() => {
                       setFwaMenuOpen(false);
                       onScheduleClick();
                     }}
-                    className="p-3.5 bg-[#291B64] hover:bg-[#382586] text-white border border-white/15 text-xs font-semibold flex items-center justify-between gap-2 cursor-pointer transition-colors"
+                    className="p-3.5 bg-[#291B64] hover:bg-[#382586] text-white text-xs font-semibold flex items-center justify-between gap-2 cursor-pointer transition-colors"
                   >
                     <span className="inline-flex items-center gap-2">
                       <Video className="w-4 h-4 text-emerald-300" />
@@ -465,6 +478,18 @@ export const Header: React.FC<HeaderProps> = ({
                     <ArrowUpRight className="w-3.5 h-3.5" />
                   </button>
 
+                  <a
+                    href="#blog"
+                    onClick={(e) => handleNavClick(e, '#blog')}
+                    className="p-3.5 bg-white/[0.06] hover:bg-white/[0.12] text-white text-xs font-semibold flex items-center justify-between gap-2 transition-colors"
+                  >
+                    <span className="inline-flex items-center gap-2">
+                      <BookOpen className="w-4 h-4 text-emerald-400" />
+                      <span>Ir al Blog</span>
+                    </span>
+                    <ArrowUpRight className="w-3.5 h-3.5" />
+                  </a>
+
                   {onClientPortalClick && (
                     <button
                       type="button"
@@ -472,7 +497,7 @@ export const Header: React.FC<HeaderProps> = ({
                         setFwaMenuOpen(false);
                         onClientPortalClick();
                       }}
-                      className="p-3.5 bg-white/5 hover:bg-white/10 text-white border border-white/15 text-xs font-semibold flex items-center justify-between gap-2 cursor-pointer transition-colors"
+                      className="p-3.5 bg-white/[0.06] hover:bg-white/[0.12] text-white text-xs font-semibold flex items-center justify-between gap-2 cursor-pointer transition-colors"
                     >
                       <span className="inline-flex items-center gap-2">
                         <UserCheck className="w-4 h-4 text-emerald-400" />
@@ -488,7 +513,7 @@ export const Header: React.FC<HeaderProps> = ({
                       setFwaMenuOpen(false);
                       onWhatsAppClick();
                     }}
-                    className="p-3.5 bg-white/5 hover:bg-white/10 text-white border border-white/15 text-xs font-semibold flex items-center justify-between gap-2 cursor-pointer transition-colors"
+                    className="p-3.5 bg-white/[0.06] hover:bg-white/[0.12] text-white text-xs font-semibold flex items-center justify-between gap-2 cursor-pointer transition-colors"
                   >
                     <span className="inline-flex items-center gap-2">
                       <MessageSquare className="w-4 h-4 text-emerald-400" />
@@ -496,18 +521,6 @@ export const Header: React.FC<HeaderProps> = ({
                     </span>
                     <ArrowUpRight className="w-3.5 h-3.5" />
                   </button>
-
-                  <a
-                    href="#ia-services"
-                    onClick={(e) => handleNavClick(e, '#ia-services')}
-                    className="p-3.5 bg-white/5 hover:bg-white/10 text-white border border-white/15 text-xs font-semibold flex items-center justify-between gap-2 transition-colors"
-                  >
-                    <span className="inline-flex items-center gap-2">
-                      <Compass className="w-4 h-4 text-emerald-400" />
-                      <span>Estructurador IA</span>
-                    </span>
-                    <ArrowUpRight className="w-3.5 h-3.5" />
-                  </a>
                 </div>
               </div>
             </div>

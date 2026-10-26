@@ -71,77 +71,74 @@ export const BioeconomyTechSection: React.FC<BioeconomyTechSectionProps> = ({
   ];
 
   return (
-    <section
-      id="bioeconomia"
-      className="py-16 md:py-24 bg-white border-b border-black/[0.14] scroll-mt-16"
-    >
-      <div className="w-full px-4 sm:px-8 lg:px-12 xl:px-16 space-y-16">
-        {/* PART 1: CONCRETE BIOECONOMY + PRODUCTIVE TECH ARCHITECTURE */}
-        <div className="space-y-8 text-left">
-          <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 border-b border-black/[0.12] pb-6">
-            <div className="space-y-3 max-w-3xl">
-              <div className="text-xs font-mono text-[#291B64] font-semibold">
-                Ingeniería Aplicada a la Bioeconomía & Producción Sostenible
-              </div>
-              <h2
-                className="font-display text-2xl sm:text-4xl font-bold tracking-tight text-[#1D1D1F]"
-                style={{ textWrap: 'balance' }}
-              >
-                Digitalización de bioprocesos, valorización de biomasa y evidencia de impacto real.
-              </h2>
+    <section id="bioeconomia" className="w-full bg-white scroll-mt-16">
+      {/* Top Organic Banner Block (Frameless) */}
+      <div className="w-full py-16 md:py-20 bg-[#0D261E] text-white">
+        <div className="w-full px-4 sm:px-8 lg:px-12 xl:px-16 flex flex-col lg:flex-row lg:items-end justify-between gap-8 text-left">
+          <div className="space-y-4 max-w-3xl">
+            <div className="text-xs font-mono text-emerald-400 font-semibold">
+              INGENIERÍA APLICADA A LA BIOECONOMÍA & PRODUCCIÓN SOSTENIBLE
             </div>
-
-            <button
-              type="button"
-              onClick={() =>
-                onAskDigitalTwin(
-                  'Tenemos un proyecto basado en bioeconomía, valorización de biomasa y trazabilidad agroindustrial con IoT.'
-                )
-              }
-              className="px-5 py-3 text-xs sm:text-sm font-semibold text-white bg-[#291B64] hover:bg-[#382586] rounded-none transition-colors inline-flex items-center gap-2 cursor-pointer self-start lg:self-auto shrink-0"
+            <h1
+              className="font-display text-3xl sm:text-5xl font-bold tracking-tight text-white leading-[1.08]"
+              style={{ textWrap: 'balance' }}
             >
-              <Sparkles className="w-4 h-4" />
-              <span>Estructurar Proyecto de Bioeconomía</span>
-            </button>
+              Digitalización de bioprocesos, valorización de biomasa y evidencia de impacto real.
+            </h1>
+            <p className="text-sm sm:text-base text-emerald-100/80 leading-relaxed max-w-2xl">
+              Convergencia entre recursos biológicos, telemetría IoT y software de gestión para certificar valor de origen a destino.
+            </p>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {bioPillars.map((pillar) => (
-              <div
-                key={pillar.code}
-                className="p-6 sm:p-7 rounded-none bg-[#F5F5F7] border border-black/[0.14] space-y-3"
-              >
-                <div className="flex items-center justify-between gap-2 text-xs font-mono">
-                  <span className="text-[#515154] font-semibold">{pillar.code}</span>
-                  <span className="text-[#291B64] font-bold">{pillar.metric}</span>
-                </div>
-                <h3 className="font-display text-lg font-bold text-[#1D1D1F] leading-snug">
-                  {pillar.title}
-                </h3>
-                <p className="text-xs sm:text-sm text-[#515154] leading-relaxed">
-                  {pillar.detail}
-                </p>
+          <button
+            type="button"
+            onClick={() =>
+              onAskDigitalTwin(
+                'Tenemos un proyecto basado en bioeconomía, valorización de biomasa y trazabilidad agroindustrial con IoT.'
+              )
+            }
+            className="px-6 py-3.5 text-xs sm:text-sm font-semibold text-white bg-[#291B64] hover:bg-[#382586] rounded-none transition-colors inline-flex items-center gap-2 cursor-pointer self-start lg:self-auto shrink-0"
+          >
+            <Sparkles className="w-4 h-4 text-emerald-300" />
+            <span>Estructurar Proyecto de Bioeconomía</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Main Content Area (No Heavy Borders) */}
+      <div className="w-full px-4 sm:px-8 lg:px-12 xl:px-16 py-16 md:py-20 space-y-20 text-left">
+        {/* Part 1: 3 Bioeconomy Pillars */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
+          {bioPillars.map((pillar) => (
+            <div key={pillar.code} className="p-8 bg-[#F3F6F4] space-y-3">
+              <div className="flex items-center justify-between gap-2 text-xs font-mono">
+                <span className="text-[#515154] font-semibold">{pillar.code}</span>
+                <span className="text-[#291B64] font-bold">{pillar.metric}</span>
               </div>
-            ))}
-          </div>
+              <h3 className="font-display text-xl font-bold text-[#1D1D1F] leading-snug">
+                {pillar.title}
+              </h3>
+              <p className="text-sm text-[#515154] leading-relaxed">{pillar.detail}</p>
+            </div>
+          ))}
         </div>
 
-        {/* PART 2: QUANTIFIED CASE STUDIES (EVIDENCE OF IMPACT) */}
-        <div className="space-y-8 text-left">
+        {/* Part 2: Quantified Case Studies */}
+        <div className="space-y-10">
           <div className="space-y-2 max-w-2xl">
-            <div className="text-xs font-mono text-[#515154]">
-              Evidencia Empírica · Resultados Auditables en Producción
+            <div className="text-xs font-mono text-[#291B64] font-semibold">
+              EVIDENCIA EMPÍRICA · RESULTADOS AUDITABLES EN PRODUCCIÓN
             </div>
-            <h3 className="font-display text-2xl sm:text-3xl font-bold tracking-tight text-[#1D1D1F]">
+            <h2 className="font-display text-2xl sm:text-4xl font-bold tracking-tight text-[#1D1D1F]">
               Casos de impacto en bioeconomía, industria y plataformas B2B2C.
-            </h3>
+            </h2>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
             {caseStudies.map((cs, idx) => (
               <div
                 key={idx}
-                className="rounded-none p-6 sm:p-8 bg-white border border-black/[0.14] flex flex-col justify-between space-y-6"
+                className="pt-6 border-t border-black/[0.1] flex flex-col justify-between space-y-6"
               >
                 <div className="space-y-4">
                   <div className="flex flex-wrap items-center gap-2 text-xs font-mono text-[#515154]">
@@ -154,11 +151,11 @@ export const BioeconomyTechSection: React.FC<BioeconomyTechSectionProps> = ({
                     {cs.metric}
                   </div>
 
-                  <h4 className="font-display text-lg sm:text-xl font-bold text-[#1D1D1F] leading-snug">
+                  <h4 className="font-display text-xl font-bold text-[#1D1D1F] leading-snug">
                     {cs.title}
                   </h4>
 
-                  <div className="space-y-3 text-xs sm:text-sm text-[#515154] leading-relaxed pt-3 border-t border-black/[0.1]">
+                  <div className="space-y-3 text-xs sm:text-sm text-[#515154] leading-relaxed pt-2">
                     <p>
                       <strong className="text-[#1D1D1F] font-semibold">Desafío: </strong>
                       {cs.challenge}
@@ -170,12 +167,12 @@ export const BioeconomyTechSection: React.FC<BioeconomyTechSectionProps> = ({
                   </div>
                 </div>
 
-                <div className="pt-4 border-t border-black/[0.1] flex items-center justify-between gap-2">
+                <div className="pt-4 border-t border-black/[0.06] flex items-center justify-between gap-2">
                   <span className="text-[11px] font-mono text-[#515154]">{cs.attribution}</span>
                   <button
                     type="button"
                     onClick={() => onSelectCase(cs.title)}
-                    className="px-3.5 py-2 text-xs font-semibold text-white bg-[#291B64] hover:bg-[#382586] rounded-none transition-colors inline-flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0"
+                    className="px-4 py-2.5 text-xs font-semibold text-white bg-[#291B64] hover:bg-[#382586] rounded-none transition-colors inline-flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0"
                   >
                     <span>Consultar caso similar</span>
                     <ArrowRight className="w-3.5 h-3.5" />

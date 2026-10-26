@@ -11,7 +11,6 @@ interface ServicesBentoSectionProps {
 export const ServicesBentoSection: React.FC<ServicesBentoSectionProps> = ({
   onSelectService,
   onAskDigitalTwin,
-  onScheduleClick,
   highlightedServiceCode,
 }) => {
   const services = [
@@ -114,31 +113,30 @@ export const ServicesBentoSection: React.FC<ServicesBentoSectionProps> = ({
   ];
 
   return (
-    <section
-      id="servicios"
-      className="py-16 md:py-24 bg-white border-b border-black/[0.08] scroll-mt-16"
-    >
-      <div className="w-full px-4 sm:px-8 lg:px-12 xl:px-16 space-y-12">
-        {/* Section Header */}
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 text-left">
+    <section id="servicios" className="w-full bg-white scroll-mt-16">
+      {/* Top Section Banner (Frameless Tonal Header) */}
+      <div className="w-full py-16 md:py-20 bg-[#F6F6F9]">
+        <div className="w-full px-4 sm:px-8 lg:px-12 xl:px-16 flex flex-col md:flex-row md:items-end justify-between gap-6 text-left">
           <div className="space-y-3 max-w-2xl">
-            <div className="text-xs font-mono text-[#515154]">
-              Arquitectura de Soluciones · 30 Años Sector Tecnológico-Productivo
+            <div className="text-xs font-mono text-[#291B64] font-semibold">
+              ARQUITECTURA DE SOLUCIONES · 30 AÑOS SECTOR TECNOLÓGICO-PRODUCTIVO
             </div>
-            <h2
-              className="font-display text-3xl sm:text-4xl font-bold tracking-tight text-[#1D1D1F]"
+            <h1
+              className="font-display text-3xl sm:text-5xl font-bold tracking-tight text-[#1D1D1F] leading-[1.08]"
               style={{ textWrap: 'balance' }}
             >
               Seis verticales de ingeniería para transformar su operación.
-            </h2>
+            </h1>
           </div>
           <p className="text-sm text-[#515154] max-w-md leading-relaxed">
-            Seleccione cualquier solución para simular su implementación con la IA integrada de la web o solicitar una cotización ejecutiva bajo acuerdo de confidencialidad (NDA).
+            Seleccione cualquier solución para simular su implementación con el Estructurador de Proyectos IA o solicitar una cotización ejecutiva bajo acuerdo de confidencialidad (NDA).
           </p>
         </div>
+      </div>
 
-        {/* Apple-Style Asymmetric Bento Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 text-left">
+      {/* Frameless Asymmetric Bento Grid (Tonal Surfaces, Zero Heavy Borders) */}
+      <div className="w-full px-4 sm:px-8 lg:px-12 xl:px-16 py-16 md:py-20">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 text-left">
           {services.map((srv) => {
             const isDark = srv.theme === 'dark';
             const isEmerald = srv.theme === 'emerald';
@@ -148,20 +146,15 @@ export const ServicesBentoSection: React.FC<ServicesBentoSectionProps> = ({
               <div
                 key={srv.index}
                 id={`service-card-${srv.index}`}
-                className={`${srv.span} rounded-none p-7 sm:p-9 flex flex-col justify-between transition-all ${
+                className={`${srv.span} rounded-none p-8 sm:p-10 flex flex-col justify-between transition-all ${
                   isDark
-                    ? 'bg-[#0A0A0C] text-white border border-white/15'
+                    ? 'bg-[#130D33] text-white'
                     : isEmerald
-                    ? 'bg-emerald-950 text-white border border-emerald-800'
-                    : 'bg-white text-[#1D1D1F] border border-black/[0.12]'
-                } ${
-                  isHighlighted
-                    ? 'ring-2 ring-[#291B64] shadow-lg'
-                    : 'shadow-xs'
-                }`}
+                    ? 'bg-[#0C2920] text-white'
+                    : 'bg-[#F7F7FA] text-[#1D1D1F]'
+                } ${isHighlighted ? 'ring-2 ring-[#291B64]' : ''}`}
               >
                 <div className="space-y-4">
-                  {/* Quiet 1-line unboxed text kicker */}
                   <div className="flex items-center justify-between gap-2">
                     <div
                       className={`text-xs font-mono ${
@@ -169,14 +162,14 @@ export const ServicesBentoSection: React.FC<ServicesBentoSectionProps> = ({
                           ? 'text-emerald-400 font-semibold'
                           : isEmerald
                           ? 'text-emerald-300'
-                          : 'text-[#291B64] font-medium'
+                          : 'text-[#291B64] font-semibold'
                       }`}
                     >
                       {srv.kicker}
                     </div>
                     {isHighlighted && (
                       <span className="text-xs font-mono text-emerald-500 font-semibold">
-                        Solución seleccionada por IA
+                        Solución seleccionada
                       </span>
                     )}
                   </div>
@@ -203,12 +196,12 @@ export const ServicesBentoSection: React.FC<ServicesBentoSectionProps> = ({
 
                   {/* Deliverables List */}
                   <div
-                    className={`pt-4 border-t space-y-2 ${
+                    className={`pt-5 border-t space-y-2.5 ${
                       isDark
                         ? 'border-white/10'
                         : isEmerald
-                        ? 'border-emerald-800/80'
-                        : 'border-slate-100'
+                        ? 'border-emerald-800/60'
+                        : 'border-black/[0.06]'
                     }`}
                   >
                     <div
@@ -218,11 +211,11 @@ export const ServicesBentoSection: React.FC<ServicesBentoSectionProps> = ({
                     >
                       Alcance y entregables:
                     </div>
-                    <ul className="space-y-1.5 text-xs sm:text-sm">
+                    <ul className="space-y-2 text-xs sm:text-sm">
                       {srv.deliverables.map((deliv, i) => (
                         <li
                           key={i}
-                          className={`flex items-start gap-2 ${
+                          className={`flex items-start gap-2.5 ${
                             isDark
                               ? 'text-neutral-200'
                               : isEmerald
@@ -244,26 +237,20 @@ export const ServicesBentoSection: React.FC<ServicesBentoSectionProps> = ({
                   </div>
                 </div>
 
-                {/* Card Actions: Configure with Web AI or Request Proposal */}
+                {/* Card Actions */}
                 <div
-                  className={`pt-6 mt-6 border-t flex flex-wrap items-center justify-between gap-3 ${
+                  className={`pt-6 mt-8 border-t flex flex-wrap items-center justify-between gap-3 ${
                     isDark
                       ? 'border-white/10'
                       : isEmerald
-                      ? 'border-emerald-800/80'
-                      : 'border-slate-100'
+                      ? 'border-emerald-800/60'
+                      : 'border-black/[0.06]'
                   }`}
                 >
                   <button
                     type="button"
                     onClick={() => onAskDigitalTwin(srv.twinPrompt)}
-                    className={`px-4 py-2.5 text-xs font-semibold rounded-none transition-colors inline-flex items-center gap-2 cursor-pointer whitespace-nowrap ${
-                      isDark
-                        ? 'bg-[#291B64] text-white hover:bg-[#382586] border border-white/15'
-                        : isEmerald
-                        ? 'bg-[#291B64] text-white hover:bg-[#382586] border border-white/20'
-                        : 'bg-[#291B64] text-white hover:bg-[#382586]'
-                    }`}
+                    className="px-5 py-3 text-xs font-semibold rounded-none transition-colors inline-flex items-center gap-2 cursor-pointer whitespace-nowrap bg-[#291B64] text-white hover:bg-[#382586]"
                   >
                     <Sparkles className="w-3.5 h-3.5" />
                     <span>Estructurar Proyecto con IA</span>
@@ -274,7 +261,7 @@ export const ServicesBentoSection: React.FC<ServicesBentoSectionProps> = ({
                     onClick={() => onSelectService(srv.title)}
                     className={`text-xs font-semibold underline-offset-4 hover:underline inline-flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
                       isDark || isEmerald
-                        ? 'text-neutral-300 hover:text-white'
+                        ? 'text-neutral-200 hover:text-white'
                         : 'text-[#291B64] hover:text-[#382586]'
                     }`}
                   >

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Play,
   Volume2,
@@ -60,29 +60,25 @@ export const Hero: React.FC<HeroProps> = ({
   const [showVideoSelector, setShowVideoSelector] = useState<boolean>(false);
   const [overrideYoutubeId, setOverrideYoutubeId] = useState<string>('');
 
-  // aengel.io Inspired Full-Bleed Interactive Video Stage State
   const [isImmersionActive, setIsImmersionActive] = useState<boolean>(false);
   const [isCinemaExpanded, setIsCinemaExpanded] = useState<boolean>(false);
-  const [pointerCoords, setPointerCoords] = useState<{ x: number; y: number }>({ x: 50, y: 50 });
-  const stageRef = useRef<HTMLDivElement>(null);
 
-  // Interactive Web AI Solution Finder State (The Whole Web as a Digital Twin)
+  // Interactive Web AI Solution Finder State
   const [aiQuery, setAiQuery] = useState<string>('');
   const [isAiThinking, setIsAiThinking] = useState<boolean>(false);
   const [aiResponseText, setAiResponseText] = useState<string>(
-    'Toda esta plataforma opera como una arquitectura viva entrenada con mis 30 años en el sector tecnológico-productivo y 14 años dirigiendo proyectos con clientes. Escribí qué desafío querés resolver o elegí un área para que la IA te guíe a la solución exacta dentro de la web.'
+    'Toda esta plataforma opera como mi Gemelo Digital entrenado con 30 años en el sector tecnológico-productivo y 14 años dirigiendo proyectos con clientes. Escribí qué desafío querés resolver o elegí un eje para abrir su página dedicada.'
   );
   const [matchedSolution, setMatchedSolution] = useState<MatchedSolution>({
     serviceCode: '02',
     serviceTitle: '02. IA Services, Gemelos Digitales & Business Intelligence',
-    sectionId: '#servicios',
+    sectionId: '#ia-services',
     timeline: '3 a 6 semanas',
     summary:
       'Integración de arquitecturas web inteligentes, Gemelos Digitales corporativos, agentes entrenados con datos propios (RAG) y tableros predictivos.',
-    ctaLabel: 'Explorar IA Services en la Web',
+    ctaLabel: 'Abrir página de IA Services',
   });
 
-  // Sync with backend CRM configuration if customized
   useEffect(() => {
     fetch('/api/site-config')
       .then((r) => (r.ok ? r.json() : null))
@@ -91,9 +87,7 @@ export const Hero: React.FC<HeroProps> = ({
           setLiveConfig(data);
         }
       })
-      .catch(() => {
-        // Retain default SITE_CONFIG
-      });
+      .catch(() => {});
   }, []);
 
   const videoConfig = liveConfig.presentationVideo || SITE_CONFIG.presentationVideo;
@@ -108,8 +102,8 @@ export const Hero: React.FC<HeroProps> = ({
     {
       id: 'ep-01',
       youtubeId: primaryYoutubeId,
-      code: 'REEL 01',
-      label: 'Presentación Canal',
+      code: '01',
+      label: 'Presentación General',
       title:
         videoConfig.title ||
         'Proyectos de Base Tecnológica y Bioeconomía: De la Visión a la Producción',
@@ -122,7 +116,7 @@ export const Hero: React.FC<HeroProps> = ({
     {
       id: 'ep-02',
       youtubeId: primaryYoutubeId,
-      code: 'REEL 02',
+      code: '02',
       label: 'IA Services & Gemelos',
       title: 'IA Services: Cómo transformar una Web o Empresa en un Gemelo Digital Interactivo',
       subtitle:
@@ -133,7 +127,7 @@ export const Hero: React.FC<HeroProps> = ({
     {
       id: 'ep-03',
       youtubeId: primaryYoutubeId,
-      code: 'REEL 03',
+      code: '03',
       label: 'Bioeconomía & Odoo ERP',
       title: 'Trazabilidad en Bioeconomía, Odoo ERP v18 y Dirección Ejecutiva PMO',
       subtitle:
@@ -144,14 +138,6 @@ export const Hero: React.FC<HeroProps> = ({
   ];
 
   const activeVideo = channelPlaylist[selectedVideoIndex] || channelPlaylist[0];
-
-  const handleStageMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!stageRef.current) return;
-    const rect = stageRef.current.getBoundingClientRect();
-    const relX = Math.max(0, Math.min(100, Math.round(((e.clientX - rect.left) / rect.width) * 100)));
-    const relY = Math.max(0, Math.min(100, Math.round(((e.clientY - rect.top) / rect.height) * 100)));
-    setPointerCoords({ x: relX, y: relY });
-  };
 
   const handleEnterExperience = () => {
     setIsImmersionActive(true);
@@ -185,7 +171,7 @@ export const Hero: React.FC<HeroProps> = ({
   const quickIntents = [
     {
       code: '01',
-      label: 'Proyecto de Base Tecnológica',
+      label: 'Base Tecnológica',
       query:
         'Queremos desarrollar y escalar un proyecto de base tecnológica o plataforma digital productiva.',
     },
@@ -240,7 +226,7 @@ export const Hero: React.FC<HeroProps> = ({
       }
     } catch {
       setAiResponseText(
-        'Desde mis 30 años en el sector tecnológico-productivo y 14 años dirigiendo proyectos con clientes, estructuramos esta solución en 3 hitos verificables (40% arquitectura, 40% validación en Staging y 20% producción). Podés saltar directamente al módulo recomendado abajo.'
+        'Desde mis 30 años en el sector tecnológico-productivo y 14 años dirigiendo proyectos con clientes, estructuramos esta solución en 3 hitos verificables (40% arquitectura, 40% validación en Staging y 20% producción). Podés abrir la página de la solución recomendada a la derecha.'
       );
     } finally {
       setIsAiThinking(false);
@@ -248,128 +234,45 @@ export const Hero: React.FC<HeroProps> = ({
   };
 
   return (
-    <section id="inicio" className="relative w-full bg-white border-b border-black/[0.14]">
-      {/* STEP 1: 100% FULL-BLEED VIDEO STAGE WITH INTEGRATED TOP MENU (aengel.io + thefwa.com) */}
-      <div
-        ref={stageRef}
-        onMouseMove={handleStageMouseMove}
-        className="w-full pt-16 bg-[#060608] text-white border-b border-black/[0.2] overflow-hidden"
-      >
-        {/* Top Sub-Header Telemetry & Episode Strip (Directly under the fixed 64px Header) */}
-        <div className="w-full px-4 sm:px-8 lg:px-12 py-3 bg-[#0C0C10] border-b border-white/15 flex flex-wrap items-center justify-between gap-3">
-          <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-[11px] sm:text-xs font-mono">
-            <span className="font-bold text-white tracking-wider">
-              CANAL YOUTUBE · GASTÓN BAREA
-            </span>
-            <span aria-hidden="true" className="text-white/30">
-              /
-            </span>
-            <span className="text-emerald-400 tabular-nums">
-              {activeVideo.code} · {activeVideo.duration}
-            </span>
-            <span aria-hidden="true" className="text-white/30 hidden md:inline">
-              /
-            </span>
-            <span className="text-neutral-400 tabular-nums hidden md:inline">
-              RETÍCULA X:{pointerCoords.x}% Y:{pointerCoords.y}%
-            </span>
-          </div>
-
-          {/* Right Controls: Chapter Tabs + Expand Stage + Channel Link */}
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="hidden xl:flex items-center border border-white/15 bg-black">
-              {channelPlaylist.map((vid, idx) => (
-                <button
-                  key={vid.id}
-                  type="button"
-                  onClick={() => setSelectedVideoIndex(idx)}
-                  className={`px-3 py-1.5 text-xs font-mono transition-colors cursor-pointer whitespace-nowrap border-r last:border-r-0 border-white/15 ${
-                    selectedVideoIndex === idx
-                      ? 'bg-[#291B64] text-white font-bold'
-                      : 'text-neutral-400 hover:text-white'
-                  }`}
-                >
-                  {vid.code} · {vid.label}
-                </button>
-              ))}
-            </div>
-
-            <button
-              type="button"
-              onClick={() => setIsCinemaExpanded(!isCinemaExpanded)}
-              className="px-2.5 sm:px-3 py-1.5 text-xs font-mono text-neutral-300 hover:text-white bg-white/5 hover:bg-white/10 rounded-none border border-white/15 transition-colors inline-flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
-              title="Alternar modo pantalla completa de escenario"
-            >
-              {isCinemaExpanded ? (
-                <>
-                  <Minimize2 className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline">Vista Split</span>
-                </>
-              ) : (
-                <>
-                  <Maximize2 className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline">Ancho Completo</span>
-                </>
-              )}
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setShowVideoSelector(!showVideoSelector)}
-              className="px-2.5 sm:px-3 py-1.5 text-xs font-mono text-neutral-300 hover:text-white bg-white/5 hover:bg-white/10 rounded-none border border-white/15 transition-colors inline-flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
-            >
-              <SlidersHorizontal className="w-3.5 h-3.5" />
-              <span>Cambiar Video</span>
-            </button>
-
-            <a
-              href={youtubeChannelUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="px-2.5 sm:px-3 py-1.5 text-xs font-mono text-neutral-300 hover:text-white bg-white/5 hover:bg-white/10 rounded-none border border-white/15 transition-colors inline-flex items-center gap-1.5 whitespace-nowrap"
-            >
-              <span>@gastonbarea</span>
-              <ExternalLink className="w-3 h-3" />
-            </a>
-          </div>
-        </div>
-
+    <section id="inicio" className="relative w-full bg-white">
+      {/* BLOQUE 1: ESCENARIO AUDIOVISUAL FULL-WIDTH (Sin marcos recargados) */}
+      <div className="w-full pt-16 bg-[#08080C] text-white overflow-hidden">
         {/* Optional YouTube URL/ID Loader Bar */}
         {showVideoSelector && (
           <form
             onSubmit={handleApplyCustomVideo}
-            className="w-full px-4 sm:px-8 lg:px-12 py-3 bg-[#14141A] border-b border-white/15 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3"
+            className="w-full px-4 sm:px-8 lg:px-12 py-3.5 bg-[#12121A] flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3"
           >
             <div className="text-xs font-mono text-neutral-300">
-              Pegá la URL o ID de cualquier video de tu canal de YouTube para transmitirlo a ancho completo:
+              Pegá la URL o ID de cualquier video de tu canal de YouTube para transmitirlo en portada:
             </div>
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
               <input
                 type="text"
                 value={customYoutubeInput}
                 onChange={(e) => setCustomYoutubeInput(e.target.value)}
-                placeholder="https://www.youtube.com/watch?v=... o ID"
-                className="px-3 py-2 text-xs font-mono bg-black text-white rounded-none border border-white/20 focus:outline-none focus:border-white sm:min-w-[260px]"
+                placeholder="https://youtu.be/XVYUP8Pz-hE"
+                className="px-3.5 py-2 text-xs font-mono bg-black/60 text-white rounded-none border border-white/15 focus:outline-none focus:border-white sm:min-w-[260px]"
               />
               <button
                 type="submit"
                 className="px-4 py-2 text-xs font-mono font-bold text-white bg-[#291B64] hover:bg-[#382586] rounded-none transition-colors cursor-pointer whitespace-nowrap"
               >
-                Cargar en Escenario
+                Cargar Video
               </button>
             </div>
           </form>
         )}
 
-        {/* Main Full-Bleed Interactive Stage: Responsive Mobile / Tablet / Desktop */}
+        {/* Main Full-Bleed Cinema Split */}
         <div className="w-full grid grid-cols-1 lg:grid-cols-12 items-stretch">
-          {/* LEFT / FULL STAGE: YOUTUBE SHOWREEL WITH AENGEL.IO WIREFRAME GRID OVERLAY */}
+          {/* LEFT / FULL STAGE: YOUTUBE VIDEO STREAM */}
           <div
             className={`${
               isCinemaExpanded
-                ? 'lg:col-span-12 min-h-[460px] sm:min-h-[600px] lg:min-h-[76vh]'
-                : 'lg:col-span-8 min-h-[420px] sm:min-h-[540px] lg:min-h-[72vh]'
-            } relative bg-black overflow-hidden flex flex-col justify-between border-b lg:border-b-0 lg:border-r border-white/15 transition-all duration-150`}
+                ? 'lg:col-span-12 min-h-[460px] sm:min-h-[600px] lg:min-h-[78vh]'
+                : 'lg:col-span-8 min-h-[420px] sm:min-h-[540px] lg:min-h-[74vh]'
+            } relative bg-black overflow-hidden flex flex-col justify-between transition-all duration-150`}
           >
             {/* Live YouTube Embed Stream */}
             <iframe
@@ -385,38 +288,68 @@ export const Hero: React.FC<HeroProps> = ({
               allowFullScreen
             />
 
-            {/* aengel.io Inspired Interactive Spatial Wireframe Grid Overlay */}
+            {/* Clean Measured Scrim Overlay (No wireframe clutter) */}
             <div
-              className={`relative z-10 flex-1 flex flex-col justify-between p-4 sm:p-8 lg:p-10 transition-opacity duration-200 ${
+              className={`relative z-10 flex-1 flex flex-col justify-between p-5 sm:p-8 lg:p-12 transition-opacity duration-200 ${
                 isImmersionActive && !isMuted
-                  ? 'bg-gradient-to-t from-black/85 via-transparent to-black/30 pointer-events-none'
-                  : 'bg-gradient-to-t from-black/90 via-black/45 to-black/40'
+                  ? 'bg-gradient-to-t from-black/80 via-transparent to-black/25 pointer-events-none'
+                  : 'bg-gradient-to-t from-black/90 via-black/40 to-black/30'
               }`}
             >
-              {/* Top Wireframe Crosshairs & Area Metadata */}
-              <div className="flex items-start justify-between gap-4 border-b border-white/15 pb-3.5">
-                <div className="space-y-1 text-left">
-                  <div className="text-[11px] font-mono text-emerald-400 tracking-wider">
-                    {activeVideo.focusArea}
-                  </div>
-                  <div className="text-xs font-mono text-white/85 line-clamp-1">
-                    {activeVideo.title}
-                  </div>
+              {/* Top Quiet Kicker & Controls */}
+              <div className="flex flex-wrap items-center justify-between gap-3 pointer-events-auto">
+                <div className="flex items-center gap-2 text-xs font-mono text-white/80">
+                  <span className="text-emerald-400 font-semibold">CANAL YOUTUBE</span>
+                  <span aria-hidden="true">·</span>
+                  <span>{activeVideo.focusArea}</span>
                 </div>
-                <div className="text-right font-mono text-[11px] text-white/60 tabular-nums hidden sm:block shrink-0">
-                  <div>FULL-WIDTH STREAM</div>
-                  <div>CHUBUT · PATAGONIA</div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowVideoSelector(!showVideoSelector)}
+                    className="px-3 py-1.5 text-xs font-mono text-neutral-300 hover:text-white bg-black/50 hover:bg-black/80 transition-colors inline-flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <SlidersHorizontal className="w-3.5 h-3.5" />
+                    <span>Video</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsCinemaExpanded(!isCinemaExpanded)}
+                    className="px-3 py-1.5 text-xs font-mono text-neutral-300 hover:text-white bg-black/50 hover:bg-black/80 transition-colors inline-flex items-center gap-1.5 cursor-pointer"
+                  >
+                    {isCinemaExpanded ? (
+                      <>
+                        <Minimize2 className="w-3.5 h-3.5" />
+                        <span className="hidden sm:inline">Vista Split</span>
+                      </>
+                    ) : (
+                      <>
+                        <Maximize2 className="w-3.5 h-3.5" />
+                        <span className="hidden sm:inline">Expandir</span>
+                      </>
+                    )}
+                  </button>
+                  <a
+                    href={youtubeChannelUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-3 py-1.5 text-xs font-mono text-neutral-300 hover:text-white bg-black/50 hover:bg-black/80 transition-colors inline-flex items-center gap-1.5"
+                  >
+                    <span>@gastonbarea</span>
+                    <ExternalLink className="w-3 h-3" />
+                  </a>
                 </div>
               </div>
 
-              {/* Center Interactive Entrance Trigger (aengel.io "ENTER THE EXPERIENCE" style) */}
+              {/* Center Interactive Entrance Trigger */}
               {(!isImmersionActive || isMuted) && (
-                <div className="my-auto py-6 sm:py-10 flex flex-col items-start sm:items-center text-left sm:text-center max-w-2xl mx-auto space-y-4 sm:space-y-5 pointer-events-auto">
-                  <div className="text-[11px] sm:text-xs font-mono tracking-widest text-emerald-400">
-                    EXPERIENCIA AUDIOVISUAL INTERACTIVA · GEMELO DIGITAL
+                <div className="my-auto py-8 flex flex-col items-start max-w-2xl space-y-4 pointer-events-auto text-left">
+                  <div className="text-xs font-mono tracking-wider text-emerald-400">
+                    GEMELO DIGITAL INTERACTIVO · GASTÓN BAREA
                   </div>
                   <h2
-                    className="font-display text-xl sm:text-3xl lg:text-4xl font-bold tracking-tight text-white leading-tight"
+                    className="font-display text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight text-white leading-tight"
                     style={{ textWrap: 'balance' }}
                   >
                     {activeVideo.title}
@@ -424,33 +357,23 @@ export const Hero: React.FC<HeroProps> = ({
                   <p className="text-xs sm:text-sm text-neutral-300 leading-relaxed max-w-xl">
                     {activeVideo.subtitle}
                   </p>
-                  <div className="flex flex-wrap items-center justify-start sm:justify-center gap-3 pt-1 w-full sm:w-auto">
+                  <div className="flex flex-wrap items-center gap-3 pt-2">
                     <button
                       type="button"
                       onClick={handleEnterExperience}
-                      className="w-full sm:w-auto px-6 py-3.5 text-xs sm:text-sm font-mono font-bold tracking-wider text-white bg-[#291B64] hover:bg-[#382586] border border-white/25 rounded-none transition-colors inline-flex items-center justify-center gap-3 cursor-pointer shadow-lg"
+                      className="px-6 py-3.5 text-xs sm:text-sm font-mono font-bold tracking-wider text-white bg-[#291B64] hover:bg-[#382586] rounded-none transition-colors inline-flex items-center gap-3 cursor-pointer"
                     >
                       <Volume2 className="w-4 h-4 text-emerald-300 shrink-0" />
-                      <span>ENTRAR A LA EXPERIENCIA CON SONIDO</span>
+                      <span>ACTIVAR SONIDO DEL VIDEO</span>
                       <ArrowRight className="w-4 h-4 shrink-0" />
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setIsCinemaExpanded(!isCinemaExpanded)}
-                      className="w-full sm:w-auto px-4 py-3.5 text-xs font-mono font-semibold text-white bg-black/75 hover:bg-black border border-white/20 rounded-none transition-colors inline-flex items-center justify-center gap-2 cursor-pointer"
-                    >
-                      <Maximize2 className="w-3.5 h-3.5" />
-                      <span>{isCinemaExpanded ? 'Vista Split' : 'Expandir Video 100%'}</span>
                     </button>
                   </div>
                 </div>
               )}
 
-              {/* Bottom Interactive Timeline Scrubber & Sound Toggle */}
-              <div className="pt-4 border-t border-white/15 flex flex-col md:flex-row md:items-center justify-between gap-3 pointer-events-auto">
-                {/* 3 Interactive Reel Chapters (Responsive Grid) */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 flex-1 max-w-2xl">
+              {/* Bottom Clean Chapter Selector & Audio Toggle (Frameless) */}
+              <div className="pt-4 border-t border-white/15 flex flex-col sm:flex-row sm:items-center justify-between gap-4 pointer-events-auto">
+                <div className="flex flex-wrap items-center gap-4 sm:gap-6">
                   {channelPlaylist.map((vid, idx) => {
                     const active = selectedVideoIndex === idx;
                     return (
@@ -458,53 +381,50 @@ export const Hero: React.FC<HeroProps> = ({
                         key={vid.id}
                         type="button"
                         onClick={() => setSelectedVideoIndex(idx)}
-                        className={`p-2.5 text-left border transition-colors cursor-pointer rounded-none ${
+                        className={`text-left transition-colors cursor-pointer py-1 border-b-2 ${
                           active
-                            ? 'bg-[#291B64] border-white/35 text-white'
-                            : 'bg-black/75 border-white/15 text-neutral-400 hover:text-white hover:bg-black/90'
+                            ? 'border-emerald-400 text-white'
+                            : 'border-transparent text-neutral-400 hover:text-white'
                         }`}
                       >
-                        <div className="text-[10px] font-mono font-bold text-emerald-400">
-                          {vid.code} · {vid.duration}
-                        </div>
-                        <div className="text-xs font-semibold truncate">{vid.label}</div>
+                        <span className="text-[11px] font-mono text-emerald-400 mr-1.5">
+                          {vid.code}.
+                        </span>
+                        <span className="text-xs font-semibold">{vid.label}</span>
                       </button>
                     );
                   })}
                 </div>
 
-                {/* Audio / Mute Control */}
-                <div className="flex items-center gap-2 shrink-0">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsImmersionActive(true);
-                      setIsMuted(!isMuted);
-                    }}
-                    className="w-full md:w-auto px-4 py-2.5 text-xs font-mono font-bold text-white bg-[#291B64] hover:bg-[#382586] border border-white/20 rounded-none transition-colors inline-flex items-center justify-center gap-2 cursor-pointer whitespace-nowrap"
-                  >
-                    {isMuted ? (
-                      <>
-                        <Volume2 className="w-3.5 h-3.5 text-emerald-300" />
-                        <span>Activar Audio</span>
-                      </>
-                    ) : (
-                      <>
-                        <VolumeX className="w-3.5 h-3.5" />
-                        <span>Silenciar Audio</span>
-                      </>
-                    )}
-                  </button>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsImmersionActive(true);
+                    setIsMuted(!isMuted);
+                  }}
+                  className="px-4 py-2 text-xs font-mono font-bold text-white bg-[#291B64] hover:bg-[#382586] rounded-none transition-colors inline-flex items-center justify-center gap-2 cursor-pointer self-start sm:self-auto"
+                >
+                  {isMuted ? (
+                    <>
+                      <Volume2 className="w-3.5 h-3.5 text-emerald-300" />
+                      <span>Activar Audio</span>
+                    </>
+                  ) : (
+                    <>
+                      <VolumeX className="w-3.5 h-3.5" />
+                      <span>Silenciar</span>
+                    </>
+                  )}
+                </button>
               </div>
             </div>
           </div>
 
-          {/* RIGHT ARCHITECTURAL COMMAND COLUMN (4 Cols on Desktop when not expanded) */}
+          {/* RIGHT EXECUTIVE BIO & DIRECT ACCESS COLUMN (Clean dark surface, no inner boxes) */}
           {!isCinemaExpanded && (
-            <div className="lg:col-span-4 p-5 sm:p-8 lg:p-10 flex flex-col justify-between space-y-6 text-left bg-[#0B0B0F]">
+            <div className="lg:col-span-4 p-6 sm:p-10 lg:p-12 flex flex-col justify-between space-y-8 text-left bg-[#0E0E14]">
               <div className="space-y-5">
-                <div className="flex flex-wrap items-center gap-2 text-xs font-mono text-neutral-400 border-b border-white/15 pb-3">
+                <div className="flex flex-wrap items-center gap-2 text-xs font-mono text-neutral-400">
                   <span>GASTÓN BAREA</span>
                   <span aria-hidden="true">·</span>
                   <span>30 AÑOS TECH</span>
@@ -513,27 +433,27 @@ export const Hero: React.FC<HeroProps> = ({
                 </div>
 
                 <h1
-                  className="font-display font-bold tracking-tight text-white leading-[1.08]"
+                  className="font-display font-bold tracking-tight text-white leading-[1.1]"
                   style={{
-                    fontSize: 'clamp(1.6rem, 2.2vw, 2.4rem)',
+                    fontSize: 'clamp(1.65rem, 2.3vw, 2.45rem)',
                     textWrap: 'balance',
                   }}
                 >
                   Consultor y desarrollador de proyectos de base tecnológica, IA Services y bioeconomía.
                 </h1>
 
-                <p className="text-xs sm:text-sm text-neutral-300 leading-relaxed">
+                <p className="text-sm text-neutral-300 leading-relaxed">
                   Toda esta web funciona como mi{' '}
-                  <strong className="text-white font-semibold">Gemelo Digital</strong>. Interactuá con el video de presentación a ancho completo o utilizá el motor de Inteligencia Artificial inferior para encontrar la solución exacta y estructurar tu proyecto.
+                  <strong className="text-white font-semibold">Gemelo Digital</strong>. Explorá los bloques temáticos del inicio o navegá a cada página dedicada para estructurar tu proyecto e interactuar con mi experiencia.
                 </p>
               </div>
 
-              {/* Executive Action Matrix */}
-              <div className="pt-4 border-t border-white/15 space-y-3">
+              {/* Clean Executive Actions */}
+              <div className="space-y-3 pt-4 border-t border-white/10">
                 <button
                   type="button"
                   onClick={() => onScheduleClick('Sesión Ejecutiva Google Meet Pro desde Portada')}
-                  className="w-full px-5 py-3.5 text-xs sm:text-sm font-semibold text-white bg-[#291B64] hover:bg-[#382586] border border-white/20 rounded-none transition-colors flex items-center justify-between gap-2 cursor-pointer"
+                  className="w-full px-5 py-3.5 text-xs sm:text-sm font-semibold text-white bg-[#291B64] hover:bg-[#382586] rounded-none transition-colors flex items-center justify-between gap-2 cursor-pointer"
                 >
                   <span className="inline-flex items-center gap-2">
                     <Video className="w-4 h-4 text-emerald-300" />
@@ -545,16 +465,16 @@ export const Hero: React.FC<HeroProps> = ({
                 <button
                   type="button"
                   onClick={onDiagnosticoClick}
-                  className="w-full px-5 py-3 text-xs sm:text-sm font-semibold text-white bg-white/5 hover:bg-[#291B64] border border-white/15 rounded-none transition-colors flex items-center justify-between gap-2 cursor-pointer"
+                  className="w-full px-5 py-3.5 text-xs sm:text-sm font-semibold text-white bg-white/[0.07] hover:bg-[#291B64] rounded-none transition-colors flex items-center justify-between gap-2 cursor-pointer"
                 >
                   <span className="inline-flex items-center gap-2">
                     <Play className="w-3.5 h-3.5 text-emerald-400" />
-                    <span>Abrir Estructurador de Proyectos IA</span>
+                    <span>Ir a IA Services & Estructurador</span>
                   </span>
                   <ArrowRight className="w-4 h-4" />
                 </button>
 
-                <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-neutral-400 pt-2">
+                <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-neutral-400 pt-3">
                   <button
                     type="button"
                     onClick={() => onWhatsAppClick()}
@@ -581,27 +501,27 @@ export const Hero: React.FC<HeroProps> = ({
         </div>
       </div>
 
-      {/* STEP 2: FULL-WIDTH AI SOLUTION FINDER (THE ENTIRE WEB AS DIGITAL TWIN) */}
-      <div className="w-full px-4 sm:px-8 lg:px-12 xl:px-16 py-12 md:py-16 space-y-10 bg-white">
-        <div className="rounded-none bg-white border border-black/[0.14] p-5 sm:p-8 lg:p-10 space-y-7 text-left">
-          <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4 border-b border-slate-200 pb-6">
+      {/* BLOQUE 2: BUSCADOR DE SOLUCIONES CON IA (Diseño Abierto, Sin Marcos Pesados) */}
+      <div className="w-full px-4 sm:px-8 lg:px-12 xl:px-16 py-16 md:py-20 bg-[#F7F7FA]">
+        <div className="w-full space-y-10 text-left">
+          <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6">
             <div className="space-y-2 max-w-2xl">
               <div className="text-xs font-mono text-[#291B64] font-semibold">
-                Navegación Asistida por IA · Encontrá tu Solución en la Web
+                BLOQUE INTERACTIVO · GEMELO DIGITAL EN VIVO
               </div>
               <h2
-                className="font-display text-2xl sm:text-3xl font-bold tracking-tight text-[#1D1D1F]"
+                className="font-display text-2xl sm:text-4xl font-bold tracking-tight text-[#1D1D1F]"
                 style={{ textWrap: 'balance' }}
               >
                 ¿Qué proyecto o desafío querés resolver hoy?
               </h2>
             </div>
             <p className="text-xs sm:text-sm text-[#515154] max-w-md leading-relaxed">
-              Consultá en lenguaje natural o seleccioná un eje. La IA integrada evaluará tu caso con el criterio de Gastón Barea y te llevará directamente a la solución correspondiente dentro de la web.
+              Consultá en lenguaje natural o elegí un eje. La IA evaluará tu necesidad con el criterio de Gastón Barea y te abrirá la sección correspondiente.
             </p>
           </div>
 
-          {/* Interactive Intent Selector Bar + Natural Language Input */}
+          {/* Interactive Intent Selector + Sleek Unboxed Input */}
           <div className="space-y-4">
             <div className="flex flex-wrap items-center gap-2">
               {quickIntents.map((intent) => {
@@ -612,10 +532,10 @@ export const Hero: React.FC<HeroProps> = ({
                     type="button"
                     onClick={() => handleAskWebAi(intent.query)}
                     disabled={isAiThinking}
-                    className={`px-3 sm:px-3.5 py-2 text-xs font-semibold rounded-none border transition-colors cursor-pointer whitespace-nowrap ${
+                    className={`px-4 py-2 text-xs font-semibold rounded-none transition-colors cursor-pointer whitespace-nowrap ${
                       isSelected
-                        ? 'bg-[#291B64] text-white border-[#291B64]'
-                        : 'bg-[#F5F5F7] text-[#1D1D1F] border-black/[0.1] hover:bg-[#291B64]/10 hover:border-[#291B64]/30'
+                        ? 'bg-[#291B64] text-white'
+                        : 'bg-white text-[#1D1D1F] hover:bg-[#291B64]/10'
                     }`}
                   >
                     {intent.code}. {intent.label}
@@ -629,31 +549,31 @@ export const Hero: React.FC<HeroProps> = ({
                 e.preventDefault();
                 handleAskWebAi();
               }}
-              className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 p-2 rounded-none bg-[#F5F5F7] border border-black/[0.1]"
+              className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 p-2 rounded-none bg-white shadow-xs"
             >
-              <div className="flex-1 flex items-center gap-3 px-3 py-2">
+              <div className="flex-1 flex items-center gap-3 px-4 py-2.5">
                 <Compass className="w-5 h-5 text-[#291B64] shrink-0" />
                 <input
                   type="text"
                   value={aiQuery}
                   onChange={(e) => setAiQuery(e.target.value)}
                   placeholder="Escribí tu necesidad (ej: 'Integrar IA en nuestra empresa', 'Trazabilidad en bioeconomía', 'Implementar Odoo B2B2C')..."
-                  className="w-full text-sm bg-transparent text-[#1D1D1F] placeholder:text-slate-500 focus:outline-none"
+                  className="w-full text-sm bg-transparent text-[#1D1D1F] placeholder:text-slate-400 focus:outline-none"
                 />
               </div>
               <button
                 type="submit"
                 disabled={isAiThinking || !aiQuery.trim()}
-                className="px-6 py-3 text-xs sm:text-sm font-semibold text-white bg-[#291B64] hover:bg-[#382586] rounded-none transition-colors inline-flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 whitespace-nowrap shrink-0"
+                className="px-6 py-3.5 text-xs sm:text-sm font-semibold text-white bg-[#291B64] hover:bg-[#382586] rounded-none transition-colors inline-flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 whitespace-nowrap shrink-0"
               >
                 {isAiThinking ? (
                   <>
                     <RefreshCw className="w-4 h-4 animate-spin" />
-                    <span>Buscando solución...</span>
+                    <span>Analizando...</span>
                   </>
                 ) : (
                   <>
-                    <span>Encontrar Solución con IA</span>
+                    <span>Consultar al Gemelo Digital</span>
                     <Send className="w-3.5 h-3.5" />
                   </>
                 )}
@@ -661,22 +581,22 @@ export const Hero: React.FC<HeroProps> = ({
             </form>
           </div>
 
-          {/* Live AI Diagnosis + Matched Web Solution Card */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch pt-2">
+          {/* Open Two-Column AI Result (Tonal surfaces, zero heavy borders) */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch pt-2">
             {/* Left (7 cols): Gastón's AI Synthesis */}
-            <div className="lg:col-span-7 p-5 sm:p-6 rounded-none bg-[#F5F5F7] border border-black/[0.1] flex flex-col justify-between space-y-4">
-              <div className="space-y-2.5">
-                <div className="flex flex-wrap items-center justify-between gap-2 text-xs font-mono text-slate-600">
-                  <span>Respuesta del Ecosistema IA · Gastón Barea</span>
-                  <span>Criterio 30 Años Tech · 14 Años PMO</span>
+            <div className="lg:col-span-7 p-6 sm:p-8 bg-white flex flex-col justify-between space-y-5">
+              <div className="space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-2 text-xs font-mono text-slate-500">
+                  <span className="text-[#291B64] font-semibold">Respuesta del Gemelo Digital</span>
+                  <span>30 Años Tech · 14 Años PMO</span>
                 </div>
-                <p className="text-sm sm:text-[15px] text-[#1D1D1F] leading-relaxed whitespace-pre-line">
+                <p className="text-sm sm:text-base text-[#1D1D1F] leading-relaxed whitespace-pre-line">
                   {aiResponseText}
                 </p>
               </div>
 
-              <div className="pt-3 border-t border-black/[0.08] flex flex-wrap items-center justify-between gap-3 text-xs text-slate-600">
-                <span>Metodología de ejecución: 40% Arquitectura · 40% Staging · 20% Producción</span>
+              <div className="pt-4 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-500">
+                <span>Ejecución auditada: 40% Arquitectura · 40% Staging · 20% Producción</span>
                 <button
                   type="button"
                   onClick={() =>
@@ -692,14 +612,14 @@ export const Hero: React.FC<HeroProps> = ({
               </div>
             </div>
 
-            {/* Right (5 cols): Highlighted Solution Found Inside the Web */}
-            <div className="lg:col-span-5 p-5 sm:p-6 rounded-none bg-[#0A0A0C] text-white flex flex-col justify-between space-y-5 border border-white/10">
-              <div className="space-y-2.5">
+            {/* Right (5 cols): Recommended Solution Page */}
+            <div className="lg:col-span-5 p-6 sm:p-8 bg-[#18103C] text-white flex flex-col justify-between space-y-6">
+              <div className="space-y-3">
                 <div className="flex flex-wrap items-center justify-between gap-2 text-xs font-mono text-emerald-400">
-                  <span>Solución Recomendada en la Web</span>
+                  <span>Solución Recomendada</span>
                   <span>Plazo: {matchedSolution.timeline}</span>
                 </div>
-                <h3 className="font-display text-lg sm:text-xl font-bold text-white leading-snug">
+                <h3 className="font-display text-xl sm:text-2xl font-bold text-white leading-snug">
                   {matchedSolution.serviceTitle}
                 </h3>
                 <p className="text-xs sm:text-sm text-neutral-300 leading-relaxed">
@@ -707,7 +627,7 @@ export const Hero: React.FC<HeroProps> = ({
                 </p>
               </div>
 
-              <div className="pt-3 border-t border-white/10 flex flex-wrap items-center gap-2.5">
+              <div className="flex flex-wrap items-center gap-3 pt-2">
                 <button
                   type="button"
                   onClick={() => {
@@ -719,7 +639,7 @@ export const Hero: React.FC<HeroProps> = ({
                       );
                     }
                   }}
-                  className="px-4 py-2.5 text-xs font-semibold text-white bg-[#291B64] hover:bg-[#382586] rounded-none transition-colors inline-flex items-center gap-2 cursor-pointer whitespace-nowrap"
+                  className="px-5 py-3 text-xs font-semibold text-white bg-[#291B64] hover:bg-[#382586] rounded-none transition-colors inline-flex items-center gap-2 cursor-pointer whitespace-nowrap"
                 >
                   <span>{matchedSolution.ctaLabel}</span>
                   <ArrowRight className="w-3.5 h-3.5" />
@@ -728,9 +648,9 @@ export const Hero: React.FC<HeroProps> = ({
                 <button
                   type="button"
                   onClick={onDiagnosticoClick}
-                  className="px-3.5 py-2.5 text-xs font-semibold text-white bg-white/10 hover:bg-white/20 rounded-none transition-colors cursor-pointer whitespace-nowrap"
+                  className="px-4 py-3 text-xs font-semibold text-white bg-white/10 hover:bg-white/20 rounded-none transition-colors cursor-pointer whitespace-nowrap"
                 >
-                  Estructurar Hoja de Ruta
+                  Abrir Estructurador IA
                 </button>
               </div>
             </div>

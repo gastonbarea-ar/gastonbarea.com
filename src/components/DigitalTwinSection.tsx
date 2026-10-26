@@ -83,7 +83,6 @@ export const DigitalTwinSection: React.FC<DigitalTwinSectionProps> = ({
     'Facturación AFIP / B2B',
   ];
 
-  // Pre-fill blueprint generator if user clicked "Estructurar Proyecto con IA" on any service card
   useEffect(() => {
     if (!initialPrompt || !initialPrompt.trim()) return;
     const lower = initialPrompt.toLowerCase();
@@ -153,7 +152,7 @@ export const DigitalTwinSection: React.FC<DigitalTwinSectionProps> = ({
         executiveMessage: data.executiveMessage,
       }).catch(() => {});
     } catch {
-      // Fallback handled by server or gracefully retained
+      // Fallback handled gracefully
     } finally {
       setIsGeneratingBlueprint(false);
     }
@@ -184,55 +183,54 @@ ${proposal.workPhases.map((p) => `- ${p.phase} (${p.duration}): ${p.deliverable}
   };
 
   return (
-    <section
-      id="ia-services"
-      className="py-16 md:py-24 bg-white border-b border-black/[0.14] scroll-mt-16"
-    >
-      <div className="w-full px-4 sm:px-8 lg:px-12 xl:px-16 space-y-10">
-        {/* Anchor alias for legacy #gemelo-digital links */}
-        <div id="gemelo-digital" className="sr-only" />
+    <section id="ia-services" className="w-full bg-white scroll-mt-16">
+      <div id="gemelo-digital" className="sr-only" />
 
-        {/* Section Header */}
-        <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 pb-6 border-b border-black/[0.12]">
-          <div className="space-y-3 max-w-3xl text-left">
-            <div className="text-xs font-mono text-[#291B64] font-semibold">
-              IA Services & Estructurador de Proyectos · Metodología 40 · 40 · 20%
+      {/* Top Deep-Violet IA Services Banner Block (Frameless) */}
+      <div className="w-full py-16 md:py-20 bg-[#160E3B] text-white">
+        <div className="w-full px-4 sm:px-8 lg:px-12 xl:px-16 flex flex-col lg:flex-row lg:items-end justify-between gap-8 text-left">
+          <div className="space-y-4 max-w-3xl">
+            <div className="text-xs font-mono text-emerald-400 font-semibold">
+              IA SERVICES & ESTRUCTURADOR DE PROYECTOS · METODOLOGÍA 40 · 40 · 20%
             </div>
-            <h2
-              className="font-display text-3xl sm:text-4xl font-bold tracking-tight text-[#1D1D1F]"
+            <h1
+              className="font-display text-3xl sm:text-5xl font-bold tracking-tight text-white leading-[1.08]"
               style={{ textWrap: 'balance' }}
             >
               Genere la hoja de ruta técnica y los entregables de su proyecto en tiempo real.
-            </h2>
+            </h1>
+            <p className="text-sm sm:text-base text-neutral-300 leading-relaxed max-w-2xl">
+              Configure el perfil de su organización para que el Gemelo Digital de Gastón Barea calcule arquitectura recomendada, etapas de ejecución y plazos estimados.
+            </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3 self-start lg:self-auto shrink-0">
-            {onClientPortalClick && (
-              <button
-                type="button"
-                onClick={onClientPortalClick}
-                className="px-4 py-2.5 text-xs font-semibold text-[#1D1D1F] bg-[#F5F5F7] hover:bg-black/[0.08] border border-black/[0.14] rounded-none transition-colors inline-flex items-center gap-2 cursor-pointer"
-              >
-                <UserCheck className="w-3.5 h-3.5 text-[#291B64]" />
-                <span>Seguimiento en Portal Clientes</span>
-              </button>
-            )}
-          </div>
+          {onClientPortalClick && (
+            <button
+              type="button"
+              onClick={onClientPortalClick}
+              className="px-5 py-3 text-xs font-mono font-bold text-white bg-white/10 hover:bg-white/20 rounded-none transition-colors inline-flex items-center gap-2 cursor-pointer self-start lg:self-auto shrink-0"
+            >
+              <UserCheck className="w-4 h-4 text-emerald-300" />
+              <span>Seguimiento en Portal Clientes</span>
+            </button>
+          )}
         </div>
+      </div>
 
-        {/* INTERACTIVE PROJECT BLUEPRINT GENERATOR */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start text-left">
+      {/* Main Interactive Structurer Area (Clean Tonal Surfaces, No Heavy Boxes) */}
+      <div className="w-full px-4 sm:px-8 lg:px-12 xl:px-16 py-14 md:py-20">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-start text-left">
           {/* Form Column (5 cols) */}
           <form
             onSubmit={handleGenerateBlueprint}
-            className="lg:col-span-5 p-6 sm:p-8 rounded-none bg-[#F5F5F7] border border-black/[0.14] space-y-5"
+            className="lg:col-span-5 p-7 sm:p-9 rounded-none bg-[#F6F6F9] space-y-5"
           >
-            <div className="space-y-1 pb-3 border-b border-black/[0.1]">
+            <div className="space-y-1 pb-3 border-b border-black/[0.08]">
               <h3 className="font-display text-lg font-bold text-[#1D1D1F]">
                 Parámetros del Proyecto
               </h3>
               <p className="text-xs text-[#515154]">
-                Configure el perfil de su organización para calcular fases, stack recomendado y entregables auditables.
+                Complete los datos clave para simular el plan de ingeniería y gobernanza PMO.
               </p>
             </div>
 
@@ -243,7 +241,7 @@ ${proposal.workPhases.map((p) => `- ${p.phase} (${p.duration}): ${p.deliverable}
               <select
                 value={organizationType}
                 onChange={(e) => setOrganizationType(e.target.value)}
-                className="w-full px-3.5 py-2.5 text-xs sm:text-sm bg-white rounded-none border border-black/[0.18] text-[#1D1D1F] focus:outline-none focus:border-[#291B64]"
+                className="w-full px-3.5 py-2.5 text-xs sm:text-sm bg-white rounded-none border border-black/[0.1] text-[#1D1D1F] focus:outline-none focus:border-[#291B64]"
               >
                 {orgOptions.map((opt) => (
                   <option key={opt} value={opt}>
@@ -260,7 +258,7 @@ ${proposal.workPhases.map((p) => `- ${p.phase} (${p.duration}): ${p.deliverable}
               <select
                 value={primaryChallenge}
                 onChange={(e) => setPrimaryChallenge(e.target.value)}
-                className="w-full px-3.5 py-2.5 text-xs sm:text-sm bg-white rounded-none border border-black/[0.18] text-[#1D1D1F] focus:outline-none focus:border-[#291B64]"
+                className="w-full px-3.5 py-2.5 text-xs sm:text-sm bg-white rounded-none border border-black/[0.1] text-[#1D1D1F] focus:outline-none focus:border-[#291B64]"
               >
                 {challengeOptions.map((ch) => (
                   <option key={ch} value={ch}>
@@ -282,10 +280,10 @@ ${proposal.workPhases.map((p) => `- ${p.phase} (${p.duration}): ${p.deliverable}
                       key={tag}
                       type="button"
                       onClick={() => toggleStackTag(tag)}
-                      className={`px-2.5 py-1 text-xs font-medium rounded-none border transition-colors cursor-pointer ${
+                      className={`px-3 py-1.5 text-xs font-medium rounded-none transition-colors cursor-pointer ${
                         active
-                          ? 'bg-[#291B64] text-white border-[#291B64]'
-                          : 'bg-white text-[#1D1D1F] border-black/[0.15] hover:border-[#291B64]'
+                          ? 'bg-[#291B64] text-white'
+                          : 'bg-white text-[#515154] hover:text-[#1D1D1F]'
                       }`}
                     >
                       {tag}
@@ -305,7 +303,7 @@ ${proposal.workPhases.map((p) => `- ${p.phase} (${p.duration}): ${p.deliverable}
                   value={companyName}
                   onChange={(e) => setCompanyName(e.target.value)}
                   placeholder="Ej: BioPatagonia S.A."
-                  className="w-full px-3 py-2 text-xs bg-white rounded-none border border-black/[0.18] text-[#1D1D1F] focus:outline-none focus:border-[#291B64]"
+                  className="w-full px-3 py-2.5 text-xs bg-white rounded-none border border-black/[0.1] text-[#1D1D1F] focus:outline-none focus:border-[#291B64]"
                 />
               </div>
               <div>
@@ -315,7 +313,7 @@ ${proposal.workPhases.map((p) => `- ${p.phase} (${p.duration}): ${p.deliverable}
                 <select
                   value={urgency}
                   onChange={(e) => setUrgency(e.target.value)}
-                  className="w-full px-3 py-2 text-xs bg-white rounded-none border border-black/[0.18] text-[#1D1D1F] focus:outline-none focus:border-[#291B64]"
+                  className="w-full px-3 py-2.5 text-xs bg-white rounded-none border border-black/[0.1] text-[#1D1D1F] focus:outline-none focus:border-[#291B64]"
                 >
                   <option value="Crítica (Inmediata)">Inmediato (Esta semana)</option>
                   <option value="Alta (Próximos 30 días)">Próximos 30 días</option>
@@ -333,14 +331,14 @@ ${proposal.workPhases.map((p) => `- ${p.phase} (${p.duration}): ${p.deliverable}
                 value={customContext}
                 onChange={(e) => setCustomContext(e.target.value)}
                 placeholder="Describí brevemente el desafío técnico, de IA Services o bioeconomía..."
-                className="w-full px-3 py-2 text-xs bg-white rounded-none border border-black/[0.18] text-[#1D1D1F] focus:outline-none focus:border-[#291B64]"
+                className="w-full px-3 py-2.5 text-xs bg-white rounded-none border border-black/[0.1] text-[#1D1D1F] focus:outline-none focus:border-[#291B64]"
               />
             </div>
 
             <button
               type="submit"
               disabled={isGeneratingBlueprint}
-              className="w-full py-3.5 px-5 text-xs sm:text-sm font-semibold text-white bg-[#291B64] hover:bg-[#382586] rounded-none transition-colors flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+              className="w-full py-4 px-5 text-xs sm:text-sm font-semibold text-white bg-[#291B64] hover:bg-[#382586] rounded-none transition-colors flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
             >
               {isGeneratingBlueprint ? (
                 <>
@@ -356,53 +354,53 @@ ${proposal.workPhases.map((p) => `- ${p.phase} (${p.duration}): ${p.deliverable}
             </button>
           </form>
 
-          {/* Blueprint Output Column (7 cols) */}
-          <div className="lg:col-span-7 p-6 sm:p-9 rounded-none bg-white border border-black/[0.14] space-y-6">
+          {/* Blueprint Output Column (7 cols - Open Layout without Outer Frame) */}
+          <div className="lg:col-span-7 space-y-8">
             {!proposal ? (
-              <div className="py-8 sm:py-12 space-y-6">
-                <div className="space-y-2 border-b border-black/[0.1] pb-5">
+              <div className="space-y-8">
+                <div className="space-y-3 pb-6 border-b border-black/[0.08]">
                   <div className="text-xs font-mono text-[#291B64] font-semibold">
-                    Arquitectura de Ejecución · Hitos Verificables
+                    ARQUITECTURA DE EJECUCIÓN · HITOS VERIFICABLES
                   </div>
-                  <h4 className="font-display text-xl sm:text-2xl font-bold text-[#1D1D1F]">
+                  <h3 className="font-display text-2xl sm:text-3xl font-bold text-[#1D1D1F]">
                     ¿Cómo estructuramos y dirigimos cada proyecto?
-                  </h4>
-                  <p className="text-xs sm:text-sm text-[#515154] leading-relaxed">
+                  </h3>
+                  <p className="text-sm text-[#515154] leading-relaxed">
                     Seleccione los parámetros a la izquierda y presione{' '}
-                    <strong className="text-[#1D1D1F]">Generar Hoja de Ruta del Proyecto</strong> para obtener un diagnóstico personalizado, o revise el esquema estándar de gobernanza PMO:
+                    <strong className="text-[#1D1D1F]">Generar Hoja de Ruta del Proyecto</strong> para obtener un diagnóstico personalizado en vivo, o revise el esquema estándar de gobernanza PMO:
                   </p>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <div className="p-4 bg-[#F5F5F7] border border-black/[0.1] space-y-1.5">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+                  <div className="p-6 bg-[#F6F6F9] space-y-2">
                     <div className="text-xs font-mono font-bold text-[#291B64]">HITO 01 · 40%</div>
-                    <div className="text-sm font-bold text-[#1D1D1F]">Arquitectura & Kick-off</div>
+                    <div className="text-base font-bold text-[#1D1D1F]">Arquitectura & Kick-off</div>
                     <p className="text-xs text-[#515154] leading-relaxed">
                       Definición de alcance cerrado, modelo de datos PostgreSQL, contenedores Docker y entorno base.
                     </p>
                   </div>
-                  <div className="p-4 bg-[#F5F5F7] border border-black/[0.1] space-y-1.5">
+                  <div className="p-6 bg-[#F6F6F9] space-y-2">
                     <div className="text-xs font-mono font-bold text-[#291B64]">HITO 02 · 40%</div>
-                    <div className="text-sm font-bold text-[#1D1D1F]">Validación en Staging</div>
+                    <div className="text-base font-bold text-[#1D1D1F]">Validación en Staging</div>
                     <p className="text-xs text-[#515154] leading-relaxed">
                       Despliegue funcional en servidor espejo para pruebas reales con su equipo antes de salir en vivo.
                     </p>
                   </div>
-                  <div className="p-4 bg-[#F5F5F7] border border-black/[0.1] space-y-1.5">
+                  <div className="p-6 bg-[#F6F6F9] space-y-2">
                     <div className="text-xs font-mono font-bold text-[#291B64]">HITO 03 · 20%</div>
-                    <div className="text-sm font-bold text-[#1D1D1F]">Puesta en Producción</div>
+                    <div className="text-base font-bold text-[#1D1D1F]">Puesta en Producción</div>
                     <p className="text-xs text-[#515154] leading-relaxed">
                       Lanzamiento auditado, capacitación operativa, transferencia de código y soporte SLA en Portal Clientes.
                     </p>
                   </div>
                 </div>
 
-                <div className="p-4 bg-[#0A0A0C] text-white border border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                  <div className="space-y-0.5">
+                <div className="p-7 bg-[#160E3B] text-white flex flex-col sm:flex-row sm:items-center justify-between gap-6">
+                  <div className="space-y-1">
                     <div className="text-xs font-mono text-emerald-400">
-                      IA Services · Gemelos Digitales Corporativos
+                      IA SERVICES · GEMELOS DIGITALES CORPORATIVOS
                     </div>
-                    <p className="text-xs text-neutral-300">
+                    <p className="text-sm text-neutral-200">
                       ¿Quiere replicar una arquitectura interactiva con IA como esta web en su propia empresa?
                     </p>
                   </div>
@@ -414,7 +412,7 @@ ${proposal.workPhases.map((p) => `- ${p.phase} (${p.duration}): ${p.deliverable}
                         '02. IA Services: Gemelos Digitales & Agentes RAG'
                       )
                     }
-                    className="px-4 py-2.5 text-xs font-semibold text-white bg-[#291B64] hover:bg-[#382586] rounded-none transition-colors inline-flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0"
+                    className="px-5 py-3 text-xs font-semibold text-white bg-[#291B64] hover:bg-[#382586] rounded-none transition-colors inline-flex items-center gap-2 cursor-pointer whitespace-nowrap shrink-0"
                   >
                     <Sparkles className="w-3.5 h-3.5" />
                     <span>Coordinar Reunión IA Services</span>
@@ -423,43 +421,40 @@ ${proposal.workPhases.map((p) => `- ${p.phase} (${p.duration}): ${p.deliverable}
               </div>
             ) : (
               <div className="space-y-6">
-                <div className="flex flex-wrap items-start justify-between gap-4 pb-4 border-b border-black/[0.1]">
+                <div className="flex flex-wrap items-start justify-between gap-4 pb-5 border-b border-black/[0.08]">
                   <div className="space-y-1">
                     <div className="text-xs font-mono text-[#291B64] font-semibold">
                       Plazo estimado: {proposal.estimatedTimeline} · Dirección Ejecutiva Gastón Barea
                     </div>
-                    <h3 className="font-display text-xl sm:text-2xl font-bold text-[#1D1D1F]">
+                    <h3 className="font-display text-2xl sm:text-3xl font-bold text-[#1D1D1F]">
                       {proposal.architectureTitle}
                     </h3>
                   </div>
                   <button
                     type="button"
                     onClick={handleCopyBlueprint}
-                    className="px-3 py-1.5 text-xs font-medium text-[#1D1D1F] bg-[#F5F5F7] hover:bg-black/[0.08] rounded-none border border-black/[0.15] inline-flex items-center gap-1.5 cursor-pointer"
+                    className="px-4 py-2 text-xs font-medium text-[#1D1D1F] bg-[#F6F6F9] hover:bg-black/[0.06] rounded-none inline-flex items-center gap-1.5 cursor-pointer"
                   >
                     {copied ? <Check className="w-3.5 h-3.5 text-emerald-700" /> : <Copy className="w-3.5 h-3.5" />}
                     <span>{copied ? 'Copiado' : 'Copiar Resumen'}</span>
                   </button>
                 </div>
 
-                <div className="p-5 rounded-none bg-[#F5F5F7] border border-black/[0.1] space-y-1.5">
-                  <div className="text-xs font-mono text-[#515154]">Diagnóstico Ejecutivo</div>
-                  <p className="text-sm text-[#1D1D1F] leading-relaxed">
+                <div className="p-6 bg-[#F6F6F9] space-y-2">
+                  <div className="text-xs font-mono text-[#291B64] font-semibold">Diagnóstico Ejecutivo</div>
+                  <p className="text-sm sm:text-base text-[#1D1D1F] leading-relaxed">
                     {proposal.diagnosticSummary}
                   </p>
                 </div>
 
                 {/* Work Phases */}
-                <div className="space-y-3">
+                <div className="space-y-4">
                   <div className="text-xs font-mono text-[#515154]">
                     Etapas de Implementación y Entregables
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     {proposal.workPhases.map((phase, idx) => (
-                      <div
-                        key={idx}
-                        className="p-4 rounded-none bg-[#F5F5F7] border border-black/[0.1] space-y-1"
-                      >
+                      <div key={idx} className="p-5 bg-[#F6F6F9] space-y-1.5">
                         <div className="text-xs font-mono text-[#291B64] font-semibold">
                           {phase.duration}
                         </div>
@@ -473,7 +468,7 @@ ${proposal.workPhases.map((p) => `- ${p.phase} (${p.duration}): ${p.deliverable}
                 </div>
 
                 {/* Stack */}
-                <div className="pt-2 border-t border-black/[0.1] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="pt-3 border-t border-black/[0.08] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div className="text-xs text-[#515154]">
                     <span className="font-semibold text-[#1D1D1F]">Stack recomendado: </span>
                     {proposal.recommendedStack.join(' · ')}
@@ -481,13 +476,13 @@ ${proposal.workPhases.map((p) => `- ${p.phase} (${p.duration}): ${p.deliverable}
                 </div>
 
                 {/* Direct Conversion CTA */}
-                <div className="pt-4 border-t border-black/[0.1] flex flex-wrap items-center gap-3">
+                <div className="pt-4 flex flex-wrap items-center gap-3">
                   <button
                     type="button"
                     onClick={() =>
                       onScheduleWithProposal(getBlueprintSummary(), proposal.architectureTitle)
                     }
-                    className="px-5 py-3 text-xs sm:text-sm font-semibold text-white bg-[#291B64] hover:bg-[#382586] rounded-none transition-colors inline-flex items-center gap-2 cursor-pointer"
+                    className="px-6 py-3.5 text-xs sm:text-sm font-semibold text-white bg-[#291B64] hover:bg-[#382586] rounded-none transition-colors inline-flex items-center gap-2 cursor-pointer"
                   >
                     <Video className="w-4 h-4" />
                     <span>Validar Hoja de Ruta en Google Meet Pro (30m)</span>
@@ -495,7 +490,7 @@ ${proposal.workPhases.map((p) => `- ${p.phase} (${p.duration}): ${p.deliverable}
                   <button
                     type="button"
                     onClick={() => onWhatsAppWithProposal(getBlueprintSummary())}
-                    className="px-4 py-3 text-xs sm:text-sm font-semibold text-[#1D1D1F] bg-[#F5F5F7] hover:bg-black/[0.08] border border-black/[0.15] rounded-none transition-colors inline-flex items-center gap-2 cursor-pointer"
+                    className="px-5 py-3.5 text-xs sm:text-sm font-semibold text-[#1D1D1F] bg-[#F6F6F9] hover:bg-black/[0.06] rounded-none transition-colors inline-flex items-center gap-2 cursor-pointer"
                   >
                     <MessageSquare className="w-4 h-4" />
                     <span>Enviar a Gastón por WhatsApp</span>
