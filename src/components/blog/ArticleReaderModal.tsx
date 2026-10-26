@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { BlogPost } from '../../types/blog';
 import { MediaBlockRenderer } from './MediaBlockRenderer';
+import { BrandLogo } from '../BrandLogo';
 
 interface ArticleReaderModalProps {
   post: BlogPost | null;
@@ -180,13 +181,11 @@ export const ArticleReaderModal: React.FC<ArticleReaderModalProps> = ({
             </p>
 
             {/* Author Profile Strip */}
-            <div className="flex items-center justify-between py-4 border-y border-black/[0.08] my-6">
-              <div className="flex items-center gap-3">
-                <div className="w-11 h-11 rounded-none bg-[#291B64] text-white flex items-center justify-center font-bold font-mono text-sm">
-                  GB
-                </div>
+            <div className="flex flex-wrap items-center justify-between gap-4 py-4 border-y border-black/[0.08] my-6">
+              <div className="flex items-center gap-4">
+                <BrandLogo theme="on-light" size="sm" />
                 <div>
-                  <div className="text-sm font-bold text-[#1D1D1F] flex items-center gap-1.5">
+                  <div className="text-sm font-bold text-[#1D1D1F] flex flex-wrap items-center gap-1.5">
                     <span>{post.author.name}</span>
                     <span className="text-[#291B64] text-xs font-mono">
                       · 30 Años Tech · 14 Años PMO

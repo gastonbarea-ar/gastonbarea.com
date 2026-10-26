@@ -1,6 +1,7 @@
 import React from 'react';
 import { ArrowRight, Linkedin, Github, Video, UserCheck } from 'lucide-react';
 import { SITE_CONFIG } from '../data/siteConfig';
+import { BrandLogo } from './BrandLogo';
 
 interface AboutProfileSectionProps {
   onScheduleClick: () => void;
@@ -92,16 +93,21 @@ export const AboutProfileSection: React.FC<AboutProfileSectionProps> = ({
           {/* Right Column (5 cols): Clean Obsidian Executive Card */}
           <div className="lg:col-span-5">
             <div className="rounded-none bg-[#0D0D12] text-white p-8 sm:p-10 space-y-6">
-              <div className="pb-5 border-b border-white/10 space-y-1">
-                <div className="text-xs font-mono text-emerald-400">
-                  FICHA EJECUTIVA DEL CONSULTOR
+              <div className="pb-5 border-b border-white/10 space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <BrandLogo theme="on-dark" size="md" />
+                  <span className="text-[11px] font-mono text-emerald-400 text-right">
+                    FICHA EJECUTIVA
+                  </span>
                 </div>
-                <h3 className="font-display text-2xl font-bold text-white">
-                  {SITE_CONFIG.name}
-                </h3>
-                <p className="text-xs sm:text-sm text-slate-300">
-                  {SITE_CONFIG.role}
-                </p>
+                <div className="space-y-1">
+                  <h3 className="font-display text-2xl font-bold text-white">
+                    {SITE_CONFIG.name}
+                  </h3>
+                  <p className="text-xs sm:text-sm text-slate-300">
+                    {SITE_CONFIG.role}
+                  </p>
+                </div>
               </div>
 
               <div className="space-y-3 text-xs font-mono">

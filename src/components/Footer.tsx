@@ -13,6 +13,7 @@ import {
   Twitter,
 } from 'lucide-react';
 import { SITE_CONFIG, SiteConfig } from '../data/siteConfig';
+import { BrandLogo } from './BrandLogo';
 
 interface FooterProps {
   onNavigate?: (href: string) => void;
@@ -59,7 +60,15 @@ export const Footer: React.FC<FooterProps> = ({
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-10 pb-12 border-b border-black/[0.06] text-left">
           {/* Brand & Identity (5 cols) */}
           <div className="lg:col-span-5 space-y-3.5">
-            <div className="font-display text-base font-bold text-slate-900 tracking-tight">
+            <a
+              href="#inicio"
+              onClick={(e) => handleLinkClick(e, '#inicio')}
+              className="inline-block hover:opacity-85 transition-opacity"
+              aria-label="Gastón Barea – Inicio"
+            >
+              <BrandLogo theme="on-light" size="lg" />
+            </a>
+            <div className="font-display text-sm font-bold text-slate-900 tracking-tight">
               {liveConfig.name} · {liveConfig.domain}
             </div>
             <p className="text-xs text-slate-600 leading-relaxed max-w-md">

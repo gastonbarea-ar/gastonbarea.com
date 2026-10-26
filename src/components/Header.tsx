@@ -12,6 +12,7 @@ import {
   BookOpen,
 } from 'lucide-react';
 import { SITE_CONFIG } from '../data/siteConfig';
+import { BrandLogo } from './BrandLogo';
 
 export type PageSectionId =
   | 'inicio'
@@ -254,11 +255,13 @@ export const Header: React.FC<HeaderProps> = ({
             <a
               href="#inicio"
               onClick={(e) => handleNavClick(e, '#inicio')}
-              className={`font-display text-base sm:text-xl font-bold tracking-tight whitespace-nowrap shrink-0 hover:opacity-80 transition-opacity ${
-                isOverDarkStage ? 'text-white' : 'text-[#1D1D1F]'
-              }`}
+              className="inline-flex items-center gap-2.5 shrink-0 hover:opacity-85 transition-opacity"
+              aria-label="Gastón Barea – Inicio"
             >
-              Gastón Barea
+              <BrandLogo
+                theme={isOverDarkStage ? 'on-dark' : 'on-light'}
+                size="nav"
+              />
             </a>
           </div>
 
@@ -374,9 +377,10 @@ export const Header: React.FC<HeaderProps> = ({
               </div>
 
               {/* Bottom Quick Index Strip */}
-              <div className="px-4 sm:px-8 lg:px-12 py-5 bg-[#0E0E12] border-t border-white/10 flex flex-wrap items-center justify-between gap-4 text-xs font-mono text-neutral-400">
-                <div>
-                  <span>GASTÓN BAREA · GEMELO DIGITAL INTERACTIVO</span>
+              <div className="px-4 sm:px-8 lg:px-12 py-4 bg-[#0E0E12] border-t border-white/10 flex flex-wrap items-center justify-between gap-4 text-xs font-mono text-neutral-400">
+                <div className="flex items-center gap-3">
+                  <BrandLogo theme="on-dark" size="sm" />
+                  <span className="hidden sm:inline">· GEMELO DIGITAL INTERACTIVO</span>
                 </div>
                 <div className="flex flex-wrap items-center gap-5">
                   <a
