@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Menu,
   X,
@@ -8,8 +8,10 @@ import {
   UserCheck,
   MessageSquare,
   Youtube,
-  Compass,
   BookOpen,
+  ChevronDown,
+  Sparkles,
+  FolderKanban,
 } from 'lucide-react';
 import { SITE_CONFIG } from '../data/siteConfig';
 
@@ -18,6 +20,7 @@ export type PageSectionId =
   | 'servicios'
   | 'ia-services'
   | 'bioeconomia'
+  | 'proyectos'
   | 'trayectoria'
   | 'blog'
   | 'contacto';
@@ -31,6 +34,54 @@ interface HeaderProps {
   onClientPortalClick?: () => void;
 }
 
+interface SubSolutionItem {
+  code: string;
+  label: string;
+  sublabel: string;
+  href: string;
+  badge?: string;
+}
+
+export const SOLUCIONES_SUBMENU: SubSolutionItem[] = [
+  {
+    code: '01',
+    label: 'IA Services & Gemelos Digitales',
+    sublabel: 'Agentes RAG, BI y Estructurador de Proyectos en Vivo',
+    href: '#ia-services',
+    badge: 'IA EN VIVO',
+  },
+  {
+    code: '02',
+    label: 'Proyectos de Base Tecnológica (EBTs)',
+    sublabel: 'Ingeniería de producto full-stack y plataformas escalables',
+    href: '#ebts',
+  },
+  {
+    code: '03',
+    label: 'Bioeconomía & Trazabilidad IoT',
+    sublabel: 'Pasaportes digitales de lote, telemetría y casos reales',
+    href: '#bioeconomia',
+  },
+  {
+    code: '04',
+    label: 'Dirección Ejecutiva de Proyectos (PMO)',
+    sublabel: '14 años liderando proyectos con clientes · Hitos 40·40·20%',
+    href: '#pmo-clientes',
+  },
+  {
+    code: '05',
+    label: 'Odoo Community ERP v18 & B2B2C',
+    sublabel: ' Producción MRP, inventario multidepósito y comercio mayorista',
+    href: '#odoo-v18',
+  },
+  {
+    code: '06',
+    label: 'Infraestructura Crítica Linux & Docker',
+    sublabel: 'Soberanía de datos, redes WireGuard VPN y continuidad 24/7',
+    href: '#linux-docker',
+  },
+];
+
 interface FwaMenuItem {
   index: string;
   id: PageSectionId;
@@ -40,6 +91,7 @@ interface FwaMenuItem {
   description: string;
   metrics: string;
   featuredItems: string[];
+  subLinks?: { label: string; href: string }[];
 }
 
 const FWA_MENU_SECTIONS: FwaMenuItem[] = [
@@ -50,7 +102,7 @@ const FWA_MENU_SECTIONS: FwaMenuItem[] = [
     href: '#inicio',
     category: 'Experiencia en Video Full-Width · Bloques Personalizados & Buscador IA',
     description:
-      'Portada principal diseñada por bloques personalizados: escenario audiovisual desde el canal de YouTube de Gastón Barea, buscador de soluciones con IA y resumen interactivo de cada área.',
+      'Portada principal diseñada por bloques personalizados: escenario audiovisual desde el canal de YouTube de Gastón Barea, buscador de soluciones con IA y recorrido ejecutivo.',
     metrics: 'Canal @gastonbarea · IA en Vivo',
     featuredItems: [
       'Showreel interactivo full-width de proyectos tecnológicos y bioeconomía',
@@ -61,57 +113,47 @@ const FWA_MENU_SECTIONS: FwaMenuItem[] = [
   {
     index: '02',
     id: 'servicios',
-    label: 'Soluciones & Arquitectura',
+    label: 'Soluciones (IA Services & Verticales)',
     href: '#servicios',
-    category: 'Página Dedicada · 6 Verticales de Ingeniería & Negocios',
+    category: 'IA Services · Base Tecnológica · Bioeconomía · PMO · Odoo v18 · Linux',
     description:
-      'Desarrollo de proyectos de base tecnológica, IA Services, trazabilidad bioeconómica, dirección PMO, Odoo ERP v18 y servidores Linux/Docker.',
-    metrics: '6 Ejes Productivos · Hitos 40·40·20',
+      'Hub integral de soluciones de ingeniería y negocios: incluye IA Services y Estructurador de Proyectos en vivo, Bioeconomía con IoT, desarrollo de EBTs, dirección PMO, Odoo ERP v18 e infraestructura Linux.',
+    metrics: '6 Verticales · Hitos 40·40·20',
     featuredItems: [
-      '01. Proyectos de Base Tecnológica & Plataformas Digitales',
-      '02. IA Services: Gemelos Digitales, Agentes RAG & BI',
-      '03. Proyectos Basados en Bioeconomía & Telemetría IoT',
-      '04. Dirección Ejecutiva de Proyectos con Clientes (14 Años PMO)',
-      '05. Odoo Community ERP v18 & E-Commerce B2B2C',
-      '06. Infraestructura Crítica Linux, Docker & Ciberseguridad',
+      '01. IA Services: Gemelos Digitales, Agentes RAG & Estructurador en Vivo',
+      '02. Proyectos de Base Tecnológica (EBTs) & Plataformas Digitales',
+      '03. Bioeconomía, Trazabilidad Digital de Lote & Telemetría IoT',
+      '04. Dirección Ejecutiva de Proyectos con Clientes (PMO Externa)',
+      '05. Odoo Community ERP v18 & E-Commerce B2B2C sin costo de licencias',
+      '06. Infraestructura Crítica Linux, Docker & Ciberseguridad Industrial',
+    ],
+    subLinks: [
+      { label: 'Ir a IA Services & Estructurador', href: '#ia-services' },
+      { label: 'Ir a Bioeconomía & Casos IoT', href: '#bioeconomia' },
+      { label: 'Ver las 6 Soluciones', href: '#servicios' },
     ],
   },
   {
     index: '03',
-    id: 'ia-services',
-    label: 'IA Services & Estructurador',
-    href: '#ia-services',
-    category: 'Página Dedicada · Gemelos Digitales Corporativos & Blueprint Técnico',
+    id: 'proyectos',
+    label: 'Proyectos (Realizados & En Producción)',
+    href: '#proyectos',
+    category: 'Portfolio Ejecutivo · Sistemas Activos 24/7 & Arquitecturas Entregadas',
     description:
-      'Convertimos portales corporativos y operaciones industriales en Gemelos Digitales interactivos. Probá en vivo el estructurador de proyectos en 3 fases.',
-    metrics: '3 a 6 Semanas · Arquitectura Viva',
+      'Catálogo de proyectos realizados y sistemas actualmente en producción en IA Services, trazabilidad bioeconómica, plataformas de base tecnológica, Odoo ERP v18 e infraestructura crítica.',
+    metrics: 'En Producción · Impacto Auditable',
     featuredItems: [
-      'Diseño de Gemelos Digitales para atención, ventas B2B y operaciones',
-      'Generador instantáneo de hoja de ruta (40% Inicio · 40% Staging · 20% Producción)',
-      'Simulación de stack técnico, plazos y entregables auditables por vertical',
+      'Sistemas en producción activa 24/7 con métricas reales de operación',
+      'Proyectos realizados y transferidos bajo metodología 40·40·20%',
+      'Filtro interactivo por estado operativo y vertical tecnológica',
     ],
   },
   {
     index: '04',
-    id: 'bioeconomia',
-    label: 'Bioeconomía & Casos Reales',
-    href: '#bioeconomia',
-    category: 'Página Dedicada · Convergencia Tecnológica-Productiva & Evidencia',
-    description:
-      'Digitalización de bioprocesos, valorización de biomasa, economía circular y casos de impacto auditables en agroindustria, distribución y energía.',
-    metrics: '-42% Mermas · 100% Trazabilidad',
-    featuredItems: [
-      'Pasaportes digitales de lote y monitoreo IoT en planta y campo',
-      'Estructuración técnica de Empresas de Base Tecnológica (EBTs)',
-      'Casos de éxito documentados con métricas reales de retorno',
-    ],
-  },
-  {
-    index: '05',
     id: 'trayectoria',
-    label: 'Trayectoria (30 Años)',
-    href: '#trayectoria',
-    category: 'Página Dedicada · 30 Años Sector Tecnológico · 14 Años Dirección PMO',
+    label: 'Experience (30 Años Tech · 14 PMO)',
+    href: '#experience',
+    category: 'Respaldo Ejecutivo · 30 Años Sector Tecnológico · 14 Años Dirección PMO',
     description:
       'Tres décadas desarrollando tecnología aplicada a la producción real (1996–2026) y 14 años liderando proyectos estratégicos directamente junto a clientes.',
     metrics: '1996–2026 · Patagonia & Global',
@@ -122,11 +164,11 @@ const FWA_MENU_SECTIONS: FwaMenuItem[] = [
     ],
   },
   {
-    index: '06',
+    index: '05',
     id: 'blog',
     label: 'Blog & Publicaciones',
     href: '#blog',
-    category: 'Página Dedicada · Artículos Técnicos, Videos & Análisis Ejecutivo',
+    category: 'Artículos Técnicos, Videos & Análisis Ejecutivo',
     description:
       'Publicaciones de Gastón Barea sobre bioeconomía, trazabilidad digital, dirección de proyectos PMO, Gemelos Digitales con IA y arquitectura Odoo/Linux.',
     metrics: 'Lectura Interactiva · Editor Integrado',
@@ -137,11 +179,11 @@ const FWA_MENU_SECTIONS: FwaMenuItem[] = [
     ],
   },
   {
-    index: '07',
+    index: '06',
     id: 'contacto',
     label: 'Contacto Ejecutivo',
     href: '#contacto',
-    category: 'Página Dedicada · Canal Directo, Google Meet Pro & Protocolo NDA',
+    category: 'Canal Directo, Google Meet Pro & Protocolo NDA',
     description:
       'Inicio inmediato de evaluación de proyectos bajo acuerdo de confidencialidad (NDA), formulario de requerimiento técnico y preguntas frecuentes.',
     metrics: 'Respuesta < 24h · NDA Garantizado',
@@ -161,8 +203,10 @@ export const Header: React.FC<HeaderProps> = ({
   onClientPortalClick,
 }) => {
   const [fwaMenuOpen, setFwaMenuOpen] = useState(false);
+  const [solucionesDropdownOpen, setSolucionesDropdownOpen] = useState(false);
   const [hoveredIndex, setHoveredIndex] = useState<number>(0);
   const [isScrolledPastVideo, setIsScrolledPastVideo] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Detect scroll to transition header from integrated video overlay to crisp white bar
   useEffect(() => {
@@ -175,16 +219,26 @@ export const Header: React.FC<HeaderProps> = ({
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // Close menu on ESC key
+  // Close menus on ESC key or outside click for dropdown
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && fwaMenuOpen) {
+      if (e.key === 'Escape') {
         setFwaMenuOpen(false);
+        setSolucionesDropdownOpen(false);
+      }
+    };
+    const handleClickOutside = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setSolucionesDropdownOpen(false);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [fwaMenuOpen]);
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
 
   // Lock body scroll when full-screen FWA menu is open
   useEffect(() => {
@@ -201,6 +255,7 @@ export const Header: React.FC<HeaderProps> = ({
   const handleNavClick = (e: React.MouseEvent<HTMLAnchorElement>, href: string) => {
     e.preventDefault();
     setFwaMenuOpen(false);
+    setSolucionesDropdownOpen(false);
     if (onNavigate) {
       onNavigate(href);
     }
@@ -211,15 +266,8 @@ export const Header: React.FC<HeaderProps> = ({
   // Dark glass header when on Inicio above the video stage or when FWA menu is open
   const isOverDarkStage = (activePage === 'inicio' && !isScrolledPastVideo) || fwaMenuOpen;
 
-  const topNavItems: { id: PageSectionId; label: string; href: string }[] = [
-    { id: 'inicio', label: 'Inicio', href: '#inicio' },
-    { id: 'servicios', label: 'Soluciones', href: '#servicios' },
-    { id: 'ia-services', label: 'IA Services', href: '#ia-services' },
-    { id: 'bioeconomia', label: 'Bioeconomía', href: '#bioeconomia' },
-    { id: 'trayectoria', label: 'Trayectoria', href: '#trayectoria' },
-    { id: 'blog', label: 'Blog', href: '#blog' },
-    { id: 'contacto', label: 'Contacto', href: '#contacto' },
-  ];
+  const isSolucionesActive =
+    activePage === 'servicios' || activePage === 'ia-services' || activePage === 'bioeconomia';
 
   return (
     <>
@@ -236,7 +284,10 @@ export const Header: React.FC<HeaderProps> = ({
           <div className="flex items-center gap-3 sm:gap-5 shrink-0">
             <button
               type="button"
-              onClick={() => setFwaMenuOpen(!fwaMenuOpen)}
+              onClick={() => {
+                setSolucionesDropdownOpen(false);
+                setFwaMenuOpen(!fwaMenuOpen);
+              }}
               className={`px-3.5 py-2 text-xs font-mono font-bold tracking-wider transition-colors inline-flex items-center gap-2 cursor-pointer rounded-none whitespace-nowrap ${
                 fwaMenuOpen
                   ? 'bg-[#291B64] text-white'
@@ -262,33 +313,196 @@ export const Header: React.FC<HeaderProps> = ({
             </a>
           </div>
 
-          {/* Zone 2: Direct Multi-Page Section Navigation (Includes Blog prominently) */}
+          {/* Zone 2: Direct Multi-Page Section Navigation (Inicio | Soluciones ▾ | Proyectos | Experience | Blog | Contacto) */}
           <nav
-            className={`hidden xl:flex items-center gap-6 text-xs font-mono font-semibold ${
+            className={`hidden xl:flex items-center gap-7 text-xs font-mono font-semibold ${
               isOverDarkStage ? 'text-neutral-300' : 'text-[#515154]'
             }`}
           >
-            {topNavItems.map((nav) => {
-              const isCurrent = activePage === nav.id;
-              return (
-                <a
-                  key={nav.id}
-                  href={nav.href}
-                  onClick={(e) => handleNavClick(e, nav.href)}
-                  className={`py-1 transition-colors whitespace-nowrap shrink-0 border-b-2 ${
-                    isCurrent
-                      ? isOverDarkStage
-                        ? 'text-white border-emerald-400 font-bold'
-                        : 'text-[#291B64] border-[#291B64] font-bold'
-                      : isOverDarkStage
-                      ? 'border-transparent hover:text-white'
-                      : 'border-transparent hover:text-[#291B64]'
+            {/* 1. Inicio */}
+            <a
+              href="#inicio"
+              onClick={(e) => handleNavClick(e, '#inicio')}
+              className={`py-1 transition-colors whitespace-nowrap shrink-0 border-b-2 ${
+                activePage === 'inicio'
+                  ? isOverDarkStage
+                    ? 'text-white border-emerald-400 font-bold'
+                    : 'text-[#291B64] border-[#291B64] font-bold'
+                  : isOverDarkStage
+                  ? 'border-transparent hover:text-white'
+                  : 'border-transparent hover:text-[#291B64]'
+              }`}
+            >
+              Inicio
+            </a>
+
+            {/* 2. Soluciones (with nested IA Services & all related engineering services) */}
+            <div
+              ref={dropdownRef}
+              className="relative"
+              onMouseEnter={() => setSolucionesDropdownOpen(true)}
+              onMouseLeave={() => setSolucionesDropdownOpen(false)}
+            >
+              <button
+                type="button"
+                onClick={() => setSolucionesDropdownOpen((prev) => !prev)}
+                className={`py-1 inline-flex items-center gap-1.5 transition-colors whitespace-nowrap shrink-0 border-b-2 cursor-pointer ${
+                  isSolucionesActive
+                    ? isOverDarkStage
+                      ? 'text-white border-emerald-400 font-bold'
+                      : 'text-[#291B64] border-[#291B64] font-bold'
+                    : isOverDarkStage
+                    ? 'border-transparent hover:text-white'
+                    : 'border-transparent hover:text-[#291B64]'
+                }`}
+                aria-expanded={solucionesDropdownOpen}
+              >
+                <span>Soluciones</span>
+                <ChevronDown
+                  className={`w-3.5 h-3.5 transition-transform duration-150 ${
+                    solucionesDropdownOpen ? 'rotate-180' : ''
                   }`}
-                >
-                  {nav.label}
-                </a>
-              );
-            })}
+                />
+              </button>
+
+              {solucionesDropdownOpen && (
+                <div className="absolute left-0 top-full pt-3 w-[440px] z-50">
+                  <div className="bg-[#0D0D12] text-white border border-white/15 shadow-2xl p-5 space-y-4 text-left">
+                    <div className="flex items-center justify-between pb-3 border-b border-white/10">
+                      <span className="text-[11px] font-mono text-emerald-400 font-bold">
+                        SOLUCIONES · IA SERVICES & INGENIERÍA
+                      </span>
+                      <a
+                        href="#servicios"
+                        onClick={(e) => handleNavClick(e, '#servicios')}
+                        className="text-[11px] font-mono text-neutral-300 hover:text-white inline-flex items-center gap-1"
+                      >
+                        <span>Ver todas</span>
+                        <ArrowRight className="w-3 h-3" />
+                      </a>
+                    </div>
+
+                    <div className="divide-y divide-white/[0.08]">
+                      {SOLUCIONES_SUBMENU.map((sub) => (
+                        <a
+                          key={sub.code}
+                          href={sub.href}
+                          onClick={(e) => handleNavClick(e, sub.href)}
+                          className="group py-3 first:pt-0 last:pb-0 flex items-start justify-between gap-3 hover:bg-white/[0.04] px-2 -mx-2 transition-colors"
+                        >
+                          <div className="space-y-0.5 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="text-[11px] font-mono text-emerald-400 font-bold tabular-nums">
+                                {sub.code}.
+                              </span>
+                              <span className="font-display text-sm font-bold text-white group-hover:text-emerald-300 transition-colors truncate">
+                                {sub.label}
+                              </span>
+                              {sub.badge && (
+                                <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 bg-[#291B64] text-emerald-300">
+                                  {sub.badge}
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-[11px] font-sans text-neutral-400 line-clamp-1 pl-5">
+                              {sub.sublabel}
+                            </p>
+                          </div>
+                          <ArrowUpRight className="w-4 h-4 text-neutral-500 group-hover:text-white shrink-0 mt-0.5" />
+                        </a>
+                      ))}
+                    </div>
+
+                    <div className="pt-3 border-t border-white/10 flex items-center justify-between gap-2">
+                      <a
+                        href="#ia-services"
+                        onClick={(e) => handleNavClick(e, '#ia-services')}
+                        className="px-3.5 py-2 bg-[#291B64] hover:bg-[#382586] text-white text-[11px] font-mono font-bold inline-flex items-center gap-1.5 transition-colors"
+                      >
+                        <Sparkles className="w-3.5 h-3.5 text-emerald-300" />
+                        <span>Abrir Estructurador IA</span>
+                      </a>
+                      <a
+                        href="#servicios"
+                        onClick={(e) => handleNavClick(e, '#servicios')}
+                        className="text-[11px] font-mono text-neutral-300 hover:text-white inline-flex items-center gap-1"
+                      >
+                        <span>Matriz de Soluciones</span>
+                        <ArrowRight className="w-3.5 h-3.5" />
+                      </a>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* 3. Proyectos */}
+            <a
+              href="#proyectos"
+              onClick={(e) => handleNavClick(e, '#proyectos')}
+              className={`py-1 transition-colors whitespace-nowrap shrink-0 border-b-2 ${
+                activePage === 'proyectos'
+                  ? isOverDarkStage
+                    ? 'text-white border-emerald-400 font-bold'
+                    : 'text-[#291B64] border-[#291B64] font-bold'
+                  : isOverDarkStage
+                  ? 'border-transparent hover:text-white'
+                  : 'border-transparent hover:text-[#291B64]'
+              }`}
+            >
+              Proyectos
+            </a>
+
+            {/* 4. Experience (formerly Trayectoria) */}
+            <a
+              href="#experience"
+              onClick={(e) => handleNavClick(e, '#experience')}
+              className={`py-1 transition-colors whitespace-nowrap shrink-0 border-b-2 ${
+                activePage === 'trayectoria'
+                  ? isOverDarkStage
+                    ? 'text-white border-emerald-400 font-bold'
+                    : 'text-[#291B64] border-[#291B64] font-bold'
+                  : isOverDarkStage
+                  ? 'border-transparent hover:text-white'
+                  : 'border-transparent hover:text-[#291B64]'
+              }`}
+            >
+              Experience
+            </a>
+
+            {/* 5. Blog */}
+            <a
+              href="#blog"
+              onClick={(e) => handleNavClick(e, '#blog')}
+              className={`py-1 transition-colors whitespace-nowrap shrink-0 border-b-2 ${
+                activePage === 'blog'
+                  ? isOverDarkStage
+                    ? 'text-white border-emerald-400 font-bold'
+                    : 'text-[#291B64] border-[#291B64] font-bold'
+                  : isOverDarkStage
+                  ? 'border-transparent hover:text-white'
+                  : 'border-transparent hover:text-[#291B64]'
+              }`}
+            >
+              Blog
+            </a>
+
+            {/* 6. Contacto */}
+            <a
+              href="#contacto"
+              onClick={(e) => handleNavClick(e, '#contacto')}
+              className={`py-1 transition-colors whitespace-nowrap shrink-0 border-b-2 ${
+                activePage === 'contacto'
+                  ? isOverDarkStage
+                    ? 'text-white border-emerald-400 font-bold'
+                    : 'text-[#291B64] border-[#291B64] font-bold'
+                  : isOverDarkStage
+                  ? 'border-transparent hover:text-white'
+                  : 'border-transparent hover:text-[#291B64]'
+              }`}
+            >
+              Contacto
+            </a>
           </nav>
 
           {/* Zone 3: Primary Action */}
@@ -297,6 +511,7 @@ export const Header: React.FC<HeaderProps> = ({
               type="button"
               onClick={() => {
                 setFwaMenuOpen(false);
+                setSolucionesDropdownOpen(false);
                 onScheduleClick();
               }}
               className="px-4 sm:px-5 py-2.5 text-xs font-mono font-bold text-white bg-[#291B64] rounded-none hover:bg-[#382586] transition-colors whitespace-nowrap shrink-0 cursor-pointer"
@@ -308,7 +523,7 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
       </header>
 
-      {/* THE FWA FULL-SCREEN ARCHITECTURAL MEGA-MENU OVERLAY (Clean, no nested boxes) */}
+      {/* THE FWA FULL-SCREEN ARCHITECTURAL MEGA-MENU OVERLAY */}
       {fwaMenuOpen && (
         <div className="fixed inset-0 top-16 z-40 w-full bg-[#0A0A0C] text-white overflow-y-auto border-t border-white/10">
           <div className="w-full min-h-[calc(100vh-4rem)] grid grid-cols-1 lg:grid-cols-12">
@@ -317,7 +532,9 @@ export const Header: React.FC<HeaderProps> = ({
               <div className="divide-y divide-white/[0.07]">
                 {FWA_MENU_SECTIONS.map((item, idx) => {
                   const isActive = hoveredIndex === idx;
-                  const isCurrentPage = activePage === item.id;
+                  const isCurrentPage =
+                    activePage === item.id ||
+                    (item.id === 'servicios' && isSolucionesActive);
                   return (
                     <a
                       key={item.index}
@@ -344,7 +561,7 @@ export const Header: React.FC<HeaderProps> = ({
                             </span>
                             {isCurrentPage && (
                               <span className="text-[11px] font-mono text-emerald-400 shrink-0">
-                                · PÁGINA ACTUAL
+                                · ACTIVO
                               </span>
                             )}
                           </div>
@@ -371,6 +588,25 @@ export const Header: React.FC<HeaderProps> = ({
                     </a>
                   );
                 })}
+              </div>
+
+              {/* Quick Sub-Navigation for Soluciones inside Mobile / FWA View */}
+              <div className="px-4 sm:px-8 lg:px-12 py-5 bg-[#0D0D12] border-t border-white/10 space-y-3">
+                <div className="text-[11px] font-mono text-emerald-400 font-bold">
+                  ACCESO DIRECTO A SOLUCIONES & IA SERVICES:
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  {SOLUCIONES_SUBMENU.map((sub) => (
+                    <a
+                      key={sub.code}
+                      href={sub.href}
+                      onClick={(e) => handleNavClick(e, sub.href)}
+                      className="px-3 py-1.5 bg-white/[0.06] hover:bg-[#291B64] text-xs font-mono text-neutral-200 hover:text-white transition-colors"
+                    >
+                      {sub.code}. {sub.label}
+                    </a>
+                  ))}
+                </div>
               </div>
 
               {/* Bottom Quick Index Strip */}
@@ -409,7 +645,7 @@ export const Header: React.FC<HeaderProps> = ({
               </div>
             </div>
 
-            {/* RIGHT COLUMN (5 COLS): CLEAN TYPOGRAPHIC PREVIEW WITHOUT HEAVY FRAMES */}
+            {/* RIGHT COLUMN (5 COLS): CLEAN TYPOGRAPHIC PREVIEW */}
             <div className="lg:col-span-5 p-6 sm:p-10 lg:p-14 bg-[#101015] flex flex-col justify-between space-y-10 text-left">
               <div className="space-y-6">
                 <div className="flex flex-wrap items-center justify-between gap-2 text-xs font-mono text-emerald-400">
@@ -428,7 +664,7 @@ export const Header: React.FC<HeaderProps> = ({
 
                 <div className="space-y-3 pt-4 border-t border-white/10">
                   <div className="text-xs font-mono text-neutral-400">
-                    Contenido de esta página:
+                    Contenido e ingeniería de esta sección:
                   </div>
                   <ul className="space-y-2.5">
                     {activePreview.featuredItems.map((feat, i) => (
@@ -445,19 +681,35 @@ export const Header: React.FC<HeaderProps> = ({
                   </ul>
                 </div>
 
+                {activePreview.subLinks && activePreview.subLinks.length > 0 && (
+                  <div className="pt-2 flex flex-wrap gap-2">
+                    {activePreview.subLinks.map((sub) => (
+                      <a
+                        key={sub.href}
+                        href={sub.href}
+                        onClick={(e) => handleNavClick(e, sub.href)}
+                        className="px-3.5 py-2 text-xs font-mono font-semibold text-emerald-300 bg-white/[0.06] hover:bg-white/[0.12] inline-flex items-center gap-1.5 transition-colors"
+                      >
+                        <span>{sub.label}</span>
+                        <ArrowUpRight className="w-3.5 h-3.5" />
+                      </a>
+                    ))}
+                  </div>
+                )}
+
                 <div className="pt-4">
                   <a
                     href={activePreview.href}
                     onClick={(e) => handleNavClick(e, activePreview.href)}
                     className="px-6 py-3.5 text-xs font-mono font-bold text-white bg-[#291B64] hover:bg-[#382586] rounded-none inline-flex items-center gap-2 transition-colors"
                   >
-                    <span>Abrir página: {activePreview.label}</span>
+                    <span>Abrir: {activePreview.label}</span>
                     <ArrowRight className="w-3.5 h-3.5" />
                   </a>
                 </div>
               </div>
 
-              {/* Direct Platform Utilities (Frameless clean buttons) */}
+              {/* Direct Platform Utilities */}
               <div className="pt-6 border-t border-white/10 space-y-4">
                 <div className="text-xs font-mono text-neutral-400">
                   Accesos Directos · 30 Años Tech · 14 Años PMO
@@ -480,13 +732,13 @@ export const Header: React.FC<HeaderProps> = ({
                   </button>
 
                   <a
-                    href="#blog"
-                    onClick={(e) => handleNavClick(e, '#blog')}
+                    href="#proyectos"
+                    onClick={(e) => handleNavClick(e, '#proyectos')}
                     className="p-3.5 bg-white/[0.06] hover:bg-white/[0.12] text-white text-xs font-semibold flex items-center justify-between gap-2 transition-colors"
                   >
                     <span className="inline-flex items-center gap-2">
-                      <BookOpen className="w-4 h-4 text-emerald-400" />
-                      <span>Ir al Blog</span>
+                      <FolderKanban className="w-4 h-4 text-emerald-400" />
+                      <span>Ver Proyectos</span>
                     </span>
                     <ArrowUpRight className="w-3.5 h-3.5" />
                   </a>

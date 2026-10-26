@@ -33,12 +33,12 @@ export const AboutProfileSection: React.FC<AboutProfileSectionProps> = ({
   ];
 
   return (
-    <section id="trayectoria" className="w-full bg-white scroll-mt-16">
+    <section id="experience" className="w-full bg-white scroll-mt-16">
       {/* Top Banner Block */}
       <div className="w-full py-16 md:py-20 bg-[#F6F6F9]">
         <div className="w-full px-4 sm:px-8 lg:px-12 xl:px-16 space-y-3 text-left">
           <div className="text-xs font-mono text-[#291B64] font-semibold">
-            TRAYECTORIA PROFESIONAL · GASTÓN BAREA · PATAGONIA & GLOBAL
+            EXPERIENCE · GASTÓN BAREA · PATAGONIA & GLOBAL
           </div>
           <h1
             className="font-display text-3xl sm:text-5xl font-bold tracking-tight text-[#1D1D1F] leading-[1.08] max-w-4xl"

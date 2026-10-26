@@ -9,9 +9,11 @@ import {
   UserCheck,
   Play,
   PlusCircle,
+  FolderKanban,
 } from 'lucide-react';
 import { BlogPost } from '../types/blog';
 import { INITIAL_BLOG_POSTS } from '../data/blogData';
+import { PROJECTS_CATALOG } from '../data/projectsData';
 import { ArticleReaderModal } from './blog/ArticleReaderModal';
 import { PostEditorModal } from './blog/PostEditorModal';
 import { PageSectionId } from './Header';
@@ -67,20 +69,28 @@ export const HomeBlocksView: React.FC<HomeBlocksViewProps> = ({
     }
   };
 
-  const coreVerticals = [
+  const coreVerticals: {
+    code: string;
+    kicker: string;
+    title: string;
+    summary: string;
+    targetPage: PageSectionId;
+  }[] = [
     {
       code: '01',
+      kicker: 'Gemelos Digitales · Agentes RAG · BI',
+      title: 'IA Services: Arquitecturas Inteligentes & Gemelos Digitales',
+      summary:
+        'Integración de agentes de IA conectados a sus bases de datos, catálogos y procesos para asesorar clientes, estructurar proyectos y automatizar operaciones 24/7.',
+      targetPage: 'ia-services',
+    },
+    {
+      code: '02',
       kicker: 'Ingeniería de Producto · EBTs',
       title: 'Proyectos de Base Tecnológica & Plataformas Digitales',
       summary:
         'Estructuración técnica y desarrollo full-stack (React, Node.js, PostgreSQL) para transformar conocimiento científico o industrial en activos escalables.',
-    },
-    {
-      code: '02',
-      kicker: 'Gemelos Digitales · Agentes RAG · BI',
-      title: 'IA Services: Arquitecturas Inteligentes & Gemelos Digitales',
-      summary:
-        'Integración de agentes de IA conectados a sus bases de datos, catálogos y procesos para asesorar clientes y automatizar operaciones 24/7.',
+      targetPage: 'servicios',
     },
     {
       code: '03',
@@ -88,6 +98,7 @@ export const HomeBlocksView: React.FC<HomeBlocksViewProps> = ({
       title: 'Proyectos Basados en Bioeconomía & Producción Sostenible',
       summary:
         'Pasaportes digitales de lote, monitoreo IoT de bioprocesos, valorización de biomasa y certificación para mercados internacionales.',
+      targetPage: 'bioeconomia',
     },
     {
       code: '04',
@@ -95,6 +106,7 @@ export const HomeBlocksView: React.FC<HomeBlocksViewProps> = ({
       title: 'Dirección Ejecutiva de Proyectos (PMO Externa)',
       summary:
         'Gobernanza técnica y control de presupuesto por hitos verificables: 40% inicio, 40% validación en servidor Staging y 20% salida a producción.',
+      targetPage: 'servicios',
     },
     {
       code: '05',
@@ -102,6 +114,7 @@ export const HomeBlocksView: React.FC<HomeBlocksViewProps> = ({
       title: 'Odoo Community ERP v18 & E-Commerce B2B2C',
       summary:
         'Unificación de producción (MRP), inventario multidepósito, facturación fiscal y portales B2B2C sincronizados en tiempo real.',
+      targetPage: 'servicios',
     },
     {
       code: '06',
@@ -109,16 +122,18 @@ export const HomeBlocksView: React.FC<HomeBlocksViewProps> = ({
       title: 'Infraestructura Crítica Linux, Docker & Soberanía de Datos',
       summary:
         'Blindaje de servidores Linux Ubuntu, contenedores Docker aislados, redes privadas WireGuard VPN y copias de seguridad automatizadas.',
+      targetPage: 'servicios',
     },
   ];
 
+  const featuredProjects = PROJECTS_CATALOG.slice(0, 3);
   const featuredPost = posts[0] || INITIAL_BLOG_POSTS[0];
   const secondaryPosts = posts.slice(1, 3);
 
   return (
     <div className="w-full">
       {/* =====================================================================
-          BLOQUE 3: SOLUCIONES & VERTICALES (Diseño Abierto Editorial en Blanco)
+          BLOQUE 1: SOLUCIONES (IA Services y Servicios Relacionados Integrados)
          ===================================================================== */}
       <section className="w-full py-20 md:py-28 bg-white text-[#1D1D1F]">
         <div className="w-full px-4 sm:px-8 lg:px-12 xl:px-16 space-y-14 text-left">
@@ -126,34 +141,47 @@ export const HomeBlocksView: React.FC<HomeBlocksViewProps> = ({
           <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 pb-8 border-b border-black/[0.08]">
             <div className="space-y-3 max-w-2xl">
               <div className="text-xs font-mono text-[#291B64] font-semibold">
-                BLOQUE 01 · SOLUCIONES & ARQUITECTURA
+                BLOQUE 01 · SOLUCIONES (IA SERVICES & VERTICALES DE INGENIERÍA)
               </div>
               <h2
                 className="font-display text-3xl sm:text-5xl font-bold tracking-tight text-[#1D1D1F] leading-[1.08]"
                 style={{ textWrap: 'balance' }}
               >
-                Seis verticales de ingeniería para transformar su operación.
+                Soluciones tecnológicas integrales bajo una misma dirección ejecutiva.
               </h2>
             </div>
 
             <div className="flex flex-wrap items-center gap-3 shrink-0">
               <button
                 type="button"
+                onClick={() => onNavigatePage('ia-services')}
+                className="px-5 py-3.5 text-xs font-mono font-bold text-[#291B64] bg-[#F5F5F8] hover:bg-[#291B64] hover:text-white rounded-none transition-colors inline-flex items-center gap-2 cursor-pointer"
+              >
+                <Sparkles className="w-4 h-4" />
+                <span>IA Services & Estructurador</span>
+              </button>
+
+              <button
+                type="button"
                 onClick={() => onNavigatePage('servicios')}
                 className="px-6 py-3.5 text-xs font-mono font-bold text-white bg-[#291B64] hover:bg-[#382586] rounded-none transition-colors inline-flex items-center gap-2 cursor-pointer"
               >
-                <span>Ver Página Completa de Soluciones</span>
+                <span>Ver Todas las Soluciones</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
             </div>
           </div>
 
-          {/* Frameless Architectural Grid (Divided only by subtle hairlines & generous whitespace) */}
+          {/* Frameless Architectural Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-12 gap-y-12">
             {coreVerticals.map((item) => (
               <div
                 key={item.code}
-                onClick={() => onNavigatePage('servicios', item.code)}
+                onClick={() =>
+                  item.targetPage === 'servicios'
+                    ? onNavigatePage('servicios', item.code === '02' ? '01' : item.code)
+                    : onNavigatePage(item.targetPage)
+                }
                 className="group pt-6 border-t border-black/[0.1] hover:border-[#291B64] transition-colors flex flex-col justify-between space-y-6 cursor-pointer"
               >
                 <div className="space-y-3">
@@ -173,7 +201,7 @@ export const HomeBlocksView: React.FC<HomeBlocksViewProps> = ({
 
                 <div className="flex items-center justify-between gap-3 pt-2 text-xs font-semibold text-[#291B64]">
                   <span className="group-hover:underline underline-offset-4">
-                    Explorar alcance y entregables
+                    Explorar solución y entregables
                   </span>
                   <ArrowUpRight className="w-4 h-4 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
                 </div>
@@ -184,7 +212,7 @@ export const HomeBlocksView: React.FC<HomeBlocksViewProps> = ({
       </section>
 
       {/* =====================================================================
-          BLOQUE 4: IA SERVICES & GEMELO DIGITAL (Bloque Personalizado Violeta Profundo)
+          BLOQUE 2: IA SERVICES & GEMELO DIGITAL (Dentro de Soluciones)
          ===================================================================== */}
       <section className="w-full py-20 md:py-28 bg-[#170F3E] text-white">
         <div className="w-full px-4 sm:px-8 lg:px-12 xl:px-16">
@@ -192,7 +220,7 @@ export const HomeBlocksView: React.FC<HomeBlocksViewProps> = ({
             {/* Left (7 cols): IA Services Value Proposition */}
             <div className="lg:col-span-7 space-y-6">
               <div className="text-xs font-mono text-emerald-400 font-semibold">
-                BLOQUE 02 · IA SERVICES & GEMELOS DIGITALES CORPORATIVOS
+                SOLUCIONES DESTACADAS · IA SERVICES & GEMELOS DIGITALES CORPORATIVOS
               </div>
 
               <h2
@@ -239,7 +267,7 @@ export const HomeBlocksView: React.FC<HomeBlocksViewProps> = ({
               </div>
             </div>
 
-            {/* Right (5 cols): Interactive Structurer Callout (Clean tonal surface, no heavy border) */}
+            {/* Right (5 cols): Interactive Structurer Callout */}
             <div className="lg:col-span-5 p-8 sm:p-10 bg-[#0D0926] space-y-6">
               <div className="text-xs font-mono text-emerald-400">
                 HERRAMIENTA EN VIVO · ESTRUCTURADOR DE PROYECTOS
@@ -283,83 +311,86 @@ export const HomeBlocksView: React.FC<HomeBlocksViewProps> = ({
       </section>
 
       {/* =====================================================================
-          BLOQUE 5: BIOECONOMÍA & EVIDENCIA DE IMPACTO (Bloque Orgánico sin Marcos)
+          BLOQUE 3: PROYECTOS REALIZADOS & EN PRODUCCIÓN (Nueva Sección en Home)
          ===================================================================== */}
       <section className="w-full py-20 md:py-28 bg-[#F3F6F4] text-[#1D1D1F]">
         <div className="w-full px-4 sm:px-8 lg:px-12 xl:px-16 space-y-14 text-left">
-          <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6">
+          <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 pb-8 border-b border-emerald-950/10">
             <div className="space-y-3 max-w-3xl">
               <div className="text-xs font-mono text-emerald-900 font-semibold">
-                BLOQUE 03 · BIOECONOMÍA, TELEMETRÍA IOT & CASOS REALES
+                BLOQUE 02 · PROYECTOS REALIZADOS & EN PRODUCCIÓN
               </div>
               <h2
                 className="font-display text-3xl sm:text-5xl font-bold tracking-tight text-[#1D1D1F] leading-[1.08]"
                 style={{ textWrap: 'balance' }}
               >
-                Ingeniería digital aplicada a recursos biológicos y producción sostenible.
+                Arquitecturas operativas en producción y despliegues ejecutados.
               </h2>
             </div>
 
             <button
               type="button"
-              onClick={() => onNavigatePage('bioeconomia')}
+              onClick={() => onNavigatePage('proyectos')}
               className="px-6 py-3.5 text-xs font-mono font-bold text-white bg-[#291B64] hover:bg-[#382586] rounded-none transition-colors inline-flex items-center gap-2 cursor-pointer self-start lg:self-auto shrink-0"
             >
-              <span>Explorar Bioeconomía y Casos de Éxito</span>
+              <FolderKanban className="w-4 h-4" />
+              <span>Ver Todos los Proyectos ({PROJECTS_CATALOG.length})</span>
               <ArrowRight className="w-4 h-4" />
             </button>
           </div>
 
-          {/* Large Unframed Impact Metrics + Case Preview */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 pt-6 border-t border-emerald-950/10 items-start">
-            <div className="lg:col-span-4 space-y-2">
-              <div className="font-display text-4xl sm:text-5xl font-bold text-[#291B64] tabular-nums">
-                -42%
-              </div>
-              <div className="text-base font-bold text-[#1D1D1F]">
-                Reducción de mermas operativas en planta
-              </div>
-              <p className="text-xs sm:text-sm text-[#515154] leading-relaxed">
-                Integración de sensores IoT, balanzas en línea y PostgreSQL para controlar el rendimiento de transformación de biomasa en tiempo real.
-              </p>
-            </div>
+          {/* Featured Production Projects Grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
+            {featuredProjects.map((proj) => (
+              <article
+                key={proj.id}
+                onClick={() => onNavigatePage('proyectos')}
+                className="group bg-white p-8 flex flex-col justify-between space-y-6 cursor-pointer hover:bg-[#0D0D12] hover:text-white transition-colors"
+              >
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between gap-2 text-xs font-mono">
+                    <span className="font-bold text-[#291B64] group-hover:text-emerald-400">
+                      {proj.code}
+                    </span>
+                    <span className="font-bold text-emerald-800 group-hover:text-emerald-300">
+                      {proj.statusLabel}
+                    </span>
+                  </div>
 
-            <div className="lg:col-span-4 space-y-2">
-              <div className="font-display text-4xl sm:text-5xl font-bold text-emerald-900 tabular-nums">
-                100%
-              </div>
-              <div className="text-base font-bold text-[#1D1D1F]">
-                Trazabilidad digital de origen a destino
-              </div>
-              <p className="text-xs sm:text-sm text-[#515154] leading-relaxed">
-                Pasaportes digitales de lote para cadenas agroindustriales, forestales y pesqueras listos para auditorías ESG y exportación.
-              </p>
-            </div>
+                  <div className="text-xs font-mono text-[#515154] group-hover:text-neutral-400">
+                    {proj.category}
+                  </div>
 
-            <div className="lg:col-span-4 space-y-2">
-              <div className="font-display text-4xl sm:text-5xl font-bold text-[#291B64] tabular-nums">
-                +165%
-              </div>
-              <div className="text-base font-bold text-[#1D1D1F]">
-                Pedidos B2B autogestionados con Odoo v18
-              </div>
-              <p className="text-xs sm:text-sm text-[#515154] leading-relaxed">
-                Sincronización de stock multidepósito y listas de precios mayoristas sin costos perpetuos de licencias por usuario.
-              </p>
-            </div>
+                  <h3 className="font-display text-xl font-bold text-[#1D1D1F] group-hover:text-white leading-snug">
+                    {proj.title}
+                  </h3>
+
+                  <p className="text-xs sm:text-sm text-[#515154] group-hover:text-neutral-300 leading-relaxed">
+                    {proj.summary}
+                  </p>
+                </div>
+
+                <div className="pt-4 border-t border-black/[0.08] group-hover:border-white/15 flex items-center justify-between gap-2 text-xs font-mono">
+                  <span className="font-bold text-[#291B64] group-hover:text-emerald-400">
+                    {proj.impactMetrics}
+                  </span>
+                  <ArrowUpRight className="w-4 h-4 shrink-0" />
+                </div>
+              </article>
+            ))}
           </div>
         </div>
       </section>
 
       {/* =====================================================================
-          BLOQUE 6: TRAYECTORIA 30 AÑOS TECH · 14 AÑOS PMO (Bloque Editorial Limpio)
+          BLOQUE 4: EXPERIENCE · 30 AÑOS TECH · 14 AÑOS PMO (Renombrado desde Trayectoria)
          ===================================================================== */}
       <section className="w-full py-20 md:py-28 bg-white text-[#1D1D1F]">
         <div className="w-full px-4 sm:px-8 lg:px-12 xl:px-16">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 items-start text-left">
             <div className="lg:col-span-5 space-y-5">
               <div className="text-xs font-mono text-[#291B64] font-semibold">
-                BLOQUE 04 · RESPALDO & DIRECCIÓN EJECUTIVA
+                BLOQUE 03 · EXPERIENCE & DIRECCIÓN EJECUTIVA PMO
               </div>
               <h2
                 className="font-display text-3xl sm:text-4xl font-bold tracking-tight text-[#1D1D1F] leading-tight"
@@ -376,7 +407,7 @@ export const HomeBlocksView: React.FC<HomeBlocksViewProps> = ({
                   onClick={() => onNavigatePage('trayectoria')}
                   className="px-6 py-3.5 text-xs font-mono font-bold text-white bg-[#291B64] hover:bg-[#382586] rounded-none transition-colors inline-flex items-center gap-2 cursor-pointer"
                 >
-                  <span>Ver Trayectoria Completa (1996–2026)</span>
+                  <span>Ver Experience Completa (1996–2026)</span>
                   <ArrowRight className="w-4 h-4" />
                 </button>
 
@@ -391,7 +422,7 @@ export const HomeBlocksView: React.FC<HomeBlocksViewProps> = ({
               </div>
             </div>
 
-            {/* Right (7 cols): Open Chronological Stream (No boxes, just clean horizontal hairlines) */}
+            {/* Right (7 cols): Open Chronological Stream */}
             <div className="lg:col-span-7 divide-y divide-black/[0.08] border-t border-b border-black/[0.08]">
               <div className="py-6 grid grid-cols-1 sm:grid-cols-12 gap-4 items-baseline">
                 <div className="sm:col-span-3 font-mono text-xs font-bold text-[#291B64] tabular-nums">
@@ -440,7 +471,7 @@ export const HomeBlocksView: React.FC<HomeBlocksViewProps> = ({
       </section>
 
       {/* =====================================================================
-          BLOQUE 7: BLOG & PUBLICACIONES DESTACADAS (Restaurado y Personalizado en Home)
+          BLOQUE 5: BLOG & PUBLICACIONES DESTACADAS
          ===================================================================== */}
       <section className="w-full py-20 md:py-28 bg-[#F7F7FA] text-[#1D1D1F]">
         <div className="w-full px-4 sm:px-8 lg:px-12 xl:px-16 space-y-12 text-left">
@@ -448,7 +479,7 @@ export const HomeBlocksView: React.FC<HomeBlocksViewProps> = ({
           <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 pb-6 border-b border-black/[0.08]">
             <div className="space-y-3 max-w-2xl">
               <div className="text-xs font-mono text-[#291B64] font-semibold">
-                BLOQUE 05 · BLOG & PUBLICACIONES DE GASTÓN BAREA
+                BLOQUE 04 · BLOG & PUBLICACIONES DE GASTÓN BAREA
               </div>
               <h2
                 className="font-display text-3xl sm:text-5xl font-bold tracking-tight text-[#1D1D1F] leading-[1.08]"
@@ -526,7 +557,7 @@ export const HomeBlocksView: React.FC<HomeBlocksViewProps> = ({
               </article>
             )}
 
-            {/* Right Column: Secondary Articles List (Clean unframed stack) */}
+            {/* Right Column: Secondary Articles List */}
             <div className="lg:col-span-5 flex flex-col justify-between divide-y divide-black/[0.08] bg-white p-6 sm:p-8">
               <div className="space-y-6">
                 <div className="text-xs font-mono font-bold text-[#515154]">
@@ -579,14 +610,14 @@ export const HomeBlocksView: React.FC<HomeBlocksViewProps> = ({
       </section>
 
       {/* =====================================================================
-          BLOQUE 8: CONTACTO EJECUTIVO DIRECTO (Cierre Limpio en Negro/Violeta)
+          BLOQUE 6: CONTACTO EJECUTIVO DIRECTO
          ===================================================================== */}
       <section className="w-full py-20 md:py-24 bg-[#0A0A0E] text-white">
         <div className="w-full px-4 sm:px-8 lg:px-12 xl:px-16">
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-10 text-left">
             <div className="space-y-3 max-w-2xl">
               <div className="text-xs font-mono text-emerald-400 font-semibold">
-                BLOQUE 06 · CONTACTO DIRECTO & PROTOCOLO NDA
+                BLOQUE 05 · CONTACTO DIRECTO & PROTOCOLO NDA
               </div>
               <h2
                 className="font-display text-3xl sm:text-4xl font-bold tracking-tight text-white leading-tight"

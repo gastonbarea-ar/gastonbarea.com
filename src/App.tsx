@@ -11,6 +11,7 @@ import { HomeBlocksView } from './components/HomeBlocksView';
 import { DigitalTwinSection } from './components/DigitalTwinSection';
 import { ServicesBentoSection } from './components/ServicesBentoSection';
 import { BioeconomyTechSection } from './components/BioeconomyTechSection';
+import { ProjectsSection } from './components/ProjectsSection';
 import { AboutProfileSection } from './components/AboutProfileSection';
 import { BlogSection } from './components/BlogSection';
 import { ContactSection } from './components/ContactSection';
@@ -23,12 +24,13 @@ import { SITE_CONFIG } from './data/siteConfig';
 
 const PAGE_LABELS: Record<PageSectionId, string> = {
   inicio: 'Inicio · Gemelo Digital',
-  servicios: '01. Soluciones & Arquitectura',
-  'ia-services': '02. IA Services & Estructurador',
-  bioeconomia: '03. Bioeconomía & Casos Reales',
-  trayectoria: '04. Trayectoria (30 Años Tech · 14 PMO)',
-  blog: '05. Blog & Publicaciones',
-  contacto: '06. Contacto Ejecutivo & NDA',
+  servicios: 'Soluciones · Arquitectura & Verticales',
+  'ia-services': 'Soluciones · IA Services & Estructurador',
+  bioeconomia: 'Soluciones · Bioeconomía & Trazabilidad IoT',
+  proyectos: 'Proyectos Realizados & En Producción',
+  trayectoria: 'Experience (30 Años Tech · 14 PMO)',
+  blog: 'Blog & Publicaciones',
+  contacto: 'Contacto Ejecutivo & NDA',
 };
 
 const PAGE_ORDER: PageSectionId[] = [
@@ -36,6 +38,7 @@ const PAGE_ORDER: PageSectionId[] = [
   'servicios',
   'ia-services',
   'bioeconomia',
+  'proyectos',
   'trayectoria',
   'blog',
   'contacto',
@@ -62,6 +65,10 @@ export default function App() {
       servicios: 'servicios',
       soluciones: 'servicios',
       innovacion: 'servicios',
+      ebts: 'servicios',
+      'pmo-clientes': 'servicios',
+      'odoo-v18': 'servicios',
+      'linux-docker': 'servicios',
       odoo: 'servicios',
       'ecommerce-b2b2c': 'servicios',
       'ia-services': 'ia-services',
@@ -69,6 +76,12 @@ export default function App() {
       'gemelo-digital': 'ia-services',
       bioeconomia: 'bioeconomia',
       casos: 'bioeconomia',
+      proyectos: 'proyectos',
+      portfolio: 'proyectos',
+      portafolio: 'proyectos',
+      produccion: 'proyectos',
+      experience: 'trayectoria',
+      experiencia: 'trayectoria',
       trayectoria: 'trayectoria',
       'project-manager': 'trayectoria',
       perfil: 'trayectoria',
@@ -77,6 +90,38 @@ export default function App() {
       contacto: 'contacto',
     };
     return targetMap[cleanId] || 'inicio';
+  };
+
+  const resolveServiceCodeFromHash = (rawHash: string): string | undefined => {
+    const cleanId = rawHash.replace(/^#/, '').split('/')[0].toLowerCase();
+    const codeMap: Record<string, string> = {
+      ebts: '01',
+      'pmo-clientes': '04',
+      'odoo-v18': '05',
+      odoo: '05',
+      'ecommerce-b2b2c': '05',
+      'linux-docker': '06',
+    };
+    return codeMap[cleanId];
+  };
+
+  const handleNavigatePage = (page: PageSectionId, serviceCode?: string) => {
+    if (serviceCode) {
+      setHighlightedServiceCode(serviceCode);
+    }
+    setActivePage(page);
+    const urlHash = page === 'trayectoria' ? '#experience' : `#${page}`;
+    window.history.pushState(null, '', urlHash);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+
+    if (serviceCode && page === 'servicios') {
+      setTimeout(() => {
+        const cardEl = document.getElementById(`service-card-${serviceCode}`);
+        if (cardEl) {
+          cardEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }, 150);
+    }
   };
 
   const handleNavigate = (href: string) => {
@@ -90,27 +135,8 @@ export default function App() {
       return;
     }
     const targetPage = resolvePageFromHash(clean);
-    setActivePage(targetPage);
-    window.history.pushState(null, '', `#${targetPage}`);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
-
-  const handleNavigatePage = (page: PageSectionId, serviceCode?: string) => {
-    if (serviceCode) {
-      setHighlightedServiceCode(serviceCode);
-    }
-    setActivePage(page);
-    window.history.pushState(null, '', `#${page}`);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-
-    if (serviceCode && page === 'servicios') {
-      setTimeout(() => {
-        const cardEl = document.getElementById(`service-card-${serviceCode}`);
-        if (cardEl) {
-          cardEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }
-      }, 150);
-    }
+    const serviceCode = resolveServiceCodeFromHash(clean);
+    handleNavigatePage(targetPage, serviceCode);
   };
 
   const handleNavigateToSolution = (
@@ -137,6 +163,10 @@ export default function App() {
         setIsClientPortalOpen(true);
       } else if (hash) {
         const page = resolvePageFromHash(hash);
+        const code = resolveServiceCodeFromHash(hash);
+        if (code) {
+          setHighlightedServiceCode(code);
+        }
         setActivePage(page);
         window.scrollTo({ top: 0, behavior: 'smooth' });
       }
@@ -169,6 +199,14 @@ export default function App() {
     handleNavigatePage('contacto');
   };
 
+  const handleSelectProjectForContact = (projectTitle: string, solutionRef: string) => {
+    setSelectedServiceForContact(solutionRef);
+    setCustomMessageForContact(
+      `Hola Gastón, estuve viendo en tu portfolio el proyecto "${projectTitle}" y nos interesa evaluar un desarrollo o arquitectura de características similares para nuestra organización.`
+    );
+    handleNavigatePage('contacto');
+  };
+
   const handleAskDigitalTwin = (prompt: string) => {
     setDigitalTwinPrompt(prompt + ' [' + new Date().toLocaleTimeString() + ']');
     handleNavigatePage('ia-services');
@@ -197,7 +235,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-white text-[#1D1D1F] flex flex-col font-sans selection:bg-[#291B64]/15 selection:text-[#291B64] antialiased pb-16">
-      {/* 1. Full-Width Top Navigation Bar (Includes Inicio, Soluciones, IA Services, Bioeconomía, Trayectoria, Blog, Contacto) */}
+      {/* 1. Full-Width Top Navigation Bar (Inicio | Soluciones ▾ | Proyectos | Experience | Blog | Contacto) */}
       <Header
         activePage={activePage}
         onScheduleClick={() => openScheduleModal()}
@@ -220,7 +258,7 @@ export default function App() {
               onNavigateToSolution={handleNavigateToSolution}
             />
 
-            {/* HOME BLOCKS 3 TO 8: Customized Architectural Blocks (Soluciones, IA Services, Bioeconomía, Trayectoria, Blog, Contacto) */}
+            {/* HOME BLOCKS: Customized Architectural Blocks (Soluciones + IA Services + Proyectos + Experience + Blog + Contacto) */}
             <HomeBlocksView
               onNavigatePage={handleNavigatePage}
               onSelectService={handleSelectService}
@@ -273,6 +311,15 @@ export default function App() {
               <BioeconomyTechSection
                 onAskDigitalTwin={handleAskDigitalTwin}
                 onSelectCase={handleSelectCase}
+              />
+            )}
+
+            {activePage === 'proyectos' && (
+              <ProjectsSection
+                onSelectProjectForContact={handleSelectProjectForContact}
+                onAskDigitalTwin={handleAskDigitalTwin}
+                onScheduleClick={openScheduleModal}
+                onClientPortalClick={() => setIsClientPortalOpen(true)}
               />
             )}
 

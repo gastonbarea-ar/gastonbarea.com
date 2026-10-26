@@ -148,7 +148,7 @@ export const Footer: React.FC<FooterProps> = ({
           {/* Navigation Mirror: Multi-Page Section Links (3 cols) */}
           <div className="lg:col-span-3 space-y-3">
             <div className="text-xs font-mono font-semibold text-slate-900">
-              Páginas de la Plataforma
+              Secciones & Soluciones
             </div>
             <ul className="space-y-2 text-xs text-slate-600">
               <li>
@@ -166,34 +166,43 @@ export const Footer: React.FC<FooterProps> = ({
                   onClick={(e) => handleLinkClick(e, '#servicios')}
                   className="hover:text-[#291B64] transition-colors"
                 >
-                  02. Soluciones & Arquitectura
+                  02. Soluciones (IA Services, Bioeconomía & ERP)
                 </a>
               </li>
               <li>
                 <a
                   href="#ia-services"
                   onClick={(e) => handleLinkClick(e, '#ia-services')}
-                  className="hover:text-[#291B64] transition-colors"
+                  className="hover:text-[#291B64] transition-colors pl-3 text-slate-500"
                 >
-                  03. IA Services & Estructurador
+                  ↳ IA Services & Estructurador en Vivo
                 </a>
               </li>
               <li>
                 <a
                   href="#bioeconomia"
                   onClick={(e) => handleLinkClick(e, '#bioeconomia')}
-                  className="hover:text-[#291B64] transition-colors"
+                  className="hover:text-[#291B64] transition-colors pl-3 text-slate-500"
                 >
-                  04. Bioeconomía & Casos Reales
+                  ↳ Bioeconomía & Trazabilidad IoT
                 </a>
               </li>
               <li>
                 <a
-                  href="#trayectoria"
-                  onClick={(e) => handleLinkClick(e, '#trayectoria')}
+                  href="#proyectos"
+                  onClick={(e) => handleLinkClick(e, '#proyectos')}
+                  className="hover:text-[#291B64] font-semibold text-slate-800 transition-colors"
+                >
+                  03. Proyectos (Realizados & En Producción)
+                </a>
+              </li>
+              <li>
+                <a
+                  href="#experience"
+                  onClick={(e) => handleLinkClick(e, '#experience')}
                   className="hover:text-[#291B64] transition-colors"
                 >
-                  05. Trayectoria (30 Años Tech · 14 PMO)
+                  04. Experience (30 Años Tech · 14 PMO)
                 </a>
               </li>
               <li>
@@ -202,7 +211,7 @@ export const Footer: React.FC<FooterProps> = ({
                   onClick={(e) => handleLinkClick(e, '#blog')}
                   className="hover:text-[#291B64] font-semibold text-[#291B64] transition-colors"
                 >
-                  06. Blog & Publicaciones
+                  05. Blog & Publicaciones
                 </a>
               </li>
               <li>
@@ -211,7 +220,7 @@ export const Footer: React.FC<FooterProps> = ({
                   onClick={(e) => handleLinkClick(e, '#contacto')}
                   className="hover:text-[#291B64] transition-colors"
                 >
-                  07. Contacto Ejecutivo & NDA
+                  06. Contacto Ejecutivo & NDA
                 </a>
               </li>
             </ul>
