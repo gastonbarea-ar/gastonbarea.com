@@ -16,7 +16,6 @@ import {
   Minimize2,
 } from 'lucide-react';
 import { SITE_CONFIG, SiteConfig } from '../data/siteConfig';
-import { BrandLogo } from './BrandLogo';
 
 interface MatchedSolution {
   serviceCode: string;
@@ -400,12 +399,12 @@ export const Hero: React.FC<HeroProps> = ({
           {!isCinemaExpanded && (
             <div className="lg:col-span-4 p-5 sm:p-8 lg:p-10 flex flex-col justify-between space-y-6 text-left bg-[#0E0E14] border-t lg:border-t-0 lg:border-l border-white/10">
               <div className="space-y-4">
-                <div className="flex items-center justify-between gap-3 pb-3 border-b border-white/10">
-                  <BrandLogo theme="on-dark" size="md" />
-                  <div className="text-[11px] font-mono text-right text-neutral-400 leading-tight">
-                    <div className="text-white font-semibold">30 AÑOS TECH</div>
-                    <div className="text-emerald-400">14 AÑOS PMO</div>
-                  </div>
+                <div className="flex flex-wrap items-center gap-2 text-xs font-mono text-neutral-400">
+                  <span className="text-white font-bold tracking-wider">GASTONBAREA.COM</span>
+                  <span aria-hidden="true">·</span>
+                  <span>30 AÑOS TECH</span>
+                  <span aria-hidden="true">·</span>
+                  <span className="text-emerald-400">14 AÑOS PMO</span>
                 </div>
 
                 <h1

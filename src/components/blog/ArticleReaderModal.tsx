@@ -12,7 +12,6 @@ import {
 } from 'lucide-react';
 import { BlogPost } from '../../types/blog';
 import { MediaBlockRenderer } from './MediaBlockRenderer';
-import { BrandLogo } from '../BrandLogo';
 
 interface ArticleReaderModalProps {
   post: BlogPost | null;
@@ -182,8 +181,10 @@ export const ArticleReaderModal: React.FC<ArticleReaderModalProps> = ({
 
             {/* Author Profile Strip */}
             <div className="flex flex-wrap items-center justify-between gap-4 py-4 border-y border-black/[0.08] my-6">
-              <div className="flex items-center gap-4">
-                <BrandLogo theme="on-light" size="sm" />
+              <div className="flex items-center gap-3">
+                <div className="px-3 py-2 rounded-none bg-[#291B64] text-white font-bold font-mono text-xs tracking-wider">
+                  GASTONBAREA.COM
+                </div>
                 <div>
                   <div className="text-sm font-bold text-[#1D1D1F] flex flex-wrap items-center gap-1.5">
                     <span>{post.author.name}</span>

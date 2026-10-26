@@ -13,7 +13,6 @@ import {
   Twitter,
 } from 'lucide-react';
 import { SITE_CONFIG, SiteConfig } from '../data/siteConfig';
-import { BrandLogo } from './BrandLogo';
 
 interface FooterProps {
   onNavigate?: (href: string) => void;
@@ -63,14 +62,10 @@ export const Footer: React.FC<FooterProps> = ({
             <a
               href="#inicio"
               onClick={(e) => handleLinkClick(e, '#inicio')}
-              className="inline-block hover:opacity-85 transition-opacity"
-              aria-label="Gastón Barea – Inicio"
+              className="inline-block font-display text-lg font-extrabold text-slate-900 tracking-wider hover:text-[#291B64] transition-colors"
             >
-              <BrandLogo theme="on-light" size="lg" />
+              GASTONBAREA.COM
             </a>
-            <div className="font-display text-sm font-bold text-slate-900 tracking-tight">
-              {liveConfig.name} · {liveConfig.domain}
-            </div>
             <p className="text-xs text-slate-600 leading-relaxed max-w-md">
               Consultor y Desarrollador de Proyectos de Base Tecnológica, IA Services y Bioeconomía. 30 años de experiencia en el sector tecnológico-productivo y 14 años dirigiendo proyectos estratégicos con clientes.
             </p>
