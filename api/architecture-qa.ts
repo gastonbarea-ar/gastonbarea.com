@@ -37,7 +37,7 @@ Responde con precisión de ingeniero pragmático en 2 párrafos concisos y claro
 `;
 
       const response = await ai.models.generateContent({
-        model: 'gemini-3.8-flash',
+        model: 'gemini-3-flash-preview',
         contents: prompt,
         config: {
           systemInstruction: 'Eres Gastón Barea. Respuestas técnicas, claras, pragmáticas sin rodeos.',
