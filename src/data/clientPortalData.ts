@@ -1,4 +1,5 @@
 import type { ClientProject, ConsultingInquiry, SupportTicket, ConsultingBooking } from '../types/clientPortal.ts';
+import { INITIAL_CRM_CONTACTS } from './crmTemplates.ts';
 
 export interface ClientAccount {
   id: string;
@@ -8,31 +9,25 @@ export interface ClientAccount {
   name: string;
   company: string;
   role: string;
-  projectId: string;
+  projectId?: string;
+  contactType?: 'corporate_member' | 'individual';
+  companyId?: string;
+  hasActiveService?: boolean;
 }
 
-export const CLIENT_ACCOUNTS: ClientAccount[] = [
-  {
-    id: 'usr-cli-001',
-    username: 'martin.arismendi',
-    email: 'martin@distribuidorasur.com.ar',
-    password: 'cliente2026',
-    name: 'Martín Arismendi',
-    company: 'Distribuidora del Sur S.A.',
-    role: 'Director de Operaciones',
-    projectId: 'proj-001',
-  },
-  {
-    id: 'usr-cli-002',
-    username: 'carolina.valenzuela',
-    email: 'cvalenzuela@novafintech.io',
-    password: 'cliente2026',
-    name: 'Lic. Carolina Valenzuela',
-    company: 'Nova Fintech Hub',
-    role: 'CTO & Co-Founder',
-    projectId: 'proj-002',
-  },
-];
+export const CLIENT_ACCOUNTS: ClientAccount[] = INITIAL_CRM_CONTACTS.map((c) => ({
+  id: c.id,
+  username: c.username,
+  email: c.email,
+  password: c.password,
+  name: c.fullName,
+  company: c.companyName || (c.contactType === 'individual' ? 'Contacto Individual / Independiente' : 'Organización'),
+  role: c.roleTitle,
+  projectId: c.linkedProjectId,
+  contactType: c.contactType,
+  companyId: c.companyId,
+  hasActiveService: c.hasActiveService,
+}));
 
 export const INITIAL_CLIENT_PROJECTS: ClientProject[] = [
   {

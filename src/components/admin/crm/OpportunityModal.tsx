@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { X, Save, TrendingUp, DollarSign, Building2, User, Mail, Phone, Calendar, Tag } from 'lucide-react';
-import { Opportunity, OpportunityStage, ServiceCategory } from '../../../types/crm';
+import { X, Save, TrendingUp, Building2, User } from 'lucide-react';
+import { Opportunity, OpportunityStage, ServiceCategory, CrmCompany, CrmContact } from '../../../types/crm';
 
 interface OpportunityModalProps {
   isOpen: boolean;
@@ -8,6 +8,8 @@ interface OpportunityModalProps {
   onSaveOpportunity: (opp: Opportunity) => void;
   initialOpportunity?: Opportunity | null;
   initialStage?: OpportunityStage;
+  companies?: CrmCompany[];
+  contacts?: CrmContact[];
 }
 
 export const OpportunityModal: React.FC<OpportunityModalProps> = ({
@@ -16,12 +18,16 @@ export const OpportunityModal: React.FC<OpportunityModalProps> = ({
   onSaveOpportunity,
   initialOpportunity,
   initialStage = 'lead',
+  companies = [],
+  contacts = [],
 }) => {
   const [title, setTitle] = useState('');
   const [clientName, setClientName] = useState('');
   const [clientEmail, setClientEmail] = useState('');
   const [clientPhone, setClientPhone] = useState('');
   const [company, setCompany] = useState('');
+  const [companyId, setCompanyId] = useState<string>('');
+  const [contactId, setContactId] = useState<string>('');
   const [serviceCategory, setServiceCategory] = useState<ServiceCategory>('odoo_erp');
   const [stage, setStage] = useState<OpportunityStage>(initialStage);
   const [value, setValue] = useState<number>(3500);
@@ -40,6 +46,8 @@ export const OpportunityModal: React.FC<OpportunityModalProps> = ({
       setClientEmail(initialOpportunity.clientEmail);
       setClientPhone(initialOpportunity.clientPhone || '');
       setCompany(initialOpportunity.company || '');
+      setCompanyId(initialOpportunity.companyId || '');
+      setContactId(initialOpportunity.contactId || '');
       setServiceCategory(initialOpportunity.serviceCategory);
       setStage(initialOpportunity.stage);
       setValue(initialOpportunity.value);
@@ -54,6 +62,8 @@ export const OpportunityModal: React.FC<OpportunityModalProps> = ({
       setClientEmail('');
       setClientPhone('');
       setCompany('');
+      setCompanyId('');
+      setContactId('');
       setServiceCategory('odoo_erp');
       setStage(initialStage);
       setValue(3500);
@@ -69,6 +79,40 @@ export const OpportunityModal: React.FC<OpportunityModalProps> = ({
 
   if (!isOpen) return null;
 
+  const handleSelectAgendaContact = (selectedCntId: string) => {
+    setContactId(selectedCntId);
+    const cnt = contacts.find((c) => c.id === selectedCntId);
+    if (cnt) {
+      setClientName(cnt.fullName);
+      setClientEmail(cnt.email);
+      setClientPhone(cnt.phone || '');
+      if (cnt.companyId) {
+        setCompanyId(cnt.companyId);
+        const comp = companies.find((co) => co.id === cnt.companyId);
+        setCompany(comp?.name || cnt.companyName || '');
+      } else if (cnt.companyName) {
+        setCompany(cnt.companyName);
+      }
+    }
+  };
+
+  const handleSelectAgendaCompany = (selectedCmpId: string) => {
+    setCompanyId(selectedCmpId);
+    const comp = companies.find((c) => c.id === selectedCmpId);
+    if (comp) {
+      setCompany(comp.name);
+      // If no contact selected yet, pre-fill primary contact of this corporation
+      const corpContacts = contacts.filter((cnt) => cnt.companyId === comp.id);
+      if (corpContacts.length > 0 && !clientName) {
+        const primary = corpContacts[0];
+        setContactId(primary.id);
+        setClientName(primary.fullName);
+        setClientEmail(primary.email);
+        setClientPhone(primary.phone || comp.phone || '');
+      }
+    }
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!title || !clientName) return;
@@ -80,6 +124,8 @@ export const OpportunityModal: React.FC<OpportunityModalProps> = ({
       clientEmail,
       clientPhone,
       company,
+      companyId: companyId || undefined,
+      contactId: contactId || undefined,
       serviceCategory,
       stage,
       value: Number(value) || 0,
@@ -111,7 +157,7 @@ export const OpportunityModal: React.FC<OpportunityModalProps> = ({
                 {initialOpportunity ? 'Editar Oportunidad' : 'Nueva Oportunidad de Negocio'}
               </h3>
               <p className="text-[11px] text-slate-500 font-mono">
-                Pipeline de Servicios Gastón Barea
+                Pipeline CRM & Agenda de Empresas / Contactos
               </p>
             </div>
           </div>
@@ -126,6 +172,56 @@ export const OpportunityModal: React.FC<OpportunityModalProps> = ({
 
         {/* Content Form */}
         <form onSubmit={handleSubmit} className="p-6 overflow-y-auto space-y-4 text-xs flex-1">
+          {/* Agenda Selector Bar */}
+          {(companies.length > 0 || contacts.length > 0) && (
+            <div className="p-3.5 rounded-2xl bg-blue-50/70 border border-blue-200/80 space-y-2.5">
+              <div className="text-[11px] font-mono font-bold uppercase text-blue-900 flex items-center justify-between">
+                <span>Vincular con Agenda CRM (Corporación o Contacto Individual)</span>
+                <span className="text-[10px] text-blue-700 font-normal">Habilita acceso automático al Portal Clientes</span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                <div>
+                  <label className="block text-[10px] font-mono uppercase text-slate-600 mb-1 flex items-center gap-1">
+                    <Building2 className="w-3 h-3 text-blue-700" />
+                    <span>Seleccionar Corporación / Empresa</span>
+                  </label>
+                  <select
+                    value={companyId}
+                    onChange={(e) => handleSelectAgendaCompany(e.target.value)}
+                    className="w-full px-2.5 py-1.5 bg-white border border-blue-200 rounded-xl text-xs text-slate-800"
+                  >
+                    <option value="">-- Nueva Empresa o Sin Empresa (Individual) --</option>
+                    {companies.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name} {c.taxId ? `(${c.taxId})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-mono uppercase text-slate-600 mb-1 flex items-center gap-1">
+                    <User className="w-3 h-3 text-emerald-700" />
+                    <span>Seleccionar Contacto / Usuario Portal</span>
+                  </label>
+                  <select
+                    value={contactId}
+                    onChange={(e) => handleSelectAgendaContact(e.target.value)}
+                    className="w-full px-2.5 py-1.5 bg-white border border-blue-200 rounded-xl text-xs text-slate-800"
+                  >
+                    <option value="">-- Nuevo Contacto o escribir abajo --</option>
+                    {contacts
+                      .filter((cnt) => !companyId || cnt.companyId === companyId)
+                      .map((cnt) => (
+                        <option key={cnt.id} value={cnt.id}>
+                          {cnt.fullName} ({cnt.companyName || 'Individual'})
+                        </option>
+                      ))}
+                  </select>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div>
             <label className="block text-[11px] font-mono uppercase font-bold text-slate-500 mb-1">
               Nombre de la Oportunidad / Proyecto *
@@ -156,7 +252,7 @@ export const OpportunityModal: React.FC<OpportunityModalProps> = ({
             </div>
             <div>
               <label className="block text-[11px] font-mono uppercase font-bold text-slate-500 mb-1">
-                Empresa / Organización
+                Empresa / Corporación (dejar vacío si es Individual)
               </label>
               <input
                 type="text"
@@ -171,7 +267,7 @@ export const OpportunityModal: React.FC<OpportunityModalProps> = ({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-[11px] font-mono uppercase font-bold text-slate-500 mb-1">
-                Email
+                Email (Usuario de Acceso al Portal Clientes)
               </label>
               <input
                 type="email"

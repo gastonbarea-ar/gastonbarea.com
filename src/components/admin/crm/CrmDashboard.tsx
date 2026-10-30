@@ -22,6 +22,12 @@ import {
   Edit,
   Trash2,
   Building,
+  Building2,
+  UserPlus,
+  KeyRound,
+  User,
+  Phone,
+  Globe,
   Coins,
   ShieldCheck,
   AlertCircle,
@@ -36,12 +42,16 @@ import {
   PaymentRecord,
   PaymentGatewayConfig,
   ServiceCategory,
+  CrmCompany,
+  CrmContact,
 } from '../../../types/crm';
 import {
   DEFAULT_PAYMENT_CONFIG,
   INITIAL_CRM_OPPORTUNITIES,
   INITIAL_CRM_QUOTES,
   INITIAL_CRM_PAYMENTS,
+  INITIAL_CRM_COMPANIES,
+  INITIAL_CRM_CONTACTS,
   DEFAULT_QUOTE_TEMPLATES,
 } from '../../../data/crmTemplates';
 import { OpportunityModal } from './OpportunityModal';
@@ -77,11 +87,13 @@ const SERVICE_LABELS: Record<ServiceCategory, { label: string; badge: string }> 
 };
 
 export const CrmDashboard: React.FC<CrmDashboardProps> = ({ passkey = 'gaston2026', onClose }) => {
-  // Navigation tabs: 'kanban' | 'opportunities' | 'quotes' | 'payments' | 'leads'
-  const [activeTab, setActiveTab] = useState<'kanban' | 'opportunities' | 'quotes' | 'payments' | 'leads'>('kanban');
+  // Navigation tabs: 'kanban' | 'directory' | 'quotes' | 'payments' | 'leads'
+  const [activeTab, setActiveTab] = useState<'kanban' | 'directory' | 'quotes' | 'payments' | 'leads'>('kanban');
 
   // Main data states
   const [opportunities, setOpportunities] = useState<Opportunity[]>(INITIAL_CRM_OPPORTUNITIES);
+  const [companies, setCompanies] = useState<CrmCompany[]>(INITIAL_CRM_COMPANIES);
+  const [contacts, setContacts] = useState<CrmContact[]>(INITIAL_CRM_CONTACTS);
   const [quotes, setQuotes] = useState<Quote[]>(INITIAL_CRM_QUOTES);
   const [payments, setPayments] = useState<PaymentRecord[]>(INITIAL_CRM_PAYMENTS);
   const [paymentConfig, setPaymentConfig] = useState<PaymentGatewayConfig>(DEFAULT_PAYMENT_CONFIG);
@@ -92,6 +104,34 @@ export const CrmDashboard: React.FC<CrmDashboardProps> = ({ passkey = 'gaston202
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
+
+  // Directory (Agenda Corporativa & Contactos Individuales) states
+  const [directorySubView, setDirectorySubView] = useState<'companies' | 'contacts'>('companies');
+  const [contactFilterType, setContactFilterType] = useState<'all' | 'corporate_member' | 'individual' | 'active_service' | 'registered_only'>('all');
+  const [isCompanyFormOpen, setIsCompanyFormOpen] = useState<boolean>(false);
+  const [editingCompany, setEditingCompany] = useState<CrmCompany | null>(null);
+  const [compName, setCompName] = useState<string>('');
+  const [compTaxId, setCompTaxId] = useState<string>('');
+  const [compIndustry, setCompIndustry] = useState<string>('');
+  const [compPhone, setCompPhone] = useState<string>('');
+  const [compEmail, setCompEmail] = useState<string>('');
+  const [compWebsite, setCompWebsite] = useState<string>('');
+  const [compLocation, setCompLocation] = useState<string>('Argentina');
+  const [compTier, setCompTier] = useState<CrmCompany['tier']>('pyme');
+  const [compNotes, setCompNotes] = useState<string>('');
+
+  const [isContactFormOpen, setIsContactFormOpen] = useState<boolean>(false);
+  const [editingContact, setEditingContact] = useState<CrmContact | null>(null);
+  const [cntFullName, setCntFullName] = useState<string>('');
+  const [cntEmail, setCntEmail] = useState<string>('');
+  const [cntUsername, setCntUsername] = useState<string>('');
+  const [cntPassword, setCntPassword] = useState<string>('cliente2026');
+  const [cntPhone, setCntPhone] = useState<string>('');
+  const [cntRoleTitle, setCntRoleTitle] = useState<string>('');
+  const [cntType, setCntType] = useState<'corporate_member' | 'individual'>('corporate_member');
+  const [cntCompanyId, setCntCompanyId] = useState<string>('');
+  const [cntHasActiveService, setCntHasActiveService] = useState<boolean>(false);
+  const [cntNotes, setCntNotes] = useState<string>('');
 
   // Modal control states
   const [isOppModalOpen, setIsOppModalOpen] = useState(false);
@@ -125,6 +165,8 @@ export const CrmDashboard: React.FC<CrmDashboardProps> = ({ passkey = 'gaston202
         const json = await res.json();
         if (json.data) {
           if (json.data.opportunities) setOpportunities(json.data.opportunities);
+          if (json.data.companies) setCompanies(json.data.companies);
+          if (json.data.contacts) setContacts(json.data.contacts);
           if (json.data.quotes) setQuotes(json.data.quotes);
           if (json.data.payments) setPayments(json.data.payments);
           if (json.data.paymentConfig) setPaymentConfig(json.data.paymentConfig);
@@ -190,7 +232,7 @@ export const CrmDashboard: React.FC<CrmDashboardProps> = ({ passkey = 'gaston202
     setOpportunities(updatedList);
 
     try {
-      await fetch(isNew ? '/api/crm/opportunities' : `/api/crm/opportunities/${opp.id}`, {
+      const res = await fetch(isNew ? '/api/crm/opportunities' : `/api/crm/opportunities/${opp.id}`, {
         method: isNew ? 'POST' : 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -198,8 +240,220 @@ export const CrmDashboard: React.FC<CrmDashboardProps> = ({ passkey = 'gaston202
         },
         body: JSON.stringify(opp),
       });
+      if (res.ok) {
+        const json = await res.json();
+        if (json.companies) setCompanies(json.companies);
+        if (json.contacts) setContacts(json.contacts);
+      }
     } catch (e) {
       console.error(e);
+    }
+  };
+
+  // Company & Contact Agenda Handlers
+  const handleOpenNewCompanyForm = (companyToEdit?: CrmCompany) => {
+    if (companyToEdit) {
+      setEditingCompany(companyToEdit);
+      setCompName(companyToEdit.name);
+      setCompTaxId(companyToEdit.taxId || '');
+      setCompIndustry(companyToEdit.industry || '');
+      setCompPhone(companyToEdit.phone || '');
+      setCompEmail(companyToEdit.email || '');
+      setCompWebsite(companyToEdit.website || '');
+      setCompLocation(companyToEdit.location || 'Argentina');
+      setCompTier(companyToEdit.tier);
+      setCompNotes(companyToEdit.notes || '');
+    } else {
+      setEditingCompany(null);
+      setCompName('');
+      setCompTaxId('');
+      setCompIndustry('');
+      setCompPhone('');
+      setCompEmail('');
+      setCompWebsite('');
+      setCompLocation('Argentina');
+      setCompTier('pyme');
+      setCompNotes('');
+    }
+    setIsCompanyFormOpen(true);
+  };
+
+  const handleSaveCompany = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!compName.trim()) return;
+
+    const payload: CrmCompany = {
+      id: editingCompany?.id || `cmp-${Date.now()}`,
+      name: compName.trim(),
+      taxId: compTaxId.trim(),
+      industry: compIndustry.trim() || 'Tecnología & Operaciones',
+      phone: compPhone.trim(),
+      email: compEmail.trim(),
+      website: compWebsite.trim(),
+      location: compLocation.trim() || 'Argentina',
+      tier: compTier,
+      notes: compNotes.trim(),
+      createdAt: editingCompany?.createdAt || new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    const isNew = !editingCompany;
+    if (isNew) {
+      setCompanies([payload, ...companies]);
+    } else {
+      setCompanies(companies.map((c) => (c.id === payload.id ? payload : c)));
+      setContacts(
+        contacts.map((cnt) =>
+          cnt.companyId === payload.id ? { ...cnt, companyName: payload.name } : cnt
+        )
+      );
+    }
+
+    try {
+      await fetch(isNew ? '/api/crm/companies' : `/api/crm/companies/${payload.id}`, {
+        method: isNew ? 'POST' : 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-passkey': passkey,
+        },
+        body: JSON.stringify(payload),
+      });
+    } catch (err) {
+      console.error('Error saving company:', err);
+    }
+
+    setIsCompanyFormOpen(false);
+    setEditingCompany(null);
+    setCopiedNotification(
+      isNew
+        ? `Corporación "${payload.name}" registrada en la Agenda CRM.`
+        : `Corporación "${payload.name}" actualizada.`
+    );
+    setTimeout(() => setCopiedNotification(null), 3500);
+  };
+
+  const handleDeleteCompany = async (id: string) => {
+    if (!confirm('¿Eliminar esta empresa de la agenda? Sus contactos pasarán a ser individuales.')) return;
+    setCompanies(companies.filter((c) => c.id !== id));
+    setContacts(
+      contacts.map((cnt) =>
+        cnt.companyId === id ? { ...cnt, companyId: undefined, contactType: 'individual' } : cnt
+      )
+    );
+    try {
+      await fetch(`/api/crm/companies/${id}`, {
+        method: 'DELETE',
+        headers: { 'x-admin-passkey': passkey },
+      });
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleOpenNewContactForm = (preselectedCompanyId?: string, contactToEdit?: CrmContact) => {
+    if (contactToEdit) {
+      setEditingContact(contactToEdit);
+      setCntFullName(contactToEdit.fullName);
+      setCntEmail(contactToEdit.email);
+      setCntUsername(contactToEdit.username);
+      setCntPassword(contactToEdit.password || 'cliente2026');
+      setCntPhone(contactToEdit.phone || '');
+      setCntRoleTitle(contactToEdit.roleTitle);
+      setCntType(contactToEdit.contactType);
+      setCntCompanyId(contactToEdit.companyId || '');
+      setCntHasActiveService(contactToEdit.hasActiveService);
+      setCntNotes(contactToEdit.notes || '');
+    } else {
+      setEditingContact(null);
+      setCntFullName('');
+      setCntEmail('');
+      setCntUsername('');
+      setCntPassword('cliente2026');
+      setCntPhone('');
+      setCntRoleTitle(preselectedCompanyId ? 'Representante Corporativo' : 'Consultor / Contacto Individual');
+      setCntType(preselectedCompanyId ? 'corporate_member' : 'individual');
+      setCntCompanyId(preselectedCompanyId || '');
+      setCntHasActiveService(false);
+      setCntNotes('');
+    }
+    setIsContactFormOpen(true);
+  };
+
+  const handleSaveContact = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!cntFullName.trim() || !cntEmail.trim()) return;
+
+    const cleanEmail = cntEmail.trim().toLowerCase();
+    const cleanUsername =
+      (cntUsername.trim() || cleanEmail.split('@')[0]).toLowerCase().replace(/[^a-z0-9._-]/g, '') ||
+      `usuario.${Date.now().toString().slice(-4)}`;
+
+    const parentComp =
+      cntType === 'corporate_member' && cntCompanyId
+        ? companies.find((c) => c.id === cntCompanyId)
+        : undefined;
+
+    const payload: CrmContact = {
+      id: editingContact?.id || `cnt-${Date.now()}`,
+      fullName: cntFullName.trim(),
+      email: cleanEmail,
+      username: cleanUsername,
+      password: cntPassword.trim() || 'cliente2026',
+      phone: cntPhone.trim(),
+      roleTitle:
+        cntRoleTitle.trim() ||
+        (parentComp ? 'Miembro de Corporación' : 'Contacto Individual'),
+      contactType: parentComp ? 'corporate_member' : 'individual',
+      companyId: parentComp ? parentComp.id : undefined,
+      companyName: parentComp ? parentComp.name : undefined,
+      portalAccessStatus: 'active',
+      hasActiveService: cntHasActiveService,
+      linkedProjectId: editingContact?.linkedProjectId,
+      notes: cntNotes.trim(),
+      createdAt: editingContact?.createdAt || new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    const isNew = !editingContact;
+    if (isNew) {
+      setContacts([payload, ...contacts]);
+    } else {
+      setContacts(contacts.map((c) => (c.id === payload.id ? payload : c)));
+    }
+
+    try {
+      await fetch(isNew ? '/api/crm/contacts' : `/api/crm/contacts/${payload.id}`, {
+        method: isNew ? 'POST' : 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-passkey': passkey,
+        },
+        body: JSON.stringify(payload),
+      });
+    } catch (err) {
+      console.error('Error saving contact:', err);
+    }
+
+    setIsContactFormOpen(false);
+    setEditingContact(null);
+    setCopiedNotification(
+      isNew
+        ? `Contacto "${payload.fullName}" agendado y habilitado como usuario del Portal Clientes (Usuario: ${payload.username}).`
+        : `Contacto "${payload.fullName}" actualizado.`
+    );
+    setTimeout(() => setCopiedNotification(null), 4000);
+  };
+
+  const handleDeleteContact = async (id: string) => {
+    if (!confirm('¿Eliminar este contacto de la agenda y del Portal Clientes?')) return;
+    setContacts(contacts.filter((c) => c.id !== id));
+    try {
+      await fetch(`/api/crm/contacts/${id}`, {
+        method: 'DELETE',
+        headers: { 'x-admin-passkey': passkey },
+      });
+    } catch (err) {
+      console.error(err);
     }
   };
 
@@ -508,6 +762,19 @@ export const CrmDashboard: React.FC<CrmDashboardProps> = ({ passkey = 'gaston202
 
           <button
             type="button"
+            onClick={() => setActiveTab('directory')}
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-2 cursor-pointer transition-all ${
+              activeTab === 'directory'
+                ? 'bg-blue-600 text-white shadow-2xs'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+            }`}
+          >
+            <Building2 className="w-4 h-4" />
+            <span>Agenda: Empresas ({companies.length}) & Contactos ({contacts.length})</span>
+          </button>
+
+          <button
+            type="button"
             onClick={() => setActiveTab('quotes')}
             className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-2 cursor-pointer transition-all ${
               activeTab === 'quotes'
@@ -732,6 +999,778 @@ export const CrmDashboard: React.FC<CrmDashboardProps> = ({ passkey = 'gaston202
                 </div>
               );
             })}
+          </div>
+        )}
+
+        {/* ============================================================
+            TAB 1B: AGENDA DE EMPRESAS (CORPORACIONES) & CONTACTOS INDIVIDUALES
+        ============================================================ */}
+        {activeTab === 'directory' && (
+          <div className="space-y-6">
+            {/* Header & Quick Actions */}
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-slate-200/90 shadow-2xs">
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-[10px] font-mono uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-indigo-100 text-indigo-800 font-bold">
+                    Agenda Integrada CRM + Portal Clientes
+                  </span>
+                  <span className="text-[11px] font-mono text-emerald-700 font-semibold">
+                    ✓ Todos los contactos tienen usuario de acceso activo en #portal
+                  </span>
+                </div>
+                <h3 className="text-base font-bold text-slate-900">
+                  Directorio de Empresas (Corporaciones) & Contactos Individuales
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Las empresas agrupan los contactos de su corporación. Cada contacto (corporativo o individual) es usuario registrado del Portal Clientes sin necesidad de contar con un producto o servicio contratado.
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => handleOpenNewCompanyForm()}
+                  className="px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-colors"
+                >
+                  <Building2 className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>+ Nueva Empresa / Corporación</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleOpenNewContactForm()}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-2xs cursor-pointer transition-colors"
+                >
+                  <UserPlus className="w-3.5 h-3.5" />
+                  <span>+ Nuevo Contacto / Usuario Portal</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Inline Modal / Drawer: Nueva Empresa / Corporación */}
+            {isCompanyFormOpen && (
+              <form
+                onSubmit={handleSaveCompany}
+                className="p-5 rounded-2xl bg-white border-2 border-slate-900 shadow-lg space-y-4 text-xs"
+              >
+                <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+                  <div className="flex items-center gap-2">
+                    <Building2 className="w-4 h-4 text-blue-700" />
+                    <h4 className="font-bold text-sm text-slate-900">
+                      {editingCompany ? `Editar Corporación: ${editingCompany.name}` : 'Registrar Nueva Empresa / Corporación'}
+                    </h4>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsCompanyFormOpen(false)}
+                    className="text-xs font-semibold text-slate-500 hover:text-slate-900 cursor-pointer"
+                  >
+                    Cerrar ×
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-mono uppercase font-bold text-slate-500 mb-1">
+                      Razón Social / Corporación *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={compName}
+                      onChange={(e) => setCompName(e.target.value)}
+                      placeholder="Ej: BioPatagonia Industrial S.A."
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-900"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-mono uppercase font-bold text-slate-500 mb-1">
+                      CUIT / RUT / Tax ID
+                    </label>
+                    <input
+                      type="text"
+                      value={compTaxId}
+                      onChange={(e) => setCompTaxId(e.target.value)}
+                      placeholder="30-71000000-1"
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono text-slate-900"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-mono uppercase font-bold text-slate-500 mb-1">
+                      Segmento / Tier
+                    </label>
+                    <select
+                      value={compTier}
+                      onChange={(e) => setCompTier(e.target.value as CrmCompany['tier'])}
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-900"
+                    >
+                      <option value="enterprise">Corporación / Enterprise</option>
+                      <option value="pyme">PyME Productiva / Comercial</option>
+                      <option value="startup">Startup / EBT Tecnológica</option>
+                      <option value="institution">Institución / Salud / Cooperativa</option>
+                      <option value="prospect">Prospecto en Evaluación</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-mono uppercase font-bold text-slate-500 mb-1">
+                      Industria / Vertical
+                    </label>
+                    <input
+                      type="text"
+                      value={compIndustry}
+                      onChange={(e) => setCompIndustry(e.target.value)}
+                      placeholder="Ej: Distribución B2B2C / Fintech"
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-mono uppercase font-bold text-slate-500 mb-1">
+                      Email Institucional
+                    </label>
+                    <input
+                      type="email"
+                      value={compEmail}
+                      onChange={(e) => setCompEmail(e.target.value)}
+                      placeholder="contacto@corporacion.com"
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono text-slate-900"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-mono uppercase font-bold text-slate-500 mb-1">
+                      Teléfono Central
+                    </label>
+                    <input
+                      type="text"
+                      value={compPhone}
+                      onChange={(e) => setCompPhone(e.target.value)}
+                      placeholder="+54 9 11 ..."
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono text-slate-900"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-mono uppercase font-bold text-slate-500 mb-1">
+                      Ubicación / Sede
+                    </label>
+                    <input
+                      type="text"
+                      value={compLocation}
+                      onChange={(e) => setCompLocation(e.target.value)}
+                      placeholder="CABA / Patagonia / Remoto"
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-mono uppercase font-bold text-slate-500 mb-1">
+                    Notas de la Corporación
+                  </label>
+                  <input
+                    type="text"
+                    value={compNotes}
+                    onChange={(e) => setCompNotes(e.target.value)}
+                    placeholder="Detalle de áreas, sucursales o acuerdos..."
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900"
+                  />
+                </div>
+
+                <div className="flex items-center justify-end gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsCompanyFormOpen(false)}
+                    className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 cursor-pointer"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs cursor-pointer"
+                  >
+                    Guardar Corporación
+                  </button>
+                </div>
+              </form>
+            )}
+
+            {/* Inline Modal / Drawer: Nuevo Contacto (Corporativo o Individual) + Portal Clientes */}
+            {isContactFormOpen && (
+              <form
+                onSubmit={handleSaveContact}
+                className="p-5 rounded-2xl bg-white border-2 border-blue-600 shadow-lg space-y-4 text-xs"
+              >
+                <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+                  <div className="flex items-center gap-2">
+                    <UserPlus className="w-4 h-4 text-blue-600" />
+                    <div>
+                      <h4 className="font-bold text-sm text-slate-900">
+                        {editingContact ? `Editar Contacto: ${editingContact.fullName}` : 'Nuevo Contacto & Usuario del Portal Clientes'}
+                      </h4>
+                      <p className="text-[11px] text-slate-500">
+                        Se habilita automáticamente como usuario registrado del Portal Clientes (con o sin servicio activo contratado).
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsContactFormOpen(false)}
+                    className="text-xs font-semibold text-slate-500 hover:text-slate-900 cursor-pointer"
+                  >
+                    Cerrar ×
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-mono uppercase font-bold text-slate-500 mb-1">
+                      Tipo de Contacto *
+                    </label>
+                    <select
+                      value={cntType}
+                      onChange={(e) => setCntType(e.target.value as 'corporate_member' | 'individual')}
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-blue-900"
+                    >
+                      <option value="corporate_member">Miembro de Empresa / Corporación</option>
+                      <option value="individual">Contacto Individual / Independiente</option>
+                    </select>
+                  </div>
+
+                  {cntType === 'corporate_member' ? (
+                    <div className="sm:col-span-2">
+                      <label className="block text-[11px] font-mono uppercase font-bold text-slate-500 mb-1">
+                        Agrupar en Empresa / Corporación *
+                      </label>
+                      <select
+                        value={cntCompanyId}
+                        onChange={(e) => setCntCompanyId(e.target.value)}
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-900"
+                      >
+                        <option value="">-- Seleccionar Empresa de la Agenda --</option>
+                        {companies.map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.name} {c.taxId ? `(CUIT: ${c.taxId})` : ''}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  ) : (
+                    <div className="sm:col-span-2 flex items-center p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs">
+                      <span>
+                        <strong>Contacto Individual:</strong> Tendrá acceso personal e independiente al Portal Clientes para consultas, agenda y presupuestos sin depender de una corporación.
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-mono uppercase font-bold text-slate-500 mb-1">
+                      Nombre y Apellido *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={cntFullName}
+                      onChange={(e) => setCntFullName(e.target.value)}
+                      placeholder="Ej: Ing. Mariana Silva"
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-900"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-mono uppercase font-bold text-slate-500 mb-1">
+                      Cargo / Rol Profesional
+                    </label>
+                    <input
+                      type="text"
+                      value={cntRoleTitle}
+                      onChange={(e) => setCntRoleTitle(e.target.value)}
+                      placeholder="Ej: Gerente de Operaciones / Consultora"
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-mono uppercase font-bold text-slate-500 mb-1">
+                      Teléfono / WhatsApp
+                    </label>
+                    <input
+                      type="text"
+                      value={cntPhone}
+                      onChange={(e) => setCntPhone(e.target.value)}
+                      placeholder="+54 9 11 ..."
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono text-slate-900"
+                    />
+                  </div>
+                </div>
+
+                {/* Portal Credentials Box */}
+                <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-mono font-bold uppercase text-slate-700 flex items-center gap-1.5">
+                      <KeyRound className="w-3.5 h-3.5 text-blue-600" />
+                      <span>Credenciales de Acceso al Portal Clientes (#portal)</span>
+                    </span>
+                    <label className="inline-flex items-center gap-2 text-xs font-semibold text-slate-800 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={cntHasActiveService}
+                        onChange={(e) => setCntHasActiveService(e.target.checked)}
+                        className="accent-blue-600"
+                      />
+                      <span>¿Tiene Producto / Servicio Contratado Activo?</span>
+                    </label>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                      <label className="block text-[10px] font-mono uppercase text-slate-500 mb-1">
+                        Email de Login *
+                      </label>
+                      <input
+                        type="email"
+                        required
+                        value={cntEmail}
+                        onChange={(e) => {
+                          setCntEmail(e.target.value);
+                          if (!editingContact && !cntUsername) {
+                            setCntUsername(e.target.value.split('@')[0].toLowerCase());
+                          }
+                        }}
+                        placeholder="nombre@empresa.com"
+                        className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-xl text-xs font-mono text-slate-900"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-mono uppercase text-slate-500 mb-1">
+                        Usuario del Portal
+                      </label>
+                      <input
+                        type="text"
+                        value={cntUsername}
+                        onChange={(e) => setCntUsername(e.target.value)}
+                        placeholder="nombre.apellido"
+                        className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-xl text-xs font-mono text-slate-900"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-mono uppercase text-slate-500 mb-1">
+                        Contraseña Asignada
+                      </label>
+                      <input
+                        type="text"
+                        value={cntPassword}
+                        onChange={(e) => setCntPassword(e.target.value)}
+                        placeholder="cliente2026"
+                        className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-xl text-xs font-mono text-slate-900"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-end gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setIsContactFormOpen(false)}
+                    className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 cursor-pointer"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs cursor-pointer"
+                  >
+                    Guardar Contacto y Habilitar Portal
+                  </button>
+                </div>
+              </form>
+            )}
+
+            {/* Sub-View Switcher: Empresas (con Contactos Agrupados) vs Contactos Individuales & Todos los Usuarios */}
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="inline-flex p-1 rounded-xl bg-slate-200/80 border border-slate-300/80">
+                <button
+                  type="button"
+                  onClick={() => setDirectorySubView('companies')}
+                  className={`px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-2 cursor-pointer transition-all ${
+                    directorySubView === 'companies'
+                      ? 'bg-slate-900 text-white shadow-2xs'
+                      : 'text-slate-700 hover:text-slate-900'
+                  }`}
+                >
+                  <Building2 className="w-3.5 h-3.5" />
+                  <span>1. Empresas & Contactos de su Corporación ({companies.length})</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDirectorySubView('contacts')}
+                  className={`px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-2 cursor-pointer transition-all ${
+                    directorySubView === 'contacts'
+                      ? 'bg-slate-900 text-white shadow-2xs'
+                      : 'text-slate-700 hover:text-slate-900'
+                  }`}
+                >
+                  <Users className="w-3.5 h-3.5" />
+                  <span>2. Agenda de Contactos Individuales & Usuarios Portal ({contacts.length})</span>
+                </button>
+              </div>
+
+              {directorySubView === 'contacts' && (
+                <div className="flex flex-wrap items-center gap-1.5 text-xs">
+                  {(
+                    [
+                      { id: 'all', label: `Todos (${contacts.length})` },
+                      {
+                        id: 'corporate_member',
+                        label: `Corporativos (${contacts.filter((c) => c.contactType === 'corporate_member').length})`,
+                      },
+                      {
+                        id: 'individual',
+                        label: `Individuales (${contacts.filter((c) => c.contactType === 'individual').length})`,
+                      },
+                      {
+                        id: 'active_service',
+                        label: `Con Servicio Activo (${contacts.filter((c) => c.hasActiveService).length})`,
+                      },
+                      {
+                        id: 'registered_only',
+                        label: `Registrados sin Servicio (${contacts.filter((c) => !c.hasActiveService).length})`,
+                      },
+                    ] as const
+                  ).map((flt) => (
+                    <button
+                      key={flt.id}
+                      type="button"
+                      onClick={() => setContactFilterType(flt.id)}
+                      className={`px-2.5 py-1 rounded-lg font-semibold cursor-pointer transition-colors ${
+                        contactFilterType === flt.id
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100'
+                      }`}
+                    >
+                      {flt.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* SUB-VIEW 1: EMPRESAS Y CONTACTOS AGRUPADOS DE LA CORPORACIÓN */}
+            {directorySubView === 'companies' && (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                {companies
+                  .filter(
+                    (comp) =>
+                      !searchQuery ||
+                      comp.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                      (comp.industry && comp.industry.toLowerCase().includes(searchQuery.toLowerCase())) ||
+                      (comp.taxId && comp.taxId.toLowerCase().includes(searchQuery.toLowerCase()))
+                  )
+                  .map((comp) => {
+                    const groupedContacts = contacts.filter(
+                      (cnt) =>
+                        cnt.companyId === comp.id ||
+                        (cnt.companyName && cnt.companyName.toLowerCase() === comp.name.toLowerCase())
+                    );
+                    const compOpps = opportunities.filter(
+                      (o) =>
+                        o.companyId === comp.id ||
+                        (o.company && o.company.toLowerCase() === comp.name.toLowerCase())
+                    );
+                    const totalPipelineComp = compOpps.reduce((sum, o) => sum + (o.value || 0), 0);
+
+                    return (
+                      <div
+                        key={comp.id}
+                        className="rounded-2xl bg-white border border-slate-200/90 shadow-2xs overflow-hidden flex flex-col justify-between"
+                      >
+                        <div>
+                          {/* Company Header */}
+                          <div className="p-5 border-b border-slate-100 bg-slate-50/70 flex items-start justify-between gap-3">
+                            <div className="space-y-1">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span className="text-[10px] font-mono font-bold uppercase px-2 py-0.5 rounded-md bg-slate-900 text-white">
+                                  {comp.tier}
+                                </span>
+                                {comp.taxId && (
+                                  <span className="text-[11px] font-mono text-slate-500">
+                                    CUIT: {comp.taxId}
+                                  </span>
+                                )}
+                                <span className="text-[11px] font-mono text-blue-700 font-bold">
+                                  · {groupedContacts.length} contacto(s) agrupado(s)
+                                </span>
+                              </div>
+                              <h4 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                                <Building2 className="w-4 h-4 text-blue-600 shrink-0" />
+                                <span>{comp.name}</span>
+                              </h4>
+                              <p className="text-xs text-slate-600">
+                                {comp.industry || 'Corporación'} · {comp.location || 'Argentina'}
+                              </p>
+                            </div>
+
+                            <div className="flex items-center gap-1 shrink-0">
+                              <button
+                                type="button"
+                                onClick={() => handleOpenNewCompanyForm(comp)}
+                                className="p-1.5 rounded-lg hover:bg-slate-200/70 text-slate-500 hover:text-slate-900 cursor-pointer"
+                                title="Editar corporación"
+                              >
+                                <Edit className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteCompany(comp.id)}
+                                className="p-1.5 rounded-lg hover:bg-rose-50 text-slate-400 hover:text-rose-600 cursor-pointer"
+                                title="Eliminar corporación"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Grouped Corporate Contacts List */}
+                          <div className="p-4 space-y-3">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[11px] font-mono font-bold uppercase text-slate-500">
+                                Contactos de la Corporación (Usuarios del Portal)
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => handleOpenNewContactForm(comp.id)}
+                                className="text-[11px] font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1 cursor-pointer"
+                              >
+                                <UserPlus className="w-3 h-3" />
+                                <span>+ Agrupar Contacto</span>
+                              </button>
+                            </div>
+
+                            {groupedContacts.length === 0 ? (
+                              <div className="p-3 rounded-xl bg-slate-50 border border-dashed border-slate-200 text-xs text-slate-400 text-center">
+                                Sin contactos vinculados aún a esta corporación.
+                              </div>
+                            ) : (
+                              <div className="space-y-2">
+                                {groupedContacts.map((member) => (
+                                  <div
+                                    key={member.id}
+                                    className="p-3 rounded-xl bg-slate-50 border border-slate-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs"
+                                  >
+                                    <div className="space-y-0.5">
+                                      <div className="flex items-center gap-2">
+                                        <span className="font-bold text-slate-900">{member.fullName}</span>
+                                        <span className="text-[10px] px-2 py-0.5 rounded-md bg-blue-100/80 text-blue-900 font-semibold">
+                                          {member.roleTitle}
+                                        </span>
+                                        <span
+                                          className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-md ${
+                                            member.hasActiveService
+                                              ? 'bg-emerald-100 text-emerald-800'
+                                              : 'bg-amber-100 text-amber-800'
+                                          }`}
+                                        >
+                                          {member.hasActiveService
+                                            ? 'Servicio Activo'
+                                            : 'Usuario Portal (Sin Servicio Activo)'}
+                                        </span>
+                                      </div>
+                                      <div className="text-[11px] font-mono text-slate-500">
+                                        {member.email} · Usuario Portal: <strong className="text-slate-800">{member.username}</strong>
+                                      </div>
+                                    </div>
+
+                                    <div className="flex items-center gap-1 shrink-0">
+                                      <button
+                                        type="button"
+                                        onClick={() => handleOpenNewContactForm(comp.id, member)}
+                                        className="p-1.5 rounded-lg hover:bg-slate-200 text-slate-500 hover:text-slate-900 cursor-pointer"
+                                        title="Editar contacto"
+                                      >
+                                        <Edit className="w-3.5 h-3.5" />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleDeleteContact(member.id)}
+                                        className="p-1.5 rounded-lg hover:bg-rose-100 text-slate-400 hover:text-rose-600 cursor-pointer"
+                                        title="Eliminar contacto"
+                                      >
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                      </button>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Company Pipeline Footer */}
+                        <div className="px-5 py-3 bg-slate-50 border-t border-slate-200/80 flex flex-wrap items-center justify-between gap-2 text-xs">
+                          <div className="font-mono text-[11px] text-slate-600">
+                            Pipeline vinculado: <strong>{compOpps.length} op.</strong> (USD ${totalPipelineComp.toLocaleString()})
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const primary = groupedContacts[0];
+                              setSelectedOpp({
+                                id: `opp-${Date.now()}`,
+                                title: `Proyecto Tecnológico - ${comp.name}`,
+                                clientName: primary ? primary.fullName : comp.name,
+                                clientEmail: primary ? primary.email : comp.email || '',
+                                clientPhone: primary ? primary.phone : comp.phone || '',
+                                company: comp.name,
+                                companyId: comp.id,
+                                contactId: primary?.id,
+                                serviceCategory: 'odoo_erp',
+                                stage: 'lead',
+                                value: 3500,
+                                currency: 'USD',
+                                probability: 50,
+                                source: 'manual',
+                                createdAt: new Date().toISOString(),
+                                updatedAt: new Date().toISOString(),
+                              });
+                              setIsOppModalOpen(true);
+                            }}
+                            className="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-[11px] flex items-center gap-1.5 cursor-pointer transition-colors"
+                          >
+                            <TrendingUp className="w-3.5 h-3.5" />
+                            <span>+ Oportunidad en Pipeline</span>
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+              </div>
+            )}
+
+            {/* SUB-VIEW 2: CONTACTOS INDIVIDUALES Y TODOS LOS USUARIOS DEL PORTAL */}
+            {directorySubView === 'contacts' && (
+              <div className="border border-slate-200/90 rounded-2xl bg-white overflow-hidden shadow-2xs">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="bg-slate-100/80 text-slate-700 font-mono text-[11px] uppercase tracking-wider border-b border-slate-200">
+                      <th className="py-3 px-4">Contacto / Rol</th>
+                      <th className="py-3 px-4">Modalidad / Corporación</th>
+                      <th className="py-3 px-4">Credenciales Portal Clientes</th>
+                      <th className="py-3 px-4 text-center">Estado de Servicio</th>
+                      <th className="py-3 px-4 text-right">Acciones CRM & Pipeline</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 text-slate-700">
+                    {contacts
+                      .filter((cnt) => {
+                        const matchesSearch =
+                          !searchQuery ||
+                          cnt.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                          cnt.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                          cnt.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                          (cnt.companyName && cnt.companyName.toLowerCase().includes(searchQuery.toLowerCase()));
+
+                        const matchesType =
+                          contactFilterType === 'all' ||
+                          (contactFilterType === 'corporate_member' && cnt.contactType === 'corporate_member') ||
+                          (contactFilterType === 'individual' && cnt.contactType === 'individual') ||
+                          (contactFilterType === 'active_service' && cnt.hasActiveService) ||
+                          (contactFilterType === 'registered_only' && !cnt.hasActiveService);
+
+                        return matchesSearch && matchesType;
+                      })
+                      .map((cnt) => (
+                        <tr key={cnt.id} className="hover:bg-slate-50/70">
+                          <td className="py-3.5 px-4">
+                            <div className="font-bold text-slate-900">{cnt.fullName}</div>
+                            <div className="text-[11px] text-slate-500">
+                              {cnt.roleTitle} {cnt.phone ? `· ${cnt.phone}` : ''}
+                            </div>
+                          </td>
+                          <td className="py-3.5 px-4">
+                            {cnt.contactType === 'corporate_member' && cnt.companyName ? (
+                              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-900 font-semibold text-[11px] border border-indigo-200/70">
+                                <Building2 className="w-3.5 h-3.5 text-indigo-600" />
+                                <span>{cnt.companyName}</span>
+                              </div>
+                            ) : (
+                              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 text-slate-800 font-semibold text-[11px]">
+                                <User className="w-3.5 h-3.5 text-slate-600" />
+                                <span>Contacto Individual</span>
+                              </div>
+                            )}
+                          </td>
+                          <td className="py-3.5 px-4 font-mono text-[11px]">
+                            <div className="text-slate-900">
+                              Usuario: <strong className="text-blue-800">{cnt.username}</strong> · Clave:{' '}
+                              <span className="text-slate-600">{cnt.password}</span>
+                            </div>
+                            <div className="text-slate-400">{cnt.email}</div>
+                          </td>
+                          <td className="py-3.5 px-4 text-center">
+                            <span
+                              className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                                cnt.hasActiveService
+                                  ? 'bg-emerald-100 text-emerald-800'
+                                  : 'bg-amber-100 text-amber-800'
+                              }`}
+                            >
+                              {cnt.hasActiveService
+                                ? 'Cliente c/ Servicio Activo'
+                                : 'Usuario Portal (Sin Servicio)'}
+                            </span>
+                          </td>
+                          <td className="py-3.5 px-4 text-right space-x-1.5 whitespace-nowrap">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSelectedOpp({
+                                  id: `opp-${Date.now()}`,
+                                  title: `Propuesta Técnica - ${cnt.companyName || cnt.fullName}`,
+                                  clientName: cnt.fullName,
+                                  clientEmail: cnt.email,
+                                  clientPhone: cnt.phone || '',
+                                  company: cnt.companyName || '',
+                                  companyId: cnt.companyId,
+                                  contactId: cnt.id,
+                                  serviceCategory: 'software_architecture',
+                                  stage: 'lead',
+                                  value: 3000,
+                                  currency: 'USD',
+                                  probability: 45,
+                                  source: 'manual',
+                                  createdAt: new Date().toISOString(),
+                                  updatedAt: new Date().toISOString(),
+                                });
+                                setIsOppModalOpen(true);
+                              }}
+                              className="px-2.5 py-1 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 font-semibold text-[11px] inline-flex items-center gap-1 cursor-pointer"
+                              title="Crear Oportunidad en Pipeline para este contacto"
+                            >
+                              <TrendingUp className="w-3 h-3" />
+                              <span>+ Pipeline</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleOpenNewContactForm(cnt.companyId, cnt)}
+                              className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-900 cursor-pointer"
+                              title="Editar contacto"
+                            >
+                              <Edit className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteContact(cnt.id)}
+                              className="p-1.5 rounded-lg hover:bg-rose-50 text-slate-400 hover:text-rose-600 cursor-pointer"
+                              title="Eliminar contacto"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         )}
 
@@ -1190,6 +2229,8 @@ export const CrmDashboard: React.FC<CrmDashboardProps> = ({ passkey = 'gaston202
         onSaveOpportunity={handleSaveOpportunity}
         initialOpportunity={selectedOpp}
         initialStage={targetOppStage}
+        companies={companies}
+        contacts={contacts}
       />
 
       <QuoteBuilderModal

@@ -27,6 +27,9 @@ import {
   Video,
   Eye,
   EyeOff,
+  Users,
+  UserPlus,
+  FileText,
 } from 'lucide-react';
 import {
   ClientProject,
@@ -35,7 +38,7 @@ import {
   SupportTicket,
   ConsultingBooking,
 } from '../../types/clientPortal';
-import { PaymentGatewayConfig } from '../../types/crm';
+import { PaymentGatewayConfig, CrmCompany, CrmContact, Opportunity, Quote } from '../../types/crm';
 import {
   CLIENT_ACCOUNTS,
   INITIAL_CLIENT_PROJECTS,
@@ -43,7 +46,13 @@ import {
   INITIAL_SUPPORT_TICKETS,
   INITIAL_CONSULTING_BOOKINGS,
 } from '../../data/clientPortalData';
-import { DEFAULT_PAYMENT_CONFIG } from '../../data/crmTemplates';
+import {
+  DEFAULT_PAYMENT_CONFIG,
+  INITIAL_CRM_COMPANIES,
+  INITIAL_CRM_CONTACTS,
+  INITIAL_CRM_OPPORTUNITIES,
+  INITIAL_CRM_QUOTES,
+} from '../../data/crmTemplates';
 
 interface ClientPortalModalProps {
   isOpen?: boolean;
@@ -54,11 +63,16 @@ export const ClientPortalModal: React.FC<ClientPortalModalProps> = ({ isOpen = t
   // Auth state
   const [token, setToken] = useState<string>(() => localStorage.getItem('gb_client_token') || '');
   const [clientSession, setClientSession] = useState<{
+    id?: string;
     email: string;
     username?: string;
     name: string;
     company: string;
+    companyId?: string;
     role?: string;
+    contactType?: 'corporate_member' | 'individual';
+    hasActiveService?: boolean;
+    linkedProjectId?: string;
   } | null>(() => {
     try {
       const raw = localStorage.getItem('gb_client_user');
@@ -68,8 +82,8 @@ export const ClientPortalModal: React.FC<ClientPortalModalProps> = ({ isOpen = t
     }
   });
 
-  // Login form state (Username/Email + Password primary, OTP secondary)
-  const [loginMethod, setLoginMethod] = useState<'password' | 'otp'>('password');
+  // Login & Open Registration form state
+  const [loginMethod, setLoginMethod] = useState<'password' | 'register' | 'otp'>('password');
   const [usernameInput, setUsernameInput] = useState<string>('martin.arismendi');
   const [passwordInput, setPasswordInput] = useState<string>('cliente2026');
   const [showPassword, setShowPassword] = useState<boolean>(false);
@@ -81,10 +95,25 @@ export const ClientPortalModal: React.FC<ClientPortalModalProps> = ({ isOpen = t
   const [authError, setAuthError] = useState<string>('');
   const [codeHint, setCodeHint] = useState<string>('');
 
+  // Open Registration fields (No active service required)
+  const [regContactType, setRegContactType] = useState<'corporate_member' | 'individual'>('corporate_member');
+  const [regFullName, setRegFullName] = useState<string>('');
+  const [regEmail, setRegEmail] = useState<string>('');
+  const [regUsername, setRegUsername] = useState<string>('');
+  const [regPassword, setRegPassword] = useState<string>('');
+  const [regPhone, setRegPhone] = useState<string>('');
+  const [regCompanyName, setRegCompanyName] = useState<string>('');
+  const [regCompanyTaxId, setRegCompanyTaxId] = useState<string>('');
+  const [regRoleTitle, setRegRoleTitle] = useState<string>('');
+
   // Dashboard state
-  const [activeTab, setActiveTab] = useState<'project' | 'inquiries' | 'bookings' | 'tickets'>('project');
+  const [activeTab, setActiveTab] = useState<'project' | 'directory' | 'inquiries' | 'bookings' | 'tickets'>('project');
   const [isLoadingDashboard, setIsLoadingDashboard] = useState<boolean>(false);
   const [project, setProject] = useState<ClientProject | null>(null);
+  const [companyProfile, setCompanyProfile] = useState<CrmCompany | null>(null);
+  const [corporateColleagues, setCorporateColleagues] = useState<Partial<CrmContact>[]>([]);
+  const [relatedOpportunities, setRelatedOpportunities] = useState<Opportunity[]>([]);
+  const [relatedQuotes, setRelatedQuotes] = useState<Quote[]>([]);
   const [inquiries, setInquiries] = useState<ConsultingInquiry[]>([]);
   const [tickets, setTickets] = useState<SupportTicket[]>([]);
   const [bookings, setBookings] = useState<ConsultingBooking[]>([]);
@@ -157,25 +186,79 @@ export const ClientPortalModal: React.FC<ClientPortalModalProps> = ({ isOpen = t
     }
   };
 
-  const loadDashboardData = async (currentToken: string, overrideSession?: { email: string; name: string; company: string } | null) => {
+  const loadDashboardData = async (
+    currentToken: string,
+    overrideSession?: {
+      email: string;
+      name: string;
+      company: string;
+      companyId?: string;
+      contactType?: 'corporate_member' | 'individual';
+      hasActiveService?: boolean;
+      linkedProjectId?: string;
+    } | null
+  ) => {
     setIsLoadingDashboard(true);
-    const activeEmail = (overrideSession?.email || clientSession?.email || emailInput || 'martin@distribuidorasur.com.ar').trim().toLowerCase();
+    const activeSession = overrideSession || clientSession;
+    const activeEmail = (activeSession?.email || emailInput || 'martin@distribuidorasur.com.ar').trim().toLowerCase();
 
-    // Prepare default offline/fallback data matched by client email
-    const fallbackProject = INITIAL_CLIENT_PROJECTS.find(
-      (p) => p.clientEmail.toLowerCase() === activeEmail
-    ) || INITIAL_CLIENT_PROJECTS[0];
+    const matchedCrmContact = INITIAL_CRM_CONTACTS.find(
+      (c) => c.email.toLowerCase() === activeEmail
+    );
+    const resolvedCompId = activeSession?.companyId || matchedCrmContact?.companyId;
+    const fallbackCompanyProfile = resolvedCompId
+      ? INITIAL_CRM_COMPANIES.find((c) => c.id === resolvedCompId) || null
+      : INITIAL_CRM_COMPANIES.find(
+          (c) => c.name.toLowerCase() === (activeSession?.company || '').toLowerCase()
+        ) || null;
+
+    const fallbackColleagues = fallbackCompanyProfile
+      ? INITIAL_CRM_CONTACTS.filter((c) => c.companyId === fallbackCompanyProfile.id)
+      : [];
+
+    // Only assign a project if the user/company actually has an active contracted project
+    const fallbackProject =
+      INITIAL_CLIENT_PROJECTS.find(
+        (p) =>
+          (activeSession?.linkedProjectId && p.id === activeSession.linkedProjectId) ||
+          (matchedCrmContact?.linkedProjectId && p.id === matchedCrmContact.linkedProjectId) ||
+          p.clientEmail.toLowerCase() === activeEmail ||
+          (fallbackCompanyProfile &&
+            matchedCrmContact?.hasActiveService &&
+            p.company.toLowerCase() === fallbackCompanyProfile.name.toLowerCase())
+      ) || null;
+
+    const fallbackOpps = INITIAL_CRM_OPPORTUNITIES.filter(
+      (o) =>
+        o.clientEmail.toLowerCase() === activeEmail ||
+        (fallbackCompanyProfile && o.companyId === fallbackCompanyProfile.id) ||
+        (fallbackCompanyProfile &&
+          (o.company || '').toLowerCase() === fallbackCompanyProfile.name.toLowerCase())
+    );
+
+    const fallbackQuotes = INITIAL_CRM_QUOTES.filter(
+      (q) =>
+        q.clientEmail.toLowerCase() === activeEmail ||
+        (fallbackCompanyProfile &&
+          (q.clientCompany || '').toLowerCase() === fallbackCompanyProfile.name.toLowerCase())
+    );
 
     const fallbackInquiries = INITIAL_CONSULTING_INQUIRIES.filter(
-      (i) => i.clientEmail.toLowerCase() === activeEmail || activeEmail.includes('martin')
+      (i) =>
+        i.clientEmail.toLowerCase() === activeEmail ||
+        (fallbackCompanyProfile && i.company.toLowerCase() === fallbackCompanyProfile.name.toLowerCase())
     );
 
     const fallbackTickets = INITIAL_SUPPORT_TICKETS.filter(
-      (t) => t.clientEmail.toLowerCase() === activeEmail || activeEmail.includes('martin')
+      (t) =>
+        t.clientEmail.toLowerCase() === activeEmail ||
+        (fallbackCompanyProfile && t.company.toLowerCase() === fallbackCompanyProfile.name.toLowerCase())
     );
 
     const fallbackBookings = INITIAL_CONSULTING_BOOKINGS.filter(
-      (b) => b.clientEmail.toLowerCase() === activeEmail || activeEmail.includes('martin')
+      (b) =>
+        b.clientEmail.toLowerCase() === activeEmail ||
+        (fallbackCompanyProfile && b.company.toLowerCase() === fallbackCompanyProfile.name.toLowerCase())
     );
 
     try {
@@ -188,7 +271,15 @@ export const ClientPortalModal: React.FC<ClientPortalModalProps> = ({ isOpen = t
       if (res.ok) {
         const data = await res.json();
         if (data.success) {
-          setProject(data.project || fallbackProject);
+          setProject(data.project !== undefined ? data.project : fallbackProject);
+          setCompanyProfile(data.companyProfile || fallbackCompanyProfile);
+          setCorporateColleagues(
+            data.corporateColleagues && data.corporateColleagues.length > 0
+              ? data.corporateColleagues
+              : fallbackColleagues
+          );
+          setRelatedOpportunities(data.relatedOpportunities || fallbackOpps);
+          setRelatedQuotes(data.relatedQuotes || fallbackQuotes);
           setInquiries(data.inquiries && data.inquiries.length > 0 ? data.inquiries : fallbackInquiries);
           setTickets(data.tickets && data.tickets.length > 0 ? data.tickets : fallbackTickets);
           setBookings(data.bookings && data.bookings.length > 0 ? data.bookings : fallbackBookings);
@@ -202,8 +293,11 @@ export const ClientPortalModal: React.FC<ClientPortalModalProps> = ({ isOpen = t
       setIsLoadingDashboard(false);
     }
 
-    // Fallback if backend is warming up or connection is unavailable
     setProject(fallbackProject);
+    setCompanyProfile(fallbackCompanyProfile);
+    setCorporateColleagues(fallbackColleagues);
+    setRelatedOpportunities(fallbackOpps);
+    setRelatedQuotes(fallbackQuotes);
     setInquiries(fallbackInquiries);
     setTickets(fallbackTickets);
     setBookings(fallbackBookings);
@@ -224,7 +318,7 @@ export const ClientPortalModal: React.FC<ClientPortalModalProps> = ({ isOpen = t
     const pass = (overridePassword ?? passwordInput ?? '').trim();
 
     if (!identifier || !pass) {
-      setAuthError('Ingresá tu usuario (o correo corporativo) y tu contraseña.');
+      setAuthError('Ingresá tu usuario (o correo electrónico) y tu contraseña.');
       setAuthLoading(false);
       return;
     }
@@ -268,17 +362,30 @@ export const ClientPortalModal: React.FC<ClientPortalModalProps> = ({ isOpen = t
         ? identifier
         : 'martin@distribuidorasur.com.ar';
 
-      const matchedProj =
-        INITIAL_CLIENT_PROJECTS.find((p) => p.clientEmail.toLowerCase() === resolvedEmail) ||
-        INITIAL_CLIENT_PROJECTS[0];
+      const matchedProj = INITIAL_CLIENT_PROJECTS.find(
+        (p) =>
+          (matchedAccount?.projectId && p.id === matchedAccount.projectId) ||
+          p.clientEmail.toLowerCase() === resolvedEmail
+      );
 
       const fallbackToken = 'gb_cli_' + Date.now();
       const clientObj = {
+        id: matchedAccount?.id,
         email: resolvedEmail,
         username: matchedAccount?.username || resolvedEmail.split('@')[0],
-        name: matchedAccount?.name || matchedProj.clientName,
-        company: matchedAccount?.company || matchedProj.company,
-        role: matchedAccount?.role || 'Representante Técnico',
+        name: matchedAccount?.name || matchedProj?.clientName || 'Usuario Registrado',
+        company:
+          matchedAccount?.company ||
+          matchedProj?.company ||
+          (matchedAccount?.contactType === 'individual' ? 'Contacto Individual' : 'Organización'),
+        companyId: matchedAccount?.companyId,
+        role: matchedAccount?.role || 'Usuario Registrado',
+        contactType: matchedAccount?.contactType || 'corporate_member',
+        hasActiveService:
+          matchedAccount?.hasActiveService !== undefined
+            ? matchedAccount.hasActiveService
+            : Boolean(matchedProj),
+        linkedProjectId: matchedAccount?.projectId || matchedProj?.id,
       };
 
       setToken(fallbackToken);
@@ -289,8 +396,96 @@ export const ClientPortalModal: React.FC<ClientPortalModalProps> = ({ isOpen = t
       }
       loadDashboardData(fallbackToken, clientObj);
     } else {
-      setAuthError('Usuario o contraseña incorrectos. Verificá tus credenciales de acceso.');
+      setAuthError('Usuario o contraseña incorrectos. Verificá tus credenciales o registrate gratis.');
     }
+    setAuthLoading(false);
+  };
+
+  // Open User Registration (Corporate Member or Individual Contact — No active service required)
+  const handleRegister = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAuthLoading(true);
+    setAuthError('');
+
+    const cleanName = regFullName.trim();
+    const cleanEmail = regEmail.trim().toLowerCase();
+    const cleanPassword = regPassword.trim() || 'cliente2026';
+    const cleanUsername =
+      (regUsername.trim() || cleanEmail.split('@')[0]).toLowerCase().replace(/[^a-z0-9._-]/g, '') ||
+      `usuario.${Date.now().toString().slice(-4)}`;
+
+    if (!cleanName || !cleanEmail || !cleanEmail.includes('@')) {
+      setAuthError('Por favor ingresá tu nombre completo y un correo electrónico válido.');
+      setAuthLoading(false);
+      return;
+    }
+
+    if (regContactType === 'corporate_member' && !regCompanyName.trim()) {
+      setAuthError('Ingresá el nombre de tu Empresa o Corporación (o elegí Contacto Individual).');
+      setAuthLoading(false);
+      return;
+    }
+
+    try {
+      const res = await fetch('/api/client/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fullName: cleanName,
+          email: cleanEmail,
+          username: cleanUsername,
+          password: cleanPassword,
+          phone: regPhone.trim(),
+          contactType: regContactType,
+          companyName: regContactType === 'corporate_member' ? regCompanyName.trim() : undefined,
+          companyTaxId: regContactType === 'corporate_member' ? regCompanyTaxId.trim() : undefined,
+          roleTitle:
+            regRoleTitle.trim() ||
+            (regContactType === 'corporate_member'
+              ? 'Representante Corporativo'
+              : 'Contacto Individual'),
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success && data.token && data.client) {
+        setToken(data.token);
+        setClientSession(data.client);
+        localStorage.setItem('gb_client_token', data.token);
+        localStorage.setItem('gb_client_user', JSON.stringify(data.client));
+        loadDashboardData(data.token, data.client);
+        setAuthLoading(false);
+        return;
+      } else if (!res.ok && data.error) {
+        setAuthError(data.error);
+        setAuthLoading(false);
+        return;
+      }
+    } catch (err) {
+      console.warn('Registration fallback to local session:', err);
+    }
+
+    // Resilient local registration fallback
+    const fallbackToken = 'gb_cli_reg_' + Date.now();
+    const clientObj = {
+      email: cleanEmail,
+      username: cleanUsername,
+      name: cleanName,
+      company:
+        regContactType === 'corporate_member'
+          ? regCompanyName.trim()
+          : 'Contacto Individual / Independiente',
+      role:
+        regRoleTitle.trim() ||
+        (regContactType === 'corporate_member' ? 'Representante Corporativo' : 'Contacto Individual'),
+      contactType: regContactType,
+      hasActiveService: false,
+    };
+
+    setToken(fallbackToken);
+    setClientSession(clientObj);
+    localStorage.setItem('gb_client_token', fallbackToken);
+    localStorage.setItem('gb_client_user', JSON.stringify(clientObj));
+    loadDashboardData(fallbackToken, clientObj);
     setAuthLoading(false);
   };
 
@@ -695,26 +890,46 @@ export const ClientPortalModal: React.FC<ClientPortalModalProps> = ({ isOpen = t
               <div className="flex items-center justify-between">
                 <span className="text-xs font-sans font-semibold text-emerald-400 flex items-center gap-1.5">
                   <Sparkles className="w-3.5 h-3.5" />
-                  <span>Cuentas Corporativas de Prueba (Autocompletar Login):</span>
+                  <span>Agenda CRM Sincronizada · Cuentas del Portal (Con y Sin Servicio Activo):</span>
                 </span>
               </div>
 
-              <div className="grid grid-cols-1 gap-2.5">
+              <div className="grid grid-cols-1 gap-2 max-h-[340px] overflow-y-auto pr-1">
                 {CLIENT_ACCOUNTS.map((acc) => (
                   <div
                     key={acc.id}
-                    className="p-3.5 bg-white/[0.04] hover:bg-white/[0.08] border border-white/10 transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                    className="p-3 bg-white/[0.04] hover:bg-white/[0.08] border border-white/10 transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-2.5"
                   >
-                    <div className="space-y-0.5 min-w-0">
-                      <div className="text-xs font-display font-bold text-white truncate">
-                        {acc.name} · <span className="text-emerald-400">{acc.company}</span>
+                    <div className="space-y-1 min-w-0">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="text-xs font-display font-bold text-white truncate">
+                          {acc.name}
+                        </span>
+                        <span
+                          className={`text-[10px] font-mono px-1.5 py-0.5 border ${
+                            acc.contactType === 'corporate_member'
+                              ? 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30'
+                              : 'bg-amber-500/20 text-amber-300 border-amber-500/30'
+                          }`}
+                        >
+                          {acc.contactType === 'corporate_member' ? `Corp: ${acc.company}` : 'Contacto Individual'}
+                        </span>
+                        <span
+                          className={`text-[10px] font-mono px-1.5 py-0.5 ${
+                            acc.hasActiveService
+                              ? 'bg-emerald-500/20 text-emerald-300'
+                              : 'bg-white/10 text-neutral-300'
+                          }`}
+                        >
+                          {acc.hasActiveService ? '● Servicio Activo' : '○ Registrado s/Servicio'}
+                        </span>
                       </div>
                       <div className="text-[11px] font-mono text-neutral-400">
                         Usuario: <strong className="text-neutral-200">{acc.username}</strong> · Clave:{' '}
                         <strong className="text-neutral-200">{acc.password}</strong>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2 shrink-0">
+                    <div className="flex items-center gap-1.5 shrink-0">
                       <button
                         type="button"
                         onClick={() => {
@@ -726,7 +941,7 @@ export const ClientPortalModal: React.FC<ClientPortalModalProps> = ({ isOpen = t
                         }}
                         className="px-2.5 py-1.5 text-[11px] font-sans font-semibold bg-white/10 hover:bg-white/20 text-white transition-colors cursor-pointer"
                       >
-                        Cargar Datos
+                        Cargar
                       </button>
                       <button
                         type="button"
@@ -736,9 +951,9 @@ export const ClientPortalModal: React.FC<ClientPortalModalProps> = ({ isOpen = t
                           setEmailInput(acc.email);
                           handlePasswordLogin(undefined, acc.username, acc.password);
                         }}
-                        className="px-3 py-1.5 text-[11px] font-sans font-semibold bg-[#291B64] hover:bg-[#382586] text-white inline-flex items-center gap-1 transition-colors cursor-pointer"
+                        className="px-2.5 py-1.5 text-[11px] font-sans font-semibold bg-[#291B64] hover:bg-[#382586] text-white inline-flex items-center gap-1 transition-colors cursor-pointer"
                       >
-                        <span>Ingresar Directo</span>
+                        <span>Ingresar</span>
                         <ArrowRight className="w-3 h-3" />
                       </button>
                     </div>
@@ -748,37 +963,56 @@ export const ClientPortalModal: React.FC<ClientPortalModalProps> = ({ isOpen = t
             </div>
           </div>
 
-          {/* RIGHT COLUMN (7 COLS): LOGIN FORM (USUARIO + CONTRASEÑA / OTP) */}
+          {/* RIGHT COLUMN (7 COLS): LOGIN FORM (USUARIO + CONTRASEÑA / REGISTRO ABIERTO / OTP) */}
           <div className="lg:col-span-7 bg-white flex items-center justify-center p-6 sm:p-12 lg:p-16">
-            <div className="w-full max-w-md space-y-7">
+            <div className="w-full max-w-lg space-y-6">
               <div className="space-y-2">
                 <div className="inline-flex items-center gap-2 text-xs font-sans font-semibold text-[#291B64]">
                   <Lock className="w-4 h-4" />
-                  <span>Autenticación de Clientes</span>
+                  <span>Acceso & Registro Abierto al Portal Clientes</span>
                 </div>
                 <h2 className="font-display text-2xl sm:text-3xl font-bold tracking-tight text-[#1D1D1F]">
-                  Iniciar Sesión en tu Cuenta
+                  {loginMethod === 'register'
+                    ? 'Registro en el Portal & Agenda CRM'
+                    : 'Iniciar Sesión en tu Cuenta'}
                 </h2>
                 <p className="text-xs sm:text-sm text-[#515154]">
-                  Ingresá tu nombre de usuario (o correo corporativo) y tu contraseña para acceder al panel de tu proyecto.
+                  {loginMethod === 'register'
+                    ? 'Registrate como miembro de una corporación o como contacto individual. Todos los contactos pasan a ser usuarios del Portal Clientes sin necesidad de tener un servicio contratado activo.'
+                    : 'Ingresá con tu usuario de la Agenda CRM o creá tu cuenta gratuita para consultar propuestas, agendar sesiones 1-on-1 o supervisar proyectos activos.'}
                 </p>
               </div>
 
-              {/* Login Method Switcher */}
-              <div className="grid grid-cols-2 border border-black/10 bg-[#F5F5F7] p-1">
+              {/* Login / Register Method Switcher */}
+              <div className="grid grid-cols-3 border border-black/10 bg-[#F5F5F7] p-1">
                 <button
                   type="button"
                   onClick={() => {
                     setLoginMethod('password');
                     setAuthError('');
                   }}
-                  className={`py-2 px-3 text-xs font-sans font-semibold transition-all cursor-pointer ${
+                  className={`py-2 px-2.5 text-xs font-sans font-semibold transition-all cursor-pointer ${
                     loginMethod === 'password'
                       ? 'bg-[#1D1D1F] text-white'
                       : 'text-[#515154] hover:text-[#1D1D1F]'
                   }`}
                 >
-                  Usuario y Contraseña
+                  Usuario y Clave
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setLoginMethod('register');
+                    setAuthError('');
+                  }}
+                  className={`py-2 px-2.5 text-xs font-sans font-semibold transition-all cursor-pointer flex items-center justify-center gap-1 ${
+                    loginMethod === 'register'
+                      ? 'bg-[#291B64] text-white'
+                      : 'text-[#291B64] hover:bg-black/5'
+                  }`}
+                >
+                  <UserPlus className="w-3.5 h-3.5" />
+                  <span>Crear Cuenta</span>
                 </button>
                 <button
                   type="button"
@@ -786,13 +1020,13 @@ export const ClientPortalModal: React.FC<ClientPortalModalProps> = ({ isOpen = t
                     setLoginMethod('otp');
                     setAuthError('');
                   }}
-                  className={`py-2 px-3 text-xs font-sans font-semibold transition-all cursor-pointer ${
+                  className={`py-2 px-2.5 text-xs font-sans font-semibold transition-all cursor-pointer ${
                     loginMethod === 'otp'
                       ? 'bg-[#1D1D1F] text-white'
                       : 'text-[#515154] hover:text-[#1D1D1F]'
                   }`}
                 >
-                  Código Temporal OTP
+                  Código OTP
                 </button>
               </div>
 
@@ -807,7 +1041,7 @@ export const ClientPortalModal: React.FC<ClientPortalModalProps> = ({ isOpen = t
                 <form onSubmit={(e) => handlePasswordLogin(e)} className="space-y-5">
                   <div className="space-y-1.5">
                     <label className="block text-xs font-sans font-semibold text-[#1D1D1F]">
-                      Usuario o Correo Electrónico Corporativo
+                      Usuario o Correo Electrónico
                     </label>
                     <div className="relative">
                       <User className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
@@ -816,7 +1050,7 @@ export const ClientPortalModal: React.FC<ClientPortalModalProps> = ({ isOpen = t
                         required
                         value={usernameInput}
                         onChange={(e) => setUsernameInput(e.target.value)}
-                        placeholder="Ej: martin.arismendi o martin@empresa.com"
+                        placeholder="Ej: martin.arismendi, sofia.peralta o correo"
                         className="w-full pl-10 pr-4 py-3 bg-[#F5F5F7] border border-black/15 text-sm font-sans text-[#1D1D1F] placeholder:text-slate-400 focus:outline-none focus:border-[#291B64] focus:bg-white transition-colors"
                       />
                     </div>
@@ -879,6 +1113,174 @@ export const ClientPortalModal: React.FC<ClientPortalModalProps> = ({ isOpen = t
                       <>
                         <span>Iniciar Sesión en el Portal</span>
                         <ArrowRight className="w-4 h-4" />
+                      </>
+                    )}
+                  </button>
+                </form>
+              ) : loginMethod === 'register' ? (
+                <form onSubmit={handleRegister} className="space-y-4">
+                  <div className="grid grid-cols-2 gap-2 p-1 bg-[#F5F5F7] border border-black/10">
+                    <button
+                      type="button"
+                      onClick={() => setRegContactType('corporate_member')}
+                      className={`py-2 px-3 text-xs font-sans font-semibold flex items-center justify-center gap-1.5 cursor-pointer transition-colors ${
+                        regContactType === 'corporate_member'
+                          ? 'bg-[#291B64] text-white'
+                          : 'text-[#515154] hover:text-[#1D1D1F]'
+                      }`}
+                    >
+                      <Building2 className="w-3.5 h-3.5" />
+                      <span>Contacto de Empresa</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setRegContactType('individual')}
+                      className={`py-2 px-3 text-xs font-sans font-semibold flex items-center justify-center gap-1.5 cursor-pointer transition-colors ${
+                        regContactType === 'individual'
+                          ? 'bg-[#291B64] text-white'
+                          : 'text-[#515154] hover:text-[#1D1D1F]'
+                      }`}
+                    >
+                      <User className="w-3.5 h-3.5" />
+                      <span>Contacto Individual</span>
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-sans font-semibold text-[#1D1D1F] mb-1">
+                        Nombre y Apellido *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={regFullName}
+                        onChange={(e) => setRegFullName(e.target.value)}
+                        placeholder="Ej: Ing. Laura Méndez"
+                        className="w-full px-3.5 py-2.5 bg-[#F5F5F7] border border-black/15 text-xs text-[#1D1D1F] focus:outline-none focus:border-[#291B64] focus:bg-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-sans font-semibold text-[#1D1D1F] mb-1">
+                        Correo Electrónico *
+                      </label>
+                      <input
+                        type="email"
+                        required
+                        value={regEmail}
+                        onChange={(e) => setRegEmail(e.target.value)}
+                        placeholder="laura@corporacion.com"
+                        className="w-full px-3.5 py-2.5 bg-[#F5F5F7] border border-black/15 text-xs text-[#1D1D1F] focus:outline-none focus:border-[#291B64] focus:bg-white"
+                      />
+                    </div>
+                  </div>
+
+                  {regContactType === 'corporate_member' && (
+                    <div className="p-3.5 bg-indigo-50/60 border border-indigo-200/80 space-y-3">
+                      <div className="text-[11px] font-sans font-bold text-[#291B64] flex items-center gap-1.5">
+                        <Building2 className="w-3.5 h-3.5" />
+                        <span>Agrupación Corporativa en Agenda CRM (Si la empresa existe, te vincula automáticamente)</span>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-[11px] font-semibold text-[#1D1D1F] mb-1">
+                            Razón Social / Empresa *
+                          </label>
+                          <input
+                            type="text"
+                            required={regContactType === 'corporate_member'}
+                            value={regCompanyName}
+                            onChange={(e) => setRegCompanyName(e.target.value)}
+                            placeholder="Ej: Distribuidora del Sur S.A."
+                            className="w-full px-3 py-2 bg-white border border-black/15 text-xs text-[#1D1D1F] focus:outline-none focus:border-[#291B64]"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[11px] font-semibold text-[#1D1D1F] mb-1">
+                            CUIT / ID Fiscal (Opcional)
+                          </label>
+                          <input
+                            type="text"
+                            value={regCompanyTaxId}
+                            onChange={(e) => setRegCompanyTaxId(e.target.value)}
+                            placeholder="30-71458921-9"
+                            className="w-full px-3 py-2 bg-white border border-black/15 text-xs text-[#1D1D1F] focus:outline-none focus:border-[#291B64]"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-sans font-semibold text-[#1D1D1F] mb-1">
+                        Cargo / Rol Profesional
+                      </label>
+                      <input
+                        type="text"
+                        value={regRoleTitle}
+                        onChange={(e) => setRegRoleTitle(e.target.value)}
+                        placeholder={
+                          regContactType === 'corporate_member'
+                            ? 'Ej: Directora de Operaciones'
+                            : 'Ej: Consultor Independiente'
+                        }
+                        className="w-full px-3.5 py-2.5 bg-[#F5F5F7] border border-black/15 text-xs text-[#1D1D1F] focus:outline-none focus:border-[#291B64] focus:bg-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-sans font-semibold text-[#1D1D1F] mb-1">
+                        Teléfono / WhatsApp
+                      </label>
+                      <input
+                        type="text"
+                        value={regPhone}
+                        onChange={(e) => setRegPhone(e.target.value)}
+                        placeholder="+54 9 11 5555-0000"
+                        className="w-full px-3.5 py-2.5 bg-[#F5F5F7] border border-black/15 text-xs text-[#1D1D1F] focus:outline-none focus:border-[#291B64] focus:bg-white"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-sans font-semibold text-[#1D1D1F] mb-1">
+                        Nombre de Usuario (Opcional)
+                      </label>
+                      <input
+                        type="text"
+                        value={regUsername}
+                        onChange={(e) => setRegUsername(e.target.value)}
+                        placeholder="Ej: laura.mendez"
+                        className="w-full px-3.5 py-2.5 bg-[#F5F5F7] border border-black/15 text-xs font-mono text-[#1D1D1F] focus:outline-none focus:border-[#291B64] focus:bg-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-sans font-semibold text-[#1D1D1F] mb-1">
+                        Contraseña de Acceso *
+                      </label>
+                      <input
+                        type="password"
+                        required
+                        value={regPassword}
+                        onChange={(e) => setRegPassword(e.target.value)}
+                        placeholder="Mínimo 4 caracteres"
+                        className="w-full px-3.5 py-2.5 bg-[#F5F5F7] border border-black/15 text-xs text-[#1D1D1F] focus:outline-none focus:border-[#291B64] focus:bg-white"
+                      />
+                    </div>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={authLoading}
+                    className="w-full py-3.5 px-5 bg-[#291B64] hover:bg-[#382586] text-white font-sans font-semibold text-sm transition-colors flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                  >
+                    {authLoading ? (
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <>
+                        <UserPlus className="w-4 h-4" />
+                        <span>Registrarme e Ingresar al Portal Clientes</span>
                       </>
                     )}
                   </button>
@@ -978,13 +1380,20 @@ export const ClientPortalModal: React.FC<ClientPortalModalProps> = ({ isOpen = t
               )}
 
               <div className="pt-5 border-t border-black/10 flex items-center justify-between text-xs text-[#515154]">
-                <span>¿Aún no tenés usuario asignado?</span>
+                <span>
+                  {loginMethod === 'register'
+                    ? '¿Ya tenés usuario en la Agenda CRM?'
+                    : '¿No tenés cuenta aún? Podés registrarte sin servicio activo'}
+                </span>
                 <button
                   type="button"
-                  onClick={onClose}
+                  onClick={() => {
+                    setLoginMethod(loginMethod === 'register' ? 'password' : 'register');
+                    setAuthError('');
+                  }}
                   className="font-semibold text-[#291B64] hover:underline cursor-pointer"
                 >
-                  Solicitar alta de proyecto →
+                  {loginMethod === 'register' ? 'Iniciar Sesión →' : 'Crear Cuenta Gratis →'}
                 </button>
               </div>
             </div>
@@ -1001,11 +1410,18 @@ export const ClientPortalModal: React.FC<ClientPortalModalProps> = ({ isOpen = t
               {/* Client Session Profile Card */}
               <div className="p-4 bg-white/[0.04] border border-white/10 space-y-2">
                 <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-mono uppercase tracking-wider px-2 py-0.5 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-semibold">
-                    Sesión Activa
+                  <span
+                    className={`text-[10px] font-mono uppercase tracking-wider px-2 py-0.5 border font-semibold ${
+                      project
+                        ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+                        : 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30'
+                    }`}
+                  >
+                    {project ? 'Servicio Activo' : 'Usuario Registrado'}
                   </span>
                   <span className="text-[11px] font-mono text-neutral-400">
-                    {project?.quoteNumber || 'PMO-2026'}
+                    {project?.quoteNumber ||
+                      (clientSession?.contactType === 'individual' ? 'INDIVIDUAL' : 'CORP-CRM')}
                   </span>
                 </div>
                 <div>
@@ -1015,6 +1431,11 @@ export const ClientPortalModal: React.FC<ClientPortalModalProps> = ({ isOpen = t
                   <div className="text-xs text-emerald-400 font-medium">
                     {clientSession?.company}
                   </div>
+                  {clientSession?.role && (
+                    <div className="text-[11px] text-neutral-300">
+                      {clientSession.role}
+                    </div>
+                  )}
                   <div className="text-[11px] font-mono text-neutral-400 truncate mt-0.5">
                     {clientSession?.email}
                   </div>
@@ -1037,13 +1458,39 @@ export const ClientPortalModal: React.FC<ClientPortalModalProps> = ({ isOpen = t
                 >
                   <span className="inline-flex items-center gap-2.5">
                     <FolderGit2 className="w-4 h-4 text-emerald-400" />
-                    <span>Estado & Hitos del Proyecto</span>
+                    <span>{project ? 'Estado & Hitos del Proyecto' : 'Mi Espacio & Propuestas'}</span>
                   </span>
-                  {project && (
+                  {project ? (
                     <span className="text-[11px] font-mono text-emerald-300">
                       {project.progressPercent}%
                     </span>
+                  ) : (
+                    <span className="text-[10px] font-mono px-1.5 py-0.5 bg-white/10 text-neutral-300">
+                      CRM
+                    </span>
                   )}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('directory')}
+                  className={`w-full px-3.5 py-2.5 text-xs font-sans font-semibold transition-all flex items-center justify-between cursor-pointer ${
+                    activeTab === 'directory'
+                      ? 'bg-[#291B64] text-white border-l-2 border-emerald-400'
+                      : 'text-neutral-300 hover:bg-white/[0.06] hover:text-white'
+                  }`}
+                >
+                  <span className="inline-flex items-center gap-2.5">
+                    <Users className="w-4 h-4 text-emerald-400" />
+                    <span>
+                      {clientSession?.contactType === 'individual'
+                        ? 'Mi Ficha en Agenda CRM'
+                        : 'Mi Corporación & Contactos'}
+                    </span>
+                  </span>
+                  <span className="text-[11px] font-mono px-1.5 py-0.5 bg-white/10 text-white">
+                    {corporateColleagues.length || 1}
+                  </span>
                 </button>
 
                 <button
@@ -1133,9 +1580,15 @@ export const ClientPortalModal: React.FC<ClientPortalModalProps> = ({ isOpen = t
                   <span>Portal Clientes</span>
                   <span>/</span>
                   <strong className="text-[#1D1D1F]">{clientSession?.company}</strong>
+                  {clientSession?.contactType === 'individual' && (
+                    <span className="text-[10px] font-mono px-2 py-0.5 bg-amber-100 text-amber-800 font-semibold">
+                      Contacto Individual
+                    </span>
+                  )}
                 </div>
                 <h1 className="font-display text-lg sm:text-xl font-bold text-[#1D1D1F] tracking-tight mt-0.5">
-                  {project?.projectName || 'Panel de Seguimiento de Proyecto'}
+                  {project?.projectName ||
+                    'Espacio de Usuario Registrado · Exploración, Propuestas & Consultoría'}
                 </h1>
               </div>
 
@@ -1145,7 +1598,7 @@ export const ClientPortalModal: React.FC<ClientPortalModalProps> = ({ isOpen = t
                   onClick={() => loadDashboardData(token)}
                   disabled={isLoadingDashboard}
                   className="px-3 py-2 bg-[#F5F5F7] hover:bg-black/[0.06] border border-black/10 text-xs font-sans font-semibold text-[#1D1D1F] inline-flex items-center gap-1.5 transition-colors cursor-pointer"
-                  title="Sincronizar datos del proyecto"
+                  title="Sincronizar datos del portal"
                 >
                   <RefreshCw className={`w-3.5 h-3.5 ${isLoadingDashboard ? 'animate-spin' : ''}`} />
                   <span>Sincronizar</span>
@@ -1167,7 +1620,183 @@ export const ClientPortalModal: React.FC<ClientPortalModalProps> = ({ isOpen = t
 
             {/* Workspace Body */}
             <div className="flex-1 p-6 sm:p-8 lg:p-10 max-w-6xl w-full mx-auto space-y-6">
-              {/* TAB 1: ESTADO DEL PROYECTO */}
+              {/* TAB 1A: USUARIO REGISTRADO SIN PROYECTO ACTIVO CONTRATADO */}
+              {activeTab === 'project' && !project && (
+                <div className="space-y-6">
+                  <div className="bg-white p-6 sm:p-8 border border-black/[0.08] space-y-5">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-black/[0.08] pb-5">
+                      <div className="space-y-1.5">
+                        <div className="inline-flex items-center gap-2 text-[11px] font-mono font-bold uppercase px-2.5 py-0.5 bg-indigo-50 text-[#291B64] border border-indigo-200">
+                          Cuenta Activa en Portal Clientes & Agenda CRM · Sin Servicio Contratado Activo
+                        </div>
+                        <h2 className="font-display text-xl sm:text-2xl font-bold text-[#1D1D1F]">
+                          Bienvenido/a, {clientSession?.name}
+                        </h2>
+                        <p className="text-xs sm:text-sm text-[#515154] max-w-2xl">
+                          Tu perfil está registrado en nuestra Agenda Corporativa CRM como{' '}
+                          <strong>
+                            {clientSession?.contactType === 'individual'
+                              ? 'Contacto Individual'
+                              : `miembro de ${clientSession?.company}`}
+                          </strong>
+                          . Desde este espacio podés realizar consultas técnicas, agendar sesiones 1-on-1 de diagnóstico y evaluar propuestas sin necesidad de tener un producto o servicio contratado previamente.
+                        </p>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-2 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setActiveTab('inquiries');
+                            setIsNewInquiryOpen(true);
+                          }}
+                          className="px-4 py-2.5 bg-[#291B64] hover:bg-[#382586] text-white text-xs font-sans font-semibold flex items-center gap-1.5 cursor-pointer"
+                        >
+                          <HelpCircle className="w-3.5 h-3.5" />
+                          <span>Iniciar Consulta Técnica</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setActiveTab('bookings');
+                            setIsNewBookingOpen(true);
+                          }}
+                          className="px-4 py-2.5 bg-[#1D1D1F] hover:bg-black text-white text-xs font-sans font-semibold flex items-center gap-1.5 cursor-pointer"
+                        >
+                          <Calendar className="w-3.5 h-3.5" />
+                          <span>Agendar Sesión 1-on-1</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Oportunidades en Pipeline o Cotizaciones vinculadas a este Contacto / Corporación */}
+                    <div className="space-y-3">
+                      <h3 className="font-display text-sm font-bold text-[#1D1D1F] flex items-center gap-2">
+                        <FileText className="w-4 h-4 text-[#291B64]" />
+                        <span>Oportunidades & Propuestas en Evaluación en el Pipeline CRM</span>
+                      </h3>
+
+                      {relatedOpportunities.length === 0 && relatedQuotes.length === 0 ? (
+                        <div className="p-5 bg-[#F5F5F7] border border-black/10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                          <div className="space-y-1">
+                            <div className="text-xs font-bold text-[#1D1D1F]">
+                              Aún no tenés propuestas comerciales ni proyectos activos asociados
+                            </div>
+                            <p className="text-xs text-[#515154]">
+                              Podés abrir una consulta de arquitectura o solicitar una cotización formal a medida para tu organización o proyecto individual.
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setActiveTab('inquiries');
+                              setIsNewInquiryOpen(true);
+                            }}
+                            className="px-3.5 py-2 bg-white hover:bg-[#291B64] text-[#291B64] hover:text-white border border-black/15 text-xs font-semibold transition-colors shrink-0 cursor-pointer"
+                          >
+                            Solicitar Propuesta →
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          {relatedOpportunities.map((opp: any) => (
+                            <div
+                              key={opp.id}
+                              className="p-4 bg-[#F5F5F7] border border-black/10 space-y-2"
+                            >
+                              <div className="flex items-center justify-between">
+                                <span className="text-[10px] font-mono font-bold uppercase px-2 py-0.5 bg-[#291B64]/10 text-[#291B64]">
+                                  Etapa Pipeline: {opp.stage}
+                                </span>
+                                <span className="text-xs font-mono font-bold text-[#1D1D1F]">
+                                  {opp.currency} ${Number(opp.estimatedValue || 0).toLocaleString()}
+                                </span>
+                              </div>
+                              <div className="text-sm font-bold text-[#1D1D1F]">{opp.title}</div>
+                              <p className="text-xs text-[#515154]">{opp.notes}</p>
+                            </div>
+                          ))}
+                          {relatedQuotes.map((qt: any) => (
+                            <div
+                              key={qt.id}
+                              className="p-4 bg-emerald-50/50 border border-emerald-200 space-y-2"
+                            >
+                              <div className="flex items-center justify-between">
+                                <span className="text-[10px] font-mono font-bold uppercase px-2 py-0.5 bg-emerald-100 text-emerald-800">
+                                  Cotización {qt.quoteNumber} · {qt.status}
+                                </span>
+                                <span className="text-xs font-mono font-bold text-emerald-950">
+                                  {qt.currency} ${Number(qt.total || 0).toLocaleString()}
+                                </span>
+                              </div>
+                              <div className="text-sm font-bold text-[#1D1D1F]">
+                                Propuesta Formal Emitida
+                              </div>
+                              <p className="text-xs text-slate-600">{qt.paymentTerms}</p>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Accesos Rápidos para Usuarios Registrados */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
+                      <div className="p-4 bg-[#F5F5F7] border border-black/[0.08] space-y-2">
+                        <div className="text-xs font-display font-bold text-[#1D1D1F] flex items-center gap-2">
+                          <Users className="w-4 h-4 text-[#291B64]" />
+                          <span>Agenda Corporativa</span>
+                        </div>
+                        <p className="text-xs text-[#515154]">
+                          Visualizá los contactos agrupados bajo tu corporación o tu ficha de usuario registrado.
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => setActiveTab('directory')}
+                          className="text-xs font-semibold text-[#291B64] hover:underline cursor-pointer"
+                        >
+                          Ver Agenda ({corporateColleagues.length || 1}) →
+                        </button>
+                      </div>
+
+                      <div className="p-4 bg-[#F5F5F7] border border-black/[0.08] space-y-2">
+                        <div className="text-xs font-display font-bold text-[#1D1D1F] flex items-center gap-2">
+                          <HelpCircle className="w-4 h-4 text-[#291B64]" />
+                          <span>Asesoría de Arquitectura</span>
+                        </div>
+                        <p className="text-xs text-[#515154]">
+                          Realizá consultas técnicas sobre IA Services, Odoo v18, Bioeconomía o infraestructura Linux.
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => setActiveTab('inquiries')}
+                          className="text-xs font-semibold text-[#291B64] hover:underline cursor-pointer"
+                        >
+                          Ir a Consultas →
+                        </button>
+                      </div>
+
+                      <div className="p-4 bg-[#F5F5F7] border border-black/[0.08] space-y-2">
+                        <div className="text-xs font-display font-bold text-[#1D1D1F] flex items-center gap-2">
+                          <Calendar className="w-4 h-4 text-[#291B64]" />
+                          <span>Reunión de Diagnóstico</span>
+                        </div>
+                        <p className="text-xs text-[#515154]">
+                          Coordiná una videollamada 1-on-1 con Gastón Barea para relevar requerimientos.
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => setActiveTab('bookings')}
+                          className="text-xs font-semibold text-[#291B64] hover:underline cursor-pointer"
+                        >
+                          Reservar Turno →
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* TAB 1B: ESTADO DEL PROYECTO ACTIVO */}
               {activeTab === 'project' && project && (
                 <div className="space-y-6">
                   {/* Project Overview Card */}
@@ -1461,6 +2090,101 @@ export const ClientPortalModal: React.FC<ClientPortalModalProps> = ({ isOpen = t
                           </div>
                           <div className="font-bold text-[#1D1D1F]">{upd.title}</div>
                           <p className="text-slate-600">{upd.summary}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* TAB AGENDA: MI CORPORACIÓN & CONTACTOS AGRUPADOS / FICHA INDIVIDUAL */}
+              {activeTab === 'directory' && (
+                <div className="space-y-6">
+                  <div className="bg-white p-6 border border-black/[0.08] space-y-5">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-black/[0.08] pb-4">
+                      <div>
+                        <div className="text-[11px] font-mono uppercase font-bold text-[#291B64]">
+                          Agenda CRM Sincronizada con Portal Clientes
+                        </div>
+                        <h3 className="font-display text-base sm:text-lg font-bold text-[#1D1D1F]">
+                          {clientSession?.contactType === 'individual'
+                            ? 'Ficha de Contacto Individual Registrado'
+                            : `Corporación: ${companyProfile?.name || clientSession?.company}`}
+                        </h3>
+                        <p className="text-xs text-[#515154]">
+                          {clientSession?.contactType === 'individual'
+                            ? 'Tu cuenta individual está habilitada en el Portal Clientes y vinculada directamente al Pipeline CRM.'
+                            : 'Contactos ejecutivos, técnicos y administrativos agrupados bajo tu misma corporación con acceso al Portal Clientes.'}
+                        </p>
+                      </div>
+
+                      {companyProfile && (
+                        <div className="text-xs font-mono bg-[#F5F5F7] px-3.5 py-2 border border-black/10 space-y-0.5">
+                          <div className="font-bold text-[#1D1D1F]">{companyProfile.industry}</div>
+                          {companyProfile.taxId && (
+                            <div className="text-slate-500">CUIT: {companyProfile.taxId}</div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                      {(corporateColleagues.length > 0
+                        ? corporateColleagues
+                        : [
+                            {
+                              id: 'self',
+                              fullName: clientSession?.name,
+                              roleTitle: clientSession?.role || 'Usuario Portal',
+                              email: clientSession?.email,
+                              username: clientSession?.username,
+                              contactType: clientSession?.contactType || 'individual',
+                              hasActiveService: Boolean(project),
+                              isPrimaryContact: true,
+                            },
+                          ]
+                      ).map((colleague: any) => (
+                        <div
+                          key={colleague.id || colleague.email}
+                          className="p-4 bg-[#F5F5F7] border border-black/10 flex flex-col justify-between gap-3"
+                        >
+                          <div className="space-y-1">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <span className="text-sm font-display font-bold text-[#1D1D1F]">
+                                {colleague.fullName}
+                              </span>
+                              <span
+                                className={`text-[10px] font-mono px-2 py-0.5 font-bold ${
+                                  colleague.hasActiveService
+                                    ? 'bg-emerald-100 text-emerald-800'
+                                    : 'bg-indigo-100 text-[#291B64]'
+                                }`}
+                              >
+                                {colleague.hasActiveService
+                                  ? 'Con Servicio Activo'
+                                  : 'Usuario Registrado Portal'}
+                              </span>
+                            </div>
+                            <div className="text-xs font-semibold text-[#291B64]">
+                              {colleague.roleTitle || 'Miembro de Corporación'}
+                              {colleague.department ? ` · ${colleague.department}` : ''}
+                            </div>
+                            <div className="text-xs font-mono text-slate-600">{colleague.email}</div>
+                            {colleague.phone && (
+                              <div className="text-[11px] font-mono text-slate-500">
+                                Tel: {colleague.phone}
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="pt-2.5 border-t border-black/[0.08] flex items-center justify-between text-[11px] font-mono text-slate-500">
+                            <span>Usuario Portal: {colleague.username}</span>
+                            {colleague.isPrimaryContact && (
+                              <span className="px-2 py-0.5 bg-white border border-black/10 text-[#1D1D1F] font-semibold">
+                                Contacto Principal
+                              </span>
+                            )}
+                          </div>
                         </div>
                       ))}
                     </div>

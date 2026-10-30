@@ -12,6 +12,8 @@ import {
   INITIAL_CRM_OPPORTUNITIES,
   INITIAL_CRM_QUOTES,
   INITIAL_CRM_PAYMENTS,
+  INITIAL_CRM_COMPANIES,
+  INITIAL_CRM_CONTACTS,
 } from './src/data/crmTemplates.ts';
 import {
   CLIENT_ACCOUNTS,
@@ -91,6 +93,8 @@ let cachedOpportunities = [...INITIAL_CRM_OPPORTUNITIES];
 let cachedQuotes = [...INITIAL_CRM_QUOTES];
 let cachedPayments = [...INITIAL_CRM_PAYMENTS];
 let cachedPaymentConfig = { ...DEFAULT_PAYMENT_CONFIG };
+let cachedCrmCompanies = [...INITIAL_CRM_COMPANIES];
+let cachedCrmContacts = [...INITIAL_CRM_CONTACTS];
 let cachedProposals: any[] = [];
 let cachedContacts: any[] = [];
 
@@ -99,7 +103,22 @@ let cachedClientProjects = [...INITIAL_CLIENT_PROJECTS];
 let cachedClientInquiries = [...INITIAL_CONSULTING_INQUIRIES];
 let cachedSupportTickets = [...INITIAL_SUPPORT_TICKETS];
 let cachedClientBookings = [...INITIAL_CONSULTING_BOOKINGS];
-const activeClientSessions = new Map<string, { email: string; name: string; company: string; expiresAt: number }>();
+const activeClientSessions = new Map<
+  string,
+  {
+    id?: string;
+    email: string;
+    username?: string;
+    name: string;
+    company: string;
+    companyId?: string;
+    role?: string;
+    contactType?: 'corporate_member' | 'individual';
+    hasActiveService?: boolean;
+    linkedProjectId?: string;
+    expiresAt: number;
+  }
+>();
 const activeClientOtpCodes = new Map<string, { code: string; expiresAt: number }>();
 
 // Verified Authentication Store (Sessions & OTP)
@@ -1091,6 +1110,8 @@ app.get('/api/crm/overview', requireAdminAuth, async (_req, res) => {
       quotes: cachedQuotes,
       payments: cachedPayments,
       paymentConfig: cachedPaymentConfig,
+      companies: cachedCrmCompanies,
+      contacts: cachedCrmContacts,
       metrics: {
         totalOpportunities: cachedOpportunities.length,
         activeOpportunitiesCount: activeOpportunities.length,
@@ -1100,9 +1121,256 @@ app.get('/api/crm/overview', requireAdminAuth, async (_req, res) => {
         wonUsd,
         totalCollectedUsd,
         quotesSentCount: cachedQuotes.filter((q) => q.status === 'sent').length,
+        companiesCount: cachedCrmCompanies.length,
+        contactsCount: cachedCrmContacts.length,
       },
     },
   });
+});
+
+// Helper to ensure a Company and Contact exist in the CRM Agenda & Portal Clientes when an Opportunity is created
+function syncContactAndCompanyFromOpportunity(opp: {
+  clientName?: string;
+  clientEmail?: string;
+  clientPhone?: string;
+  company?: string;
+  companyId?: string;
+  contactId?: string;
+  stage?: string;
+}) {
+  let resolvedCompanyId = opp.companyId;
+  const cleanCompanyName = (opp.company || '').trim();
+
+  if (cleanCompanyName && !resolvedCompanyId) {
+    const existingCompany = cachedCrmCompanies.find(
+      (c) => c.name.toLowerCase() === cleanCompanyName.toLowerCase()
+    );
+    if (existingCompany) {
+      resolvedCompanyId = existingCompany.id;
+    } else {
+      const newCompany = {
+        id: `cmp-${Date.now()}`,
+        name: cleanCompanyName,
+        industry: 'Tecnología & Operaciones',
+        phone: opp.clientPhone || '',
+        email: opp.clientEmail || '',
+        tier: 'pyme' as const,
+        notes: 'Empresa incorporada automáticamente desde el Pipeline CRM.',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      cachedCrmCompanies.unshift(newCompany);
+      resolvedCompanyId = newCompany.id;
+    }
+  }
+
+  let resolvedContactId = opp.contactId;
+  const cleanEmail = (opp.clientEmail || '').trim().toLowerCase();
+  const cleanName = (opp.clientName || '').trim();
+
+  if ((cleanEmail || cleanName) && !resolvedContactId) {
+    const existingContact = cachedCrmContacts.find(
+      (c) =>
+        (cleanEmail && c.email.toLowerCase() === cleanEmail) ||
+        (!cleanEmail && c.fullName.toLowerCase() === cleanName.toLowerCase())
+    );
+    if (existingContact) {
+      resolvedContactId = existingContact.id;
+      if (resolvedCompanyId && !existingContact.companyId) {
+        existingContact.companyId = resolvedCompanyId;
+        existingContact.companyName = cleanCompanyName;
+        existingContact.contactType = 'corporate_member';
+      }
+    } else if (cleanName) {
+      const generatedEmail =
+        cleanEmail ||
+        `${cleanName.toLowerCase().replace(/[^a-z0-9]/g, '.')}@portal.gastonbarea.com`;
+      const generatedUsername = generatedEmail.split('@')[0].replace(/[^a-z0-9._-]/g, '');
+      const newContact = {
+        id: `cnt-${Date.now()}`,
+        fullName: cleanName,
+        email: generatedEmail,
+        username: generatedUsername || `usuario.${Date.now().toString().slice(-4)}`,
+        password: 'cliente2026',
+        phone: opp.clientPhone || '',
+        roleTitle: cleanCompanyName ? 'Representante Corporativo' : 'Contacto Individual',
+        contactType: cleanCompanyName ? ('corporate_member' as const) : ('individual' as const),
+        companyId: resolvedCompanyId,
+        companyName: cleanCompanyName || undefined,
+        portalAccessStatus: 'active' as const,
+        hasActiveService: opp.stage === 'won',
+        notes: 'Usuario del Portal Clientes habilitado automáticamente desde el Pipeline CRM.',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      cachedCrmContacts.unshift(newContact);
+      resolvedContactId = newContact.id;
+    }
+  }
+
+  return { companyId: resolvedCompanyId, contactId: resolvedContactId };
+}
+
+// 10.1 CRM Agenda: Companies & Individual Contacts Directory CRUD
+app.get('/api/crm/directory', requireAdminAuth, (_req, res) => {
+  return res.json({
+    success: true,
+    companies: cachedCrmCompanies,
+    contacts: cachedCrmContacts,
+  });
+});
+
+app.post('/api/crm/companies', requireAdminAuth, (req, res) => {
+  const body = req.body || {};
+  if (!body.name || !String(body.name).trim()) {
+    return res.status(400).json({ error: 'El nombre de la empresa o corporación es requerido.' });
+  }
+  const newCompany = {
+    id: body.id || `cmp-${Date.now()}`,
+    name: String(body.name).trim(),
+    taxId: body.taxId || '',
+    industry: body.industry || 'Tecnología & Producción',
+    website: body.website || '',
+    phone: body.phone || '',
+    email: body.email || '',
+    location: body.location || 'Argentina',
+    tier: body.tier || 'pyme',
+    notes: body.notes || '',
+    createdAt: body.createdAt || new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+  cachedCrmCompanies.unshift(newCompany);
+  return res.json({ success: true, company: newCompany });
+});
+
+app.put('/api/crm/companies/:id', requireAdminAuth, (req, res) => {
+  const { id } = req.params;
+  const idx = cachedCrmCompanies.findIndex((c) => c.id === id);
+  if (idx === -1) {
+    return res.status(404).json({ error: 'Empresa no encontrada' });
+  }
+  const updated = {
+    ...cachedCrmCompanies[idx],
+    ...req.body,
+    updatedAt: new Date().toISOString(),
+  };
+  cachedCrmCompanies[idx] = updated;
+
+  // Keep grouped contacts' companyName in sync
+  cachedCrmContacts = cachedCrmContacts.map((cnt) =>
+    cnt.companyId === id ? { ...cnt, companyName: updated.name } : cnt
+  );
+
+  return res.json({ success: true, company: updated });
+});
+
+app.delete('/api/crm/companies/:id', requireAdminAuth, (req, res) => {
+  const { id } = req.params;
+  cachedCrmCompanies = cachedCrmCompanies.filter((c) => c.id !== id);
+  // Unlink contacts into individual contacts or clear companyId
+  cachedCrmContacts = cachedCrmContacts.map((cnt) =>
+    cnt.companyId === id ? { ...cnt, companyId: undefined, contactType: 'individual' as const } : cnt
+  );
+  return res.json({ success: true, id });
+});
+
+app.post('/api/crm/contacts', requireAdminAuth, (req, res) => {
+  const body = req.body || {};
+  if (!body.fullName || !body.email) {
+    return res.status(400).json({ error: 'Nombre completo y correo electrónico son requeridos.' });
+  }
+
+  const cleanEmail = String(body.email).trim().toLowerCase();
+  const cleanUsername =
+    (body.username ? String(body.username).trim().toLowerCase() : cleanEmail.split('@')[0]) ||
+    `user.${Date.now().toString().slice(-4)}`;
+
+  let resolvedCompanyId = body.companyId || undefined;
+  let resolvedCompanyName = body.companyName || undefined;
+
+  if (resolvedCompanyId) {
+    const comp = cachedCrmCompanies.find((c) => c.id === resolvedCompanyId);
+    if (comp) resolvedCompanyName = comp.name;
+  } else if (resolvedCompanyName && body.contactType === 'corporate_member') {
+    const existingComp = cachedCrmCompanies.find(
+      (c) => c.name.toLowerCase() === String(resolvedCompanyName).trim().toLowerCase()
+    );
+    if (existingComp) {
+      resolvedCompanyId = existingComp.id;
+      resolvedCompanyName = existingComp.name;
+    } else {
+      const createdComp = {
+        id: `cmp-${Date.now()}`,
+        name: String(resolvedCompanyName).trim(),
+        taxId: body.companyTaxId || '',
+        industry: 'Corporación / Empresa',
+        phone: body.phone || '',
+        email: cleanEmail,
+        location: 'Argentina',
+        tier: 'pyme' as const,
+        notes: 'Creada automáticamente al registrar contacto corporativo.',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      cachedCrmCompanies.unshift(createdComp);
+      resolvedCompanyId = createdComp.id;
+      resolvedCompanyName = createdComp.name;
+    }
+  }
+
+  const newContact = {
+    id: body.id || `cnt-${Date.now()}`,
+    fullName: String(body.fullName).trim(),
+    email: cleanEmail,
+    username: cleanUsername,
+    password: body.password ? String(body.password).trim() : 'cliente2026',
+    phone: body.phone || '',
+    roleTitle:
+      body.roleTitle ||
+      (resolvedCompanyId ? 'Miembro de Corporación' : 'Contacto Individual / Profesional'),
+    contactType: resolvedCompanyId ? ('corporate_member' as const) : (body.contactType || 'individual'),
+    companyId: resolvedCompanyId,
+    companyName: resolvedCompanyName,
+    portalAccessStatus: body.portalAccessStatus || ('active' as const),
+    hasActiveService: Boolean(body.hasActiveService),
+    linkedProjectId: body.linkedProjectId || undefined,
+    notes: body.notes || '',
+    createdAt: body.createdAt || new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+
+  cachedCrmContacts.unshift(newContact);
+  return res.json({ success: true, contact: newContact });
+});
+
+app.put('/api/crm/contacts/:id', requireAdminAuth, (req, res) => {
+  const { id } = req.params;
+  const idx = cachedCrmContacts.findIndex((c) => c.id === id);
+  if (idx === -1) {
+    return res.status(404).json({ error: 'Contacto no encontrado' });
+  }
+
+  const body = req.body || {};
+  let resolvedCompanyName = body.companyName ?? cachedCrmContacts[idx].companyName;
+  if (body.companyId) {
+    const comp = cachedCrmCompanies.find((c) => c.id === body.companyId);
+    if (comp) resolvedCompanyName = comp.name;
+  }
+
+  const updated = {
+    ...cachedCrmContacts[idx],
+    ...body,
+    companyName: resolvedCompanyName,
+    updatedAt: new Date().toISOString(),
+  };
+  cachedCrmContacts[idx] = updated;
+  return res.json({ success: true, contact: updated });
+});
+
+app.delete('/api/crm/contacts/:id', requireAdminAuth, (req, res) => {
+  const { id } = req.params;
+  cachedCrmContacts = cachedCrmContacts.filter((c) => c.id !== id);
+  return res.json({ success: true, id });
 });
 
 // 11. Opportunities CRUD
@@ -1111,9 +1379,12 @@ app.get('/api/crm/opportunities', requireAdminAuth, (_req, res) => {
 });
 
 app.post('/api/crm/opportunities', requireAdminAuth, async (req, res) => {
+  const syncedLinks = syncContactAndCompanyFromOpportunity(req.body || {});
   const newOpp = {
     ...req.body,
     id: req.body.id || `opp-${Date.now()}`,
+    companyId: req.body.companyId || syncedLinks.companyId,
+    contactId: req.body.contactId || syncedLinks.contactId,
     createdAt: req.body.createdAt || new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
@@ -1146,7 +1417,12 @@ app.post('/api/crm/opportunities', requireAdminAuth, async (req, res) => {
     }
   }
 
-  return res.json({ success: true, opportunity: newOpp });
+  return res.json({
+    success: true,
+    opportunity: newOpp,
+    companies: cachedCrmCompanies,
+    contacts: cachedCrmContacts,
+  });
 });
 
 app.put('/api/crm/opportunities/:id', requireAdminAuth, async (req, res) => {
@@ -1570,19 +1846,44 @@ function getClientFromRequest(req: express.Request) {
   // Fallback for query email or header email
   const email = (req.headers['x-client-email'] as string) || (req.query.email as string);
   if (email) {
-    const match = cachedClientProjects.find((p) => p.clientEmail.toLowerCase() === email.toLowerCase());
+    const normalizedEmail = email.toLowerCase().trim();
+    const matchedContact = cachedCrmContacts.find((c) => c.email.toLowerCase() === normalizedEmail);
+    if (matchedContact) {
+      return {
+        id: matchedContact.id,
+        email: matchedContact.email,
+        username: matchedContact.username,
+        name: matchedContact.fullName,
+        company:
+          matchedContact.companyName ||
+          (matchedContact.contactType === 'individual' ? 'Contacto Individual' : 'Organización'),
+        companyId: matchedContact.companyId,
+        role: matchedContact.roleTitle,
+        contactType: matchedContact.contactType,
+        hasActiveService: matchedContact.hasActiveService,
+        linkedProjectId: matchedContact.linkedProjectId,
+        expiresAt: Date.now() + 24 * 60 * 60 * 1000,
+      };
+    }
+
+    const match = cachedClientProjects.find((p) => p.clientEmail.toLowerCase() === normalizedEmail);
     if (match) {
       return {
         email: match.clientEmail,
         name: match.clientName,
         company: match.company,
+        contactType: 'corporate_member' as const,
+        hasActiveService: true,
+        linkedProjectId: match.id,
         expiresAt: Date.now() + 24 * 60 * 60 * 1000,
       };
     }
     return {
-      email,
-      name: 'Cliente Verificado',
-      company: 'Empresa Cliente',
+      email: normalizedEmail,
+      name: 'Usuario Registrado',
+      company: 'Contacto Individual',
+      contactType: 'individual' as const,
+      hasActiveService: false,
       expiresAt: Date.now() + 24 * 60 * 60 * 1000,
     };
   }
@@ -1598,17 +1899,23 @@ app.post('/api/client/auth/login', (req, res) => {
   if (!identifier || !cleanPassword) {
     return res.status(400).json({
       success: false,
-      error: 'Ingresa tu usuario (o correo corporativo) y contraseña.',
+      error: 'Ingresa tu usuario (o correo electrónico) y contraseña.',
     });
   }
 
-  // Match registered account by username or email
+  // Match against CRM Contacts (which includes all corporate & individual portal users)
+  const matchedContact = cachedCrmContacts.find(
+    (c) => c.username.toLowerCase() === identifier || c.email.toLowerCase() === identifier
+  );
+
+  // Also check static CLIENT_ACCOUNTS fallback
   const matchedAccount = CLIENT_ACCOUNTS.find(
     (acc) => acc.username.toLowerCase() === identifier || acc.email.toLowerCase() === identifier
   );
 
   const validMasterPasswords = ['cliente2026', 'client2026', 'gaston2026', 'distribuidora2026', 'nova2026'];
   const isPasswordValid =
+    (matchedContact && matchedContact.password === cleanPassword) ||
     (matchedAccount && matchedAccount.password === cleanPassword) ||
     validMasterPasswords.includes(cleanPassword);
 
@@ -1619,23 +1926,37 @@ app.post('/api/client/auth/login', (req, res) => {
     });
   }
 
-  const resolvedEmail = matchedAccount
+  const resolvedEmail = matchedContact
+    ? matchedContact.email.toLowerCase()
+    : matchedAccount
     ? matchedAccount.email.toLowerCase()
     : identifier.includes('@')
     ? identifier
     : 'martin@distribuidorasur.com.ar';
 
   const existingProject = cachedClientProjects.find(
-    (p) => p.clientEmail.toLowerCase() === resolvedEmail
+    (p) =>
+      (matchedContact?.linkedProjectId && p.id === matchedContact.linkedProjectId) ||
+      p.clientEmail.toLowerCase() === resolvedEmail
   );
 
   const clientToken = `gb_cli_${Date.now()}_${Math.random().toString(36).substring(2)}`;
   const session = {
+    id: matchedContact?.id || matchedAccount?.id,
     email: resolvedEmail,
-    username: matchedAccount?.username || resolvedEmail.split('@')[0],
-    name: matchedAccount?.name || existingProject?.clientName || 'Cliente Corporativo',
-    company: matchedAccount?.company || existingProject?.company || 'Organización Cliente',
-    role: matchedAccount?.role || 'Representante Técnico',
+    username: matchedContact?.username || matchedAccount?.username || resolvedEmail.split('@')[0],
+    name: matchedContact?.fullName || matchedAccount?.name || existingProject?.clientName || 'Usuario del Portal',
+    company:
+      matchedContact?.companyName ||
+      matchedAccount?.company ||
+      existingProject?.company ||
+      (matchedContact?.contactType === 'individual' ? 'Contacto Individual' : 'Organización'),
+    companyId: matchedContact?.companyId || matchedAccount?.companyId,
+    role: matchedContact?.roleTitle || matchedAccount?.role || 'Usuario Registrado',
+    contactType: matchedContact?.contactType || matchedAccount?.contactType || 'corporate_member',
+    hasActiveService:
+      matchedContact !== undefined ? matchedContact.hasActiveService : Boolean(existingProject),
+    linkedProjectId: matchedContact?.linkedProjectId || existingProject?.id,
     expiresAt: Date.now() + 7 * 24 * 60 * 60 * 1000,
   };
 
@@ -1648,11 +1969,152 @@ app.post('/api/client/auth/login', (req, res) => {
   });
 });
 
+// 0.1 Client Auth: Open Registration (Corporate Member or Individual Contact — No active service required)
+app.post('/api/client/auth/register', (req, res) => {
+  const {
+    fullName,
+    email,
+    username,
+    password,
+    phone,
+    contactType = 'individual',
+    companyName,
+    companyTaxId,
+    companyIndustry,
+    roleTitle,
+  } = req.body || {};
+
+  const cleanName = (fullName || '').trim();
+  const cleanEmail = (email || '').trim().toLowerCase();
+  const cleanPassword = (password || '').trim() || 'cliente2026';
+
+  if (!cleanName || !cleanEmail || !cleanEmail.includes('@')) {
+    return res.status(400).json({
+      success: false,
+      error: 'Por favor completá tu nombre completo y un correo electrónico válido.',
+    });
+  }
+
+  const cleanUsername =
+    (username ? String(username).trim().toLowerCase() : cleanEmail.split('@')[0]).replace(
+      /[^a-z0-9._-]/g,
+      ''
+    ) || `user.${Date.now().toString().slice(-4)}`;
+
+  // Check if email or username already exists
+  const existingContact = cachedCrmContacts.find(
+    (c) => c.email.toLowerCase() === cleanEmail || c.username.toLowerCase() === cleanUsername
+  );
+
+  if (existingContact) {
+    return res.status(409).json({
+      success: false,
+      error: 'Ya existe un usuario registrado con ese correo o nombre de usuario. Podés iniciar sesión directamente.',
+    });
+  }
+
+  let resolvedCompanyId: string | undefined = undefined;
+  let resolvedCompanyName: string | undefined = undefined;
+  let linkedProjectId: string | undefined = undefined;
+  let hasActiveService = false;
+
+  if (contactType === 'corporate_member' && companyName && String(companyName).trim()) {
+    const cleanComp = String(companyName).trim();
+    const matchedComp = cachedCrmCompanies.find(
+      (c) =>
+        c.name.toLowerCase() === cleanComp.toLowerCase() ||
+        (companyTaxId && c.taxId && c.taxId === companyTaxId)
+    );
+
+    if (matchedComp) {
+      resolvedCompanyId = matchedComp.id;
+      resolvedCompanyName = matchedComp.name;
+      // Check if this corporation already has an active project
+      const corpProject = cachedClientProjects.find(
+        (p) => p.company.toLowerCase() === matchedComp.name.toLowerCase()
+      );
+      if (corpProject) {
+        linkedProjectId = corpProject.id;
+        hasActiveService = true;
+      }
+    } else {
+      const newComp = {
+        id: `cmp-${Date.now()}`,
+        name: cleanComp,
+        taxId: companyTaxId || '',
+        industry: companyIndustry || 'Empresa / Corporación',
+        phone: phone || '',
+        email: cleanEmail,
+        location: 'Argentina',
+        tier: 'pyme' as const,
+        notes: 'Empresa registrada desde el Portal Clientes.',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      cachedCrmCompanies.unshift(newComp);
+      resolvedCompanyId = newComp.id;
+      resolvedCompanyName = newComp.name;
+    }
+  }
+
+  const newContact = {
+    id: `cnt-${Date.now()}`,
+    fullName: cleanName,
+    email: cleanEmail,
+    username: cleanUsername,
+    password: cleanPassword,
+    phone: phone || '',
+    roleTitle:
+      roleTitle ||
+      (contactType === 'corporate_member' ? 'Representante Corporativo' : 'Contacto Individual'),
+    contactType:
+      contactType === 'corporate_member' && resolvedCompanyId
+        ? ('corporate_member' as const)
+        : ('individual' as const),
+    companyId: resolvedCompanyId,
+    companyName: resolvedCompanyName,
+    portalAccessStatus: 'active' as const,
+    hasActiveService,
+    linkedProjectId,
+    notes: 'Registrado directamente en el Portal Clientes.',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+
+  cachedCrmContacts.unshift(newContact);
+
+  const clientToken = `gb_cli_${Date.now()}_${Math.random().toString(36).substring(2)}`;
+  const session = {
+    id: newContact.id,
+    email: newContact.email,
+    username: newContact.username,
+    name: newContact.fullName,
+    company:
+      newContact.companyName ||
+      (newContact.contactType === 'individual' ? 'Contacto Individual' : 'Organización'),
+    companyId: newContact.companyId,
+    role: newContact.roleTitle,
+    contactType: newContact.contactType,
+    hasActiveService: newContact.hasActiveService,
+    linkedProjectId: newContact.linkedProjectId,
+    expiresAt: Date.now() + 7 * 24 * 60 * 60 * 1000,
+  };
+
+  activeClientSessions.set(clientToken, session);
+
+  return res.json({
+    success: true,
+    token: clientToken,
+    client: session,
+    contact: newContact,
+  });
+});
+
 // 1. Client Auth: Request 6-digit access code
 app.post('/api/client/auth/request-code', (req, res) => {
   const { email } = req.body || {};
   if (!email || !email.includes('@')) {
-    return res.status(400).json({ success: false, error: 'Ingresa un correo electrónico corporativo válido.' });
+    return res.status(400).json({ success: false, error: 'Ingresa un correo electrónico válido.' });
   }
 
   const normalizedEmail = email.toLowerCase().trim();
@@ -1662,60 +2124,29 @@ app.post('/api/client/auth/request-code', (req, res) => {
   activeClientOtpCodes.set(normalizedEmail, { code, expiresAt });
   console.log(`[Client Portal 2FA] Código generado para cliente ${normalizedEmail}: ${code}`);
 
-  // Find or create default project if first time
-  const existing = cachedClientProjects.find((p) => p.clientEmail.toLowerCase() === normalizedEmail);
-  if (!existing) {
-    const newProject = {
-      id: `proj-${Date.now()}`,
-      clientEmail: normalizedEmail,
-      clientName: normalizedEmail.split('@')[0],
-      company: normalizedEmail.split('@')[1].split('.')[0].toUpperCase(),
-      projectName: 'Servicio de Consultoría & Arquitectura Tecnológica',
-      serviceCategory: 'software_architecture' as const,
-      status: 'in_progress' as const,
-      progressPercent: 35,
-      startDate: new Date().toISOString().split('T')[0],
-      estimatedDelivery: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-      activeSprint: 'Sprint 1: Relevamiento y Especificación de Arquitectura',
-      milestones: [
-        {
-          id: `ms-${Date.now()}-1`,
-          title: 'Hito 1: Relevamiento Técnico, Auditoría y Blueprint',
-          percentage: 50,
-          deliverables: ['Especificación de requerimientos', 'Definición de stack y modelo de datos'],
-          status: 'in_progress' as const,
-          paymentStatus: 'pending' as const,
-          amount: 1500,
-          currency: 'USD' as const,
-        },
-        {
-          id: `ms-${Date.now()}-2`,
-          title: 'Hito 2: Implementación en Staging & Despliegue en Producción',
-          percentage: 50,
-          deliverables: ['Despliegue contenerizado', 'Capacitación y soporte post-lanzamiento'],
-          status: 'pending' as const,
-          paymentStatus: 'pending' as const,
-          amount: 1500,
-          currency: 'USD' as const,
-        },
-      ],
-      recentUpdates: [
-        {
-          id: `upd-${Date.now()}`,
-          date: new Date().toISOString().split('T')[0],
-          title: 'Bienvenido al Portal del Cliente de Gastón Barea',
-          summary: 'Desde aquí puedes seguir el progreso de tus hitos, abrir tickets de soporte y consultar asesoramiento directo.',
-          author: 'Gastón Barea',
-        },
-      ],
-    };
-    cachedClientProjects.unshift(newProject);
+  // Ensure the email is registered in CRM Contacts (without forcing a paid project)
+  const existingContact = cachedCrmContacts.find((c) => c.email.toLowerCase() === normalizedEmail);
+  if (!existingContact) {
+    cachedCrmContacts.unshift({
+      id: `cnt-${Date.now()}`,
+      fullName: normalizedEmail.split('@')[0],
+      email: normalizedEmail,
+      username: normalizedEmail.split('@')[0],
+      password: 'cliente2026',
+      roleTitle: 'Usuario Registrado',
+      contactType: 'individual',
+      portalAccessStatus: 'active',
+      hasActiveService: false,
+      notes: 'Registrado mediante acceso OTP en Portal Clientes.',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
   }
 
   return res.json({
     success: true,
     maskedEmail: maskEmail(normalizedEmail),
-    codeHint: code, // provided in dev for zero-friction access
+    codeHint: code,
     message: `Código de acceso verificado enviado a ${maskEmail(normalizedEmail)}`,
   });
 });
@@ -1727,7 +2158,10 @@ app.post('/api/client/auth/verify-code', (req, res) => {
 
   const otpData = activeClientOtpCodes.get(normalizedEmail);
   const masterPin = 'client2026';
-  const isValid = (otpData && otpData.code === code && Date.now() <= otpData.expiresAt) || code === masterPin || code === 'gaston2026';
+  const isValid =
+    (otpData && otpData.code === code && Date.now() <= otpData.expiresAt) ||
+    code === masterPin ||
+    code === 'gaston2026';
 
   if (!isValid) {
     return res.status(401).json({ success: false, error: 'Código de acceso incorrecto o expirado.' });
@@ -1736,13 +2170,28 @@ app.post('/api/client/auth/verify-code', (req, res) => {
   activeClientOtpCodes.delete(normalizedEmail);
 
   const clientToken = `gb_cli_${Date.now()}_${Math.random().toString(36).substring(2)}`;
-  const project = cachedClientProjects.find((p) => p.clientEmail.toLowerCase() === normalizedEmail);
+  const matchedContact = cachedCrmContacts.find((c) => c.email.toLowerCase() === normalizedEmail);
+  const project = cachedClientProjects.find(
+    (p) =>
+      (matchedContact?.linkedProjectId && p.id === matchedContact.linkedProjectId) ||
+      p.clientEmail.toLowerCase() === normalizedEmail
+  );
 
   const session = {
+    id: matchedContact?.id,
     email: normalizedEmail,
-    name: project?.clientName || 'Cliente',
-    company: project?.company || 'Organización',
-    expiresAt: Date.now() + 7 * 24 * 60 * 60 * 1000, // 7 days session
+    username: matchedContact?.username || normalizedEmail.split('@')[0],
+    name: matchedContact?.fullName || project?.clientName || 'Usuario Registrado',
+    company:
+      matchedContact?.companyName ||
+      project?.company ||
+      (matchedContact?.contactType === 'individual' ? 'Contacto Individual' : 'Organización'),
+    companyId: matchedContact?.companyId,
+    role: matchedContact?.roleTitle || 'Usuario Registrado',
+    contactType: matchedContact?.contactType || 'individual',
+    hasActiveService: matchedContact ? matchedContact.hasActiveService : Boolean(project),
+    linkedProjectId: matchedContact?.linkedProjectId || project?.id,
+    expiresAt: Date.now() + 7 * 24 * 60 * 60 * 1000,
   };
 
   activeClientSessions.set(clientToken, session);
@@ -1763,33 +2212,95 @@ app.get('/api/client/auth/verify-session', (req, res) => {
   return res.status(401).json({ success: false, error: 'Sesión expirada' });
 });
 
-// 4. Client Dashboard Overview (Project, Inquiries, Tickets, Bookings)
+// 4. Client Dashboard Overview (Project, Corporate Group, Inquiries, Tickets, Bookings)
 app.get('/api/client/dashboard', (req, res) => {
   const client = getClientFromRequest(req);
   if (!client) {
     return res.status(401).json({ error: 'Acceso no autorizado al portal' });
   }
 
-  const project = cachedClientProjects.find(
-    (p) => p.clientEmail.toLowerCase() === client.email.toLowerCase()
-  ) || cachedClientProjects[0];
+  const matchedContact = cachedCrmContacts.find(
+    (c) => c.email.toLowerCase() === client.email.toLowerCase()
+  );
+
+  const companyId = client.companyId || matchedContact?.companyId;
+  const companyProfile = companyId
+    ? cachedCrmCompanies.find((c) => c.id === companyId) || null
+    : cachedCrmCompanies.find(
+        (c) => c.name.toLowerCase() === (client.company || '').toLowerCase()
+      ) || null;
+
+  const corporateColleagues = companyProfile
+    ? cachedCrmContacts
+        .filter((c) => c.companyId === companyProfile.id)
+        .map((c) => ({
+          id: c.id,
+          fullName: c.fullName,
+          email: c.email,
+          username: c.username,
+          phone: c.phone,
+          roleTitle: c.roleTitle,
+          portalAccessStatus: c.portalAccessStatus,
+          hasActiveService: c.hasActiveService,
+        }))
+    : [];
+
+  // Resolve project only if linked or matching email/company with active service
+  const project =
+    cachedClientProjects.find(
+      (p) =>
+        (client.linkedProjectId && p.id === client.linkedProjectId) ||
+        (matchedContact?.linkedProjectId && p.id === matchedContact.linkedProjectId) ||
+        p.clientEmail.toLowerCase() === client.email.toLowerCase() ||
+        (companyProfile &&
+          matchedContact?.hasActiveService &&
+          p.company.toLowerCase() === companyProfile.name.toLowerCase())
+    ) || null;
 
   const inquiries = cachedClientInquiries.filter(
-    (i) => i.clientEmail.toLowerCase() === client.email.toLowerCase()
+    (i) =>
+      i.clientEmail.toLowerCase() === client.email.toLowerCase() ||
+      (companyProfile && i.company.toLowerCase() === companyProfile.name.toLowerCase())
   );
 
   const tickets = cachedSupportTickets.filter(
-    (t) => t.clientEmail.toLowerCase() === client.email.toLowerCase()
+    (t) =>
+      t.clientEmail.toLowerCase() === client.email.toLowerCase() ||
+      (companyProfile && t.company.toLowerCase() === companyProfile.name.toLowerCase())
   );
 
   const bookings = cachedClientBookings.filter(
-    (b) => b.clientEmail.toLowerCase() === client.email.toLowerCase()
+    (b) =>
+      b.clientEmail.toLowerCase() === client.email.toLowerCase() ||
+      (companyProfile && b.company.toLowerCase() === companyProfile.name.toLowerCase())
+  );
+
+  const relatedOpportunities = cachedOpportunities.filter(
+    (o) =>
+      o.clientEmail.toLowerCase() === client.email.toLowerCase() ||
+      (companyProfile && o.companyId === companyProfile.id) ||
+      (companyProfile && (o.company || '').toLowerCase() === companyProfile.name.toLowerCase())
+  );
+
+  const relatedQuotes = cachedQuotes.filter(
+    (q) =>
+      q.clientEmail.toLowerCase() === client.email.toLowerCase() ||
+      (companyProfile && (q.clientCompany || '').toLowerCase() === companyProfile.name.toLowerCase())
   );
 
   return res.json({
     success: true,
-    client,
+    client: {
+      ...client,
+      hasActiveService: Boolean(project) || Boolean(matchedContact?.hasActiveService),
+      contactType: matchedContact?.contactType || client.contactType || 'individual',
+      companyId: companyProfile?.id || client.companyId,
+    },
     project,
+    companyProfile,
+    corporateColleagues,
+    relatedOpportunities,
+    relatedQuotes,
     inquiries,
     tickets,
     bookings,

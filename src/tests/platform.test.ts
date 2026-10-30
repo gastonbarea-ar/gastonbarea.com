@@ -14,6 +14,8 @@ import { PROJECTS_CATALOG } from '../data/projectsData.ts';
 import { SITE_CONFIG } from '../data/siteConfig.ts';
 import { INITIAL_BLOG_POSTS } from '../data/blogData.ts';
 import {
+  INITIAL_CRM_COMPANIES,
+  INITIAL_CRM_CONTACTS,
   INITIAL_CRM_OPPORTUNITIES,
   INITIAL_CRM_QUOTES,
 } from '../data/crmTemplates.ts';
@@ -37,7 +39,7 @@ describe('1. Enrutamiento y Navegación de Secciones (resolvePageFromHash & reso
     assert.equal(resolvePageFromHash('#admin'), 'admin');
     assert.equal(resolvePageFromHash('#dashboard'), 'admin');
     assert.equal(resolvePageFromHash('#crm'), 'admin');
-    assert.ok(CLIENT_ACCOUNTS.length >= 2);
+    assert.ok(CLIENT_ACCOUNTS.length >= 6);
     assert.equal(CLIENT_ACCOUNTS[0].username, 'martin.arismendi');
   });
 
@@ -198,4 +200,28 @@ describe('6. Integridad de Datos de Configuración, Blog, CRM y Portal de Client
     assert.ok(INITIAL_CRM_QUOTES.length > 0);
     assert.ok(INITIAL_CLIENT_PROJECTS.length > 0);
   });
+
+  it('debe agrupar contactos corporativos por empresa, permitir contactos individuales y habilitar a todos en el Portal Clientes con o sin servicio activo', () => {
+    assert.ok(INITIAL_CRM_COMPANIES.length >= 4);
+    assert.ok(INITIAL_CRM_CONTACTS.length >= 8);
+
+    // Verificar agrupación corporativa (ej. Distribuidora del Sur S.A. tiene múltiples contactos agrupados)
+    const distSurContacts = INITIAL_CRM_CONTACTS.filter((c) => c.companyId === 'cmp-001');
+    assert.ok(distSurContacts.length >= 3);
+    assert.ok(distSurContacts.every((c) => c.contactType === 'corporate_member'));
+
+    // Verificar contactos individuales independientes
+    const individualContacts = INITIAL_CRM_CONTACTS.filter((c) => c.contactType === 'individual');
+    assert.ok(individualContacts.length >= 2);
+
+    // Verificar que todos los contactos pasan a ser usuarios registrados del Portal Clientes, incluso sin servicio contratado activo
+    assert.ok(
+      INITIAL_CRM_CONTACTS.every(
+        (c) => c.portalAccessStatus === 'active' && c.username && c.password
+      )
+    );
+    const registeredWithoutService = CLIENT_ACCOUNTS.filter((acc) => acc.hasActiveService === false);
+    assert.ok(registeredWithoutService.length >= 3);
+  });
 });
+

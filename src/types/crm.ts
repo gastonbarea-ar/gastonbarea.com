@@ -16,6 +16,40 @@ export type ServiceCategory =
   | 'bi_analytics'
   | 'custom';
 
+export interface CrmCompany {
+  id: string;
+  name: string;
+  taxId?: string; // CUIT / RUT / Tax ID
+  industry?: string;
+  website?: string;
+  phone?: string;
+  email?: string;
+  location?: string;
+  tier: 'enterprise' | 'pyme' | 'startup' | 'institution' | 'prospect';
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CrmContact {
+  id: string;
+  fullName: string;
+  email: string;
+  username: string;
+  password: string;
+  phone?: string;
+  roleTitle: string;
+  contactType: 'corporate_member' | 'individual';
+  companyId?: string;
+  companyName?: string;
+  portalAccessStatus: 'active' | 'invited' | 'pending';
+  hasActiveService: boolean; // False when user is registered in Portal without a contracted product/service
+  linkedProjectId?: string;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface Opportunity {
   id: string;
   title: string;
@@ -23,6 +57,8 @@ export interface Opportunity {
   clientEmail: string;
   clientPhone?: string;
   company?: string;
+  companyId?: string;
+  contactId?: string;
   serviceCategory: ServiceCategory;
   stage: OpportunityStage;
   value: number;
@@ -30,12 +66,13 @@ export interface Opportunity {
   probability: number; // 0 to 100
   expectedCloseDate?: string;
   notes?: string;
-  source: 'web_diagnostic' | 'contact_form' | 'whatsapp' | 'manual' | 'referral';
+  source: 'web_diagnostic' | 'contact_form' | 'whatsapp' | 'manual' | 'referral' | 'portal_registration';
   createdAt: string;
   updatedAt: string;
   lastActivity?: string;
   linkedQuoteId?: string;
 }
+
 
 export interface QuoteItem {
   id: string;
