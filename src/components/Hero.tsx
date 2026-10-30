@@ -60,6 +60,8 @@ export const Hero: React.FC<HeroProps> = ({
   const [customYoutubeInput, setCustomYoutubeInput] = useState<string>('');
   const [showVideoSelector, setShowVideoSelector] = useState<boolean>(false);
   const [overrideYoutubeId, setOverrideYoutubeId] = useState<string>('');
+  const [overrideDirectVideoUrl, setOverrideDirectVideoUrl] = useState<string>('');
+  const [videoFitMode, setVideoFitMode] = useState<'cover' | 'contain'>('cover');
 
   const [isImmersionActive, setIsImmersionActive] = useState<boolean>(false);
   const [isCinemaExpanded, setIsCinemaExpanded] = useState<boolean>(false);
@@ -87,6 +89,9 @@ export const Hero: React.FC<HeroProps> = ({
         const cfg = data?.config || data;
         if (cfg && cfg.presentationVideo) {
           setLiveConfig(cfg);
+          if (cfg.presentationVideo.videoFitMode) {
+            setVideoFitMode(cfg.presentationVideo.videoFitMode);
+          }
         }
       })
       .catch(() => {});
@@ -98,6 +103,8 @@ export const Hero: React.FC<HeroProps> = ({
       ? videoConfig.youtubeId
       : 'XVYUP8Pz-hE';
   const primaryYoutubeId = overrideYoutubeId || resolvedConfigId;
+  const activeDirectVideoUrl =
+    overrideDirectVideoUrl || videoConfig.directVideoUrl?.trim() || '';
   const youtubeChannelUrl = liveConfig.social?.youtube || 'https://www.youtube.com/@gastonbarea';
 
   const channelPlaylist: ChannelVideoItem[] = [
@@ -148,8 +155,26 @@ export const Hero: React.FC<HeroProps> = ({
 
   const handleApplyCustomVideo = (e: React.FormEvent) => {
     e.preventDefault();
-    const extracted = extractYoutubeId(customYoutubeInput);
+    const trimmed = customYoutubeInput.trim();
+    if (!trimmed) return;
+
+    // Detect if user pasted a direct MP4/WebM/HLS URL (e.g. Cloudflare R2 / CDN)
+    if (
+      /\.(mp4|webm|m3u8)(\?.*)?$/i.test(trimmed) ||
+      trimmed.includes('r2.dev/') ||
+      trimmed.includes('cloudflare')
+    ) {
+      setOverrideDirectVideoUrl(trimmed);
+      setIsImmersionActive(true);
+      setIsMuted(false);
+      setShowVideoSelector(false);
+      setCustomYoutubeInput('');
+      return;
+    }
+
+    const extracted = extractYoutubeId(trimmed);
     if (extracted) {
+      setOverrideDirectVideoUrl('');
       setOverrideYoutubeId(extracted);
       setIsImmersionActive(true);
       setIsMuted(false);
@@ -227,28 +252,28 @@ export const Hero: React.FC<HeroProps> = ({
     <section id="inicio" className="relative w-full bg-white">
       {/* BLOQUE 1: ESCENARIO AUDIOVISUAL FULL-WIDTH (Sin marcos recargados) */}
       <div className="w-full pt-16 bg-[#08080C] text-white overflow-hidden">
-        {/* Optional YouTube URL/ID Loader Bar */}
+        {/* Optional YouTube or Cloudflare R2 Direct MP4 URL Loader Bar */}
         {showVideoSelector && (
           <form
             onSubmit={handleApplyCustomVideo}
-            className="w-full px-4 sm:px-8 lg:px-12 py-3.5 bg-[#12121A] flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3"
+            className="w-full px-4 sm:px-8 lg:px-12 py-3.5 bg-[#12121A] flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 border-b border-white/10"
           >
             <div className="text-xs font-mono text-neutral-300">
-              Pegá la URL o ID de cualquier video de tu canal de YouTube para transmitirlo en portada:
+              Pegá una URL directa <strong className="text-emerald-400">.mp4 / Cloudflare R2</strong> o el ID/URL de <strong className="text-white">YouTube</strong>:
             </div>
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
               <input
                 type="text"
                 value={customYoutubeInput}
                 onChange={(e) => setCustomYoutubeInput(e.target.value)}
-                placeholder="https://youtu.be/XVYUP8Pz-hE"
-                className="px-3.5 py-2 text-xs font-mono bg-black/60 text-white rounded-none border border-white/15 focus:outline-none focus:border-white sm:min-w-[260px]"
+                placeholder="https://pub-xxx.r2.dev/video.mp4 o https://youtu.be/XVYUP8Pz-hE"
+                className="px-3.5 py-2 text-xs font-mono bg-black/60 text-white rounded-none border border-white/15 focus:outline-none focus:border-white sm:min-w-[340px]"
               />
               <button
                 type="submit"
                 className="px-4 py-2 text-xs font-mono font-bold text-white bg-[#291B64] hover:bg-[#382586] rounded-none transition-colors cursor-pointer whitespace-nowrap"
               >
-                Cargar Video
+                Cargar Stream
               </button>
             </div>
           </form>
@@ -256,26 +281,56 @@ export const Hero: React.FC<HeroProps> = ({
 
         {/* Main Full-Bleed Cinema Split (Zero Overlap on Mobile & Desktop) */}
         <div className="w-full grid grid-cols-1 lg:grid-cols-12 items-stretch">
-          {/* LEFT / FULL STAGE: YOUTUBE VIDEO STREAM + NON-OVERLAPPING CONTROL BAR */}
+          {/* LEFT / FULL STAGE: HYBRID VIDEO STREAM (CDN MP4 OR YOUTUBE) + NON-OVERLAPPING CONTROL BAR */}
           <div
             className={`${
               isCinemaExpanded ? 'lg:col-span-12' : 'lg:col-span-8'
             } relative bg-black overflow-hidden flex flex-col justify-between transition-all duration-150`}
           >
-            {/* Unobstructed 16:9 Responsive YouTube Stream */}
-            <div className="relative w-full aspect-video lg:aspect-auto lg:flex-1 lg:min-h-[480px] bg-black overflow-hidden">
-              <iframe
-                key={`${activeVideo.youtubeId}-${isMuted ? 'muted' : 'sound'}-${selectedVideoIndex}`}
-                src={
-                  isMuted
-                    ? `https://www.youtube.com/embed/${activeVideo.youtubeId}?autoplay=1&mute=1&controls=1&loop=1&playlist=${activeVideo.youtubeId}&rel=0&modestbranding=1&playsinline=1`
-                    : `https://www.youtube.com/embed/${activeVideo.youtubeId}?autoplay=1&mute=0&controls=1&rel=0&modestbranding=1&playsinline=1`
-                }
-                title={activeVideo.title}
-                className="w-full h-full border-0"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                allowFullScreen
-              />
+            {/* Video Frame Container — Strictly fitted to frame without black letterbox bars */}
+            <div
+              className={`relative w-full aspect-video ${
+                videoFitMode === 'cover' && !isCinemaExpanded
+                  ? 'lg:aspect-auto lg:flex-1 lg:min-h-[480px]'
+                  : 'lg:aspect-video'
+              } bg-black overflow-hidden`}
+            >
+              {activeDirectVideoUrl ? (
+                <video
+                  key={`${activeDirectVideoUrl}-${isMuted ? 'muted' : 'sound'}`}
+                  src={activeDirectVideoUrl}
+                  autoPlay
+                  muted={isMuted}
+                  loop
+                  playsInline
+                  controls
+                  preload="metadata"
+                  className={`w-full h-full ${
+                    videoFitMode === 'cover' ? 'object-cover' : 'object-contain'
+                  }`}
+                />
+              ) : (
+                <div
+                  className={`w-full h-full ${
+                    videoFitMode === 'cover' && !isCinemaExpanded
+                      ? 'lg:scale-[1.18] lg:origin-center transition-transform duration-300'
+                      : ''
+                  }`}
+                >
+                  <iframe
+                    key={`${activeVideo.youtubeId}-${isMuted ? 'muted' : 'sound'}-${selectedVideoIndex}`}
+                    src={
+                      isMuted
+                        ? `https://www.youtube.com/embed/${activeVideo.youtubeId}?autoplay=1&mute=1&controls=1&loop=1&playlist=${activeVideo.youtubeId}&rel=0&modestbranding=1&playsinline=1`
+                        : `https://www.youtube.com/embed/${activeVideo.youtubeId}?autoplay=1&mute=0&controls=1&rel=0&modestbranding=1&playsinline=1`
+                    }
+                    title={activeVideo.title}
+                    className="w-full h-full border-0"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowFullScreen
+                  />
+                </div>
+              )}
             </div>
 
             {/* Clean Non-Overlapping Video Control & Episode Bar Below Player (Selector 1) */}
@@ -284,7 +339,9 @@ export const Hero: React.FC<HeroProps> = ({
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div className="min-w-0 space-y-0.5">
                   <div className="flex flex-wrap items-center gap-2 text-[11px] font-mono text-emerald-400">
-                    <span className="font-semibold">CANAL YOUTUBE</span>
+                    <span className="font-semibold">
+                      {activeDirectVideoUrl ? 'STREAM DIRECTO CDN' : 'CANAL YOUTUBE'}
+                    </span>
                     <span aria-hidden="true">·</span>
                     <span>{activeVideo.focusArea}</span>
                   </div>
@@ -313,6 +370,20 @@ export const Hero: React.FC<HeroProps> = ({
                         <span>Silenciar</span>
                       </>
                     )}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setVideoFitMode(videoFitMode === 'cover' ? 'contain' : 'cover')
+                    }
+                    className="px-3 py-2 text-xs font-mono text-neutral-300 hover:text-white bg-white/[0.06] hover:bg-white/[0.12] transition-colors inline-flex items-center gap-1.5 cursor-pointer"
+                    title="Alternar entre Llenar Frame (Cover) o Proporción 16:9 Completa"
+                  >
+                    <Maximize2 className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>
+                      {videoFitMode === 'cover' ? 'Ajuste: Cover 100%' : 'Ajuste: 16:9 Nativo'}
+                    </span>
                   </button>
 
                   <button

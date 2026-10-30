@@ -551,35 +551,85 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
                       Administra desde aquí el contenido del showcase principal, la reproducción automática al entrar y el avance automático entre frames sin botones en el front.
                     </p>
 
-                    {/* Frame 1: Video de Fondo */}
+                    {/* Frame 1: Video de Portada (Híbrido: Cloudflare R2 / CDN .mp4 o YouTube) */}
                     <div className="p-4 rounded-xl bg-white border border-slate-200 space-y-3">
                       <div className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
                         <Youtube className="w-3.5 h-3.5 text-rose-600" />
-                        <span>Frame 1 · Video YouTube de Portada</span>
+                        <span>Frame 1 · Video de Portada (YouTube o Stream Directo CDN / Cloudflare R2)</span>
                       </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs font-medium text-slate-700 mb-1">
+                            URL o ID de YouTube
+                          </label>
+                          <input
+                            type="text"
+                            value={siteConfig.presentationVideo?.youtubeId || ''}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              const match = val.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))([\w-]{11})/);
+                              const extractedId = match && match[1] ? match[1] : val;
+                              setSiteConfig({
+                                ...siteConfig,
+                                presentationVideo: {
+                                  ...siteConfig.presentationVideo,
+                                  youtubeId: extractedId,
+                                },
+                              });
+                            }}
+                            placeholder="Ej: XVYUP8Pz-hE"
+                            className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-xl text-xs font-mono text-slate-900"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-medium text-slate-700 mb-1">
+                            Modo de Ajuste al Frame
+                          </label>
+                          <select
+                            value={siteConfig.presentationVideo?.videoFitMode || 'cover'}
+                            onChange={(e) =>
+                              setSiteConfig({
+                                ...siteConfig,
+                                presentationVideo: {
+                                  ...siteConfig.presentationVideo,
+                                  videoFitMode: e.target.value as 'cover' | 'contain',
+                                },
+                              })
+                            }
+                            className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-xl text-xs text-slate-900"
+                          >
+                            <option value="cover">Cover 100% (Llenar todo el Frame sin bordes negros)</option>
+                            <option value="contain">16:9 Nativo (Encaje proporcional completo)</option>
+                          </select>
+                        </div>
+                      </div>
+
                       <div>
                         <label className="block text-xs font-medium text-slate-700 mb-1">
-                          URL o ID de YouTube
+                          URL de Video Directo .mp4 / .webm (Cloudflare R2 / CDN - Opcional)
                         </label>
                         <input
-                          type="text"
-                          value={siteConfig.presentationVideo?.youtubeId || ''}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            const match = val.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))([\w-]{11})/);
-                            const extractedId = match && match[1] ? match[1] : val;
+                          type="url"
+                          value={siteConfig.presentationVideo?.directVideoUrl || ''}
+                          onChange={(e) =>
                             setSiteConfig({
                               ...siteConfig,
                               presentationVideo: {
                                 ...siteConfig.presentationVideo,
-                                youtubeId: extractedId,
+                                directVideoUrl: e.target.value,
                               },
-                            });
-                          }}
-                          placeholder="Ej: https://www.youtube.com/watch?v=L_LUpnjgPso o L_LUpnjgPso"
+                            })
+                          }
+                          placeholder="Ej: https://pub-xxxx.r2.dev/presentacion-gaston-barea.mp4 (Si se deja vacío, usa YouTube)"
                           className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-xl text-xs font-mono text-slate-900"
                         />
+                        <p className="text-[11px] text-slate-500 mt-1">
+                          Al pegar un link público de Cloudflare R2 o CDN (.mp4/.webm), el reproductor cambia automáticamente a HTML5 nativo con object-fit: cover y cero consumo de ancho de banda en tu servidor.
+                        </p>
                       </div>
+
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
                           <label className="block text-xs font-medium text-slate-700 mb-1">
