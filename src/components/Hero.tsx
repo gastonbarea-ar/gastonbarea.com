@@ -16,6 +16,7 @@ import {
   Minimize2,
 } from 'lucide-react';
 import { SITE_CONFIG, SiteConfig } from '../data/siteConfig';
+import { extractYoutubeId } from '../lib/domainLogic';
 
 interface MatchedSolution {
   serviceCode: string;
@@ -83,8 +84,9 @@ export const Hero: React.FC<HeroProps> = ({
     fetch('/api/site-config')
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
-        if (data && data.presentationVideo) {
-          setLiveConfig(data);
+        const cfg = data?.config || data;
+        if (cfg && cfg.presentationVideo) {
+          setLiveConfig(cfg);
         }
       })
       .catch(() => {});
@@ -142,18 +144,6 @@ export const Hero: React.FC<HeroProps> = ({
   const handleEnterExperience = () => {
     setIsImmersionActive(true);
     setIsMuted(false);
-  };
-
-  const extractYoutubeId = (input: string): string => {
-    const trimmed = input.trim();
-    if (!trimmed) return '';
-    const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=|shorts\/|live\/)([^#&?]*).*/;
-    const match = trimmed.match(regExp);
-    if (match && match[2].length === 11) {
-      return match[2];
-    }
-    if (trimmed.length === 11) return trimmed;
-    return trimmed;
   };
 
   const handleApplyCustomVideo = (e: React.FormEvent) => {

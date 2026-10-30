@@ -13,6 +13,7 @@ import {
   ProjectStatus,
   ProjectCategory,
 } from '../data/projectsData';
+import { filterProjectsCatalog } from '../lib/domainLogic';
 
 interface ProjectsSectionProps {
   onSelectProjectForContact: (projectTitle: string, solutionRef: string) => void;
@@ -39,13 +40,10 @@ export const ProjectsSection: React.FC<ProjectsSectionProps> = ({
   const [statusFilter, setStatusFilter] = useState<'todos' | ProjectStatus>('todos');
   const [categoryFilter, setCategoryFilter] = useState<'Todas' | ProjectCategory>('Todas');
 
-  const filteredProjects = useMemo(() => {
-    return PROJECTS_CATALOG.filter((proj) => {
-      const matchesStatus = statusFilter === 'todos' || proj.status === statusFilter;
-      const matchesCategory = categoryFilter === 'Todas' || proj.category === categoryFilter;
-      return matchesStatus && matchesCategory;
-    });
-  }, [statusFilter, categoryFilter]);
+  const filteredProjects = useMemo(
+    () => filterProjectsCatalog(PROJECTS_CATALOG, statusFilter, categoryFilter),
+    [statusFilter, categoryFilter]
+  );
 
   const inProductionCount = useMemo(
     () => PROJECTS_CATALOG.filter((p) => p.status === 'en-produccion').length,

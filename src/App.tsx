@@ -21,6 +21,10 @@ import { ScheduleModal } from './components/ScheduleModal';
 import { AdminDashboardModal } from './components/admin/AdminDashboardModal';
 import { ClientPortalModal } from './components/client/ClientPortalModal';
 import { SITE_CONFIG } from './data/siteConfig';
+import {
+  resolvePageFromHash,
+  resolveServiceCodeFromHash,
+} from './lib/domainLogic';
 
 const PAGE_LABELS: Record<PageSectionId, string> = {
   inicio: 'Inicio · Gemelo Digital',
@@ -56,54 +60,6 @@ export default function App() {
   const [scheduleContext, setScheduleContext] = useState<string>('');
   const [isAdminOpen, setIsAdminOpen] = useState<boolean>(false);
   const [isClientPortalOpen, setIsClientPortalOpen] = useState<boolean>(false);
-
-  const resolvePageFromHash = (rawHash: string): PageSectionId => {
-    const cleanId = rawHash.replace(/^#/, '').split('/')[0].toLowerCase();
-    const targetMap: Record<string, PageSectionId> = {
-      inicio: 'inicio',
-      home: 'inicio',
-      servicios: 'servicios',
-      soluciones: 'servicios',
-      innovacion: 'servicios',
-      ebts: 'servicios',
-      'pmo-clientes': 'servicios',
-      'odoo-v18': 'servicios',
-      'linux-docker': 'servicios',
-      odoo: 'servicios',
-      'ecommerce-b2b2c': 'servicios',
-      'ia-services': 'ia-services',
-      'diagnostico-ia': 'ia-services',
-      'gemelo-digital': 'ia-services',
-      bioeconomia: 'bioeconomia',
-      casos: 'bioeconomia',
-      proyectos: 'proyectos',
-      portfolio: 'proyectos',
-      portafolio: 'proyectos',
-      produccion: 'proyectos',
-      experience: 'trayectoria',
-      experiencia: 'trayectoria',
-      trayectoria: 'trayectoria',
-      'project-manager': 'trayectoria',
-      perfil: 'trayectoria',
-      blog: 'blog',
-      publicaciones: 'blog',
-      contacto: 'contacto',
-    };
-    return targetMap[cleanId] || 'inicio';
-  };
-
-  const resolveServiceCodeFromHash = (rawHash: string): string | undefined => {
-    const cleanId = rawHash.replace(/^#/, '').split('/')[0].toLowerCase();
-    const codeMap: Record<string, string> = {
-      ebts: '01',
-      'pmo-clientes': '04',
-      'odoo-v18': '05',
-      odoo: '05',
-      'ecommerce-b2b2c': '05',
-      'linux-docker': '06',
-    };
-    return codeMap[cleanId];
-  };
 
   const handleNavigatePage = (page: PageSectionId, serviceCode?: string) => {
     if (serviceCode) {

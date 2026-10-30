@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { SITE_CONFIG } from '../data/siteConfig';
 import { saveContactInquiry } from '../lib/supabase';
+import { validateContactForm } from '../lib/domainLogic';
 
 interface ContactSectionProps {
   initialService?: string;
@@ -61,15 +62,7 @@ export const ContactSection: React.FC<ContactSectionProps> = ({
   }, [initialService, initialMessage]);
 
   const validateForm = () => {
-    const errors: { [key: string]: string } = {};
-    if (!name.trim()) errors.name = 'El nombre es obligatorio';
-    if (!email.trim()) {
-      errors.email = 'El correo electrónico es obligatorio';
-    } else if (!/\S+@\S+\.\S+/.test(email)) {
-      errors.email = 'Ingresá un formato de correo electrónico válido';
-    }
-    if (!company.trim()) errors.company = 'La empresa u organización es obligatoria';
-    if (!requirements.trim()) errors.requirements = 'Por favor describí brevemente el proyecto o consulta';
+    const errors = validateContactForm({ name, email, company, requirements });
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
   };

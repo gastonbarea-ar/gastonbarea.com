@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Search,
   PlusCircle,
@@ -42,6 +42,20 @@ export const BlogSection: React.FC<BlogSectionProps> = ({
     }
     return INITIAL_BLOG_POSTS;
   });
+
+  useEffect(() => {
+    fetch('/api/blog/posts')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (data && Array.isArray(data.posts) && data.posts.length > 0) {
+          const saved = localStorage.getItem('gb_blog_posts_v2');
+          if (!saved) {
+            setPosts(data.posts);
+          }
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   const [activeCategory, setActiveCategory] = useState<'Todos' | BlogCategory>('Todos');
   const [searchQuery, setSearchQuery] = useState<string>('');

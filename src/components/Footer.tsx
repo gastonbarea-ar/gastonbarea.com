@@ -35,8 +35,9 @@ export const Footer: React.FC<FooterProps> = ({
     fetch('/api/site-config')
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
-        if (data && data.social) {
-          setLiveConfig(data);
+        const cfg = data?.config || data;
+        if (cfg && cfg.social) {
+          setLiveConfig(cfg);
         }
       })
       .catch(() => {});

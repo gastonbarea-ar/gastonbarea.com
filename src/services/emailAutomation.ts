@@ -140,7 +140,7 @@ function buildProposalHtml(data: ProposalPayload): string {
               <div><strong>Gastón Barea</strong> · Arquitectura de Software & Business Innovación</div>
               <div style="margin-top:4px;">Chubut, Patagonia Argentina · Proyectos Remotos Globales</div>
               <div style="margin-top:4px;font-size:11px;color:#94a3b8;">
-                <a href="https://gastonbarea.com.ar" style="color:#2563eb;text-decoration:none;">gastonbarea.com.ar</a> · 
+                <a href="https://gastonbarea.com" style="color:#2563eb;text-decoration:none;">gastonbarea.com</a> · 
                 <a href="mailto:${notificationEmail}" style="color:#2563eb;text-decoration:none;">${notificationEmail}</a>
               </div>
             </td>
