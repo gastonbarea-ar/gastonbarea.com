@@ -17,10 +17,10 @@ import {
   INITIAL_CRM_OPPORTUNITIES,
   INITIAL_CRM_QUOTES,
 } from '../data/crmTemplates.ts';
-import { INITIAL_CLIENT_PROJECTS } from '../data/clientPortalData.ts';
+import { INITIAL_CLIENT_PROJECTS, CLIENT_ACCOUNTS } from '../data/clientPortalData.ts';
 
 describe('1. Enrutamiento y Navegación de Secciones (resolvePageFromHash & resolveServiceCodeFromHash)', () => {
-  it('debe resolver correctamente las páginas principales del menú superior', () => {
+  it('debe resolver correctamente las páginas principales del menú superior y los workspaces dedicados', () => {
     assert.equal(resolvePageFromHash('#inicio'), 'inicio');
     assert.equal(resolvePageFromHash('#servicios'), 'servicios');
     assert.equal(resolvePageFromHash('#soluciones'), 'servicios');
@@ -31,6 +31,14 @@ describe('1. Enrutamiento y Navegación de Secciones (resolvePageFromHash & reso
     assert.equal(resolvePageFromHash('#trayectoria'), 'trayectoria');
     assert.equal(resolvePageFromHash('#blog'), 'blog');
     assert.equal(resolvePageFromHash('#contacto'), 'contacto');
+    assert.equal(resolvePageFromHash('#portal'), 'portal-clientes');
+    assert.equal(resolvePageFromHash('#clientes'), 'portal-clientes');
+    assert.equal(resolvePageFromHash('#portal-clientes'), 'portal-clientes');
+    assert.equal(resolvePageFromHash('#admin'), 'admin');
+    assert.equal(resolvePageFromHash('#dashboard'), 'admin');
+    assert.equal(resolvePageFromHash('#crm'), 'admin');
+    assert.ok(CLIENT_ACCOUNTS.length >= 2);
+    assert.equal(CLIENT_ACCOUNTS[0].username, 'martin.arismendi');
   });
 
   it('debe mapear los sub-enlaces del menú Soluciones a su página y código de servicio exacto', () => {

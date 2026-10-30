@@ -35,6 +35,8 @@ const PAGE_LABELS: Record<PageSectionId, string> = {
   trayectoria: 'Experience (30 Años Tech · 14 PMO)',
   blog: 'Blog & Publicaciones',
   contacto: 'Contacto Ejecutivo & NDA',
+  'portal-clientes': 'Portal Clientes · Seguimiento & Soporte SLA',
+  admin: 'Panel de Control & CRM Operativo',
 };
 
 const PAGE_ORDER: PageSectionId[] = [
@@ -55,18 +57,21 @@ export default function App() {
   const [digitalTwinPrompt, setDigitalTwinPrompt] = useState<string>('');
   const [highlightedServiceCode, setHighlightedServiceCode] = useState<string>('');
 
-  // Modals state
+  // Schedule Modal state
   const [isScheduleOpen, setIsScheduleOpen] = useState<boolean>(false);
   const [scheduleContext, setScheduleContext] = useState<string>('');
-  const [isAdminOpen, setIsAdminOpen] = useState<boolean>(false);
-  const [isClientPortalOpen, setIsClientPortalOpen] = useState<boolean>(false);
 
   const handleNavigatePage = (page: PageSectionId, serviceCode?: string) => {
     if (serviceCode) {
       setHighlightedServiceCode(serviceCode);
     }
     setActivePage(page);
-    const urlHash = page === 'trayectoria' ? '#experience' : `#${page}`;
+    const urlHash =
+      page === 'trayectoria'
+        ? '#experience'
+        : page === 'portal-clientes'
+        ? '#portal'
+        : `#${page}`;
     window.history.pushState(null, '', urlHash);
     window.scrollTo({ top: 0, behavior: 'smooth' });
 
@@ -82,14 +87,6 @@ export default function App() {
 
   const handleNavigate = (href: string) => {
     const clean = href.replace(/^#/, '');
-    if (clean === 'admin' || clean === 'crm') {
-      setIsAdminOpen(true);
-      return;
-    }
-    if (clean === 'portal' || clean === 'cliente' || clean === 'clientes') {
-      setIsClientPortalOpen(true);
-      return;
-    }
     const targetPage = resolvePageFromHash(clean);
     const serviceCode = resolveServiceCodeFromHash(clean);
     handleNavigatePage(targetPage, serviceCode);
@@ -113,11 +110,7 @@ export default function App() {
   useEffect(() => {
     const handleHash = () => {
       const hash = window.location.hash;
-      if (hash === '#admin' || hash === '#crm') {
-        setIsAdminOpen(true);
-      } else if (hash === '#portal' || hash === '#cliente' || hash === '#clientes') {
-        setIsClientPortalOpen(true);
-      } else if (hash) {
+      if (hash) {
         const page = resolvePageFromHash(hash);
         const code = resolveServiceCodeFromHash(hash);
         if (code) {
@@ -191,14 +184,14 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-white text-[#1D1D1F] flex flex-col font-sans selection:bg-[#291B64]/15 selection:text-[#291B64] antialiased pb-16">
-      {/* 1. Full-Width Top Navigation Bar (Inicio | Soluciones ▾ | Proyectos | Experience | Blog | Contacto) */}
+      {/* 1. Full-Width Top Navigation Bar (Inicio | Soluciones ▾ | Proyectos | Experience | Blog | Contacto + Portal Clientes + Dashboard) */}
       <Header
         activePage={activePage}
         onScheduleClick={() => openScheduleModal()}
         onWhatsAppClick={handleOpenWhatsApp}
         onNavigate={handleNavigate}
-        onAdminClick={() => setIsAdminOpen(true)}
-        onClientPortalClick={() => setIsClientPortalOpen(true)}
+        onAdminClick={() => handleNavigatePage('admin')}
+        onClientPortalClick={() => handleNavigatePage('portal-clientes')}
       />
 
       <main className="flex-1">
@@ -210,7 +203,7 @@ export default function App() {
               onScheduleClick={openScheduleModal}
               onWhatsAppClick={handleOpenWhatsApp}
               onDiagnosticoClick={() => handleNavigatePage('ia-services')}
-              onClientPortalClick={() => setIsClientPortalOpen(true)}
+              onClientPortalClick={() => handleNavigatePage('portal-clientes')}
               onNavigateToSolution={handleNavigateToSolution}
             />
 
@@ -221,9 +214,17 @@ export default function App() {
               onAskDigitalTwin={handleAskDigitalTwin}
               onScheduleClick={openScheduleModal}
               onWhatsAppClick={handleOpenWhatsApp}
-              onClientPortalClick={() => setIsClientPortalOpen(true)}
+              onClientPortalClick={() => handleNavigatePage('portal-clientes')}
             />
           </>
+        ) : activePage === 'portal-clientes' ? (
+          <div className="pt-16">
+            <ClientPortalModal onClose={() => handleNavigatePage('inicio')} />
+          </div>
+        ) : activePage === 'admin' ? (
+          <div className="pt-16">
+            <AdminDashboardModal onClose={() => handleNavigatePage('inicio')} />
+          </div>
         ) : (
           <div className="pt-16">
             {/* Inner Page Sub-Header Bar (Return to Home + Section Switcher) */}
@@ -257,7 +258,7 @@ export default function App() {
               <DigitalTwinSection
                 onScheduleWithProposal={handleScheduleWithAiProposal}
                 onWhatsAppWithProposal={handleOpenWhatsApp}
-                onClientPortalClick={() => setIsClientPortalOpen(true)}
+                onClientPortalClick={() => handleNavigatePage('portal-clientes')}
                 onNavigateToSolution={handleNavigateToSolution}
                 initialPrompt={digitalTwinPrompt.replace(/\s*\[[^\]]*\]$/, '')}
               />
@@ -275,14 +276,14 @@ export default function App() {
                 onSelectProjectForContact={handleSelectProjectForContact}
                 onAskDigitalTwin={handleAskDigitalTwin}
                 onScheduleClick={openScheduleModal}
-                onClientPortalClick={() => setIsClientPortalOpen(true)}
+                onClientPortalClick={() => handleNavigatePage('portal-clientes')}
               />
             )}
 
             {activePage === 'trayectoria' && (
               <AboutProfileSection
                 onScheduleClick={() => openScheduleModal()}
-                onClientPortalClick={() => setIsClientPortalOpen(true)}
+                onClientPortalClick={() => handleNavigatePage('portal-clientes')}
               />
             )}
 
@@ -331,8 +332,8 @@ export default function App() {
         onNavigate={handleNavigate}
         onWhatsAppClick={() => handleOpenWhatsApp()}
         onScheduleClick={() => openScheduleModal()}
-        onAdminClick={() => setIsAdminOpen(true)}
-        onClientPortalClick={() => setIsClientPortalOpen(true)}
+        onAdminClick={() => handleNavigatePage('admin')}
+        onClientPortalClick={() => handleNavigatePage('portal-clientes')}
       />
 
       {/* Persistent AI Solution Guide Dock */}
@@ -341,7 +342,7 @@ export default function App() {
         onScheduleClick={openScheduleModal}
       />
 
-      {/* Interactive Modals: Google Meet Pro Scheduling, Client Portal & Backend CRM */}
+      {/* Interactive Schedule Modal */}
       <ScheduleModal
         isOpen={isScheduleOpen}
         onClose={() => setIsScheduleOpen(false)}
@@ -352,16 +353,7 @@ export default function App() {
         }}
         onWhatsAppClick={handleOpenWhatsApp}
       />
-
-      <AdminDashboardModal
-        isOpen={isAdminOpen}
-        onClose={() => setIsAdminOpen(false)}
-      />
-
-      <ClientPortalModal
-        isOpen={isClientPortalOpen}
-        onClose={() => setIsClientPortalOpen(false)}
-      />
     </div>
   );
 }
+

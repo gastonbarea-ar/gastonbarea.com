@@ -69,6 +69,14 @@ export function resolvePageFromHash(rawHash: string): PageSectionId {
     blog: 'blog',
     publicaciones: 'blog',
     contacto: 'contacto',
+    portal: 'portal-clientes',
+    clientes: 'portal-clientes',
+    cliente: 'portal-clientes',
+    'portal-clientes': 'portal-clientes',
+    admin: 'admin',
+    dashboard: 'admin',
+    crm: 'admin',
+    panel: 'admin',
   };
   return targetMap[cleanId] || 'inicio';
 }

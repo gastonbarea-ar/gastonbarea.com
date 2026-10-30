@@ -41,13 +41,13 @@ import { CrmDashboard } from './crm/CrmDashboard';
 import { VerifiedLoginPanel } from './VerifiedLoginPanel';
 
 interface AdminDashboardModalProps {
-  isOpen: boolean;
+  isOpen?: boolean;
   onClose: () => void;
   onSiteConfigUpdated?: (newConfig: SiteConfig) => void;
 }
 
 export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
-  isOpen,
+  isOpen = true,
   onClose,
   onSiteConfigUpdated,
 }) => {
@@ -371,140 +371,151 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 overflow-hidden">
-      <div className="relative w-full max-w-7xl bg-white rounded-3xl border border-blue-900/20 shadow-2xl overflow-hidden my-auto h-[95vh] flex flex-col">
-        
-        {/* Header Bar */}
-        <div className="px-6 py-4 bg-gradient-to-r from-slate-900 via-blue-950 to-indigo-950 text-white flex items-center justify-between border-b border-blue-900/30 shrink-0">
-          <div className="flex items-center gap-3">
-            <span className="w-8 h-8 rounded-xl bg-blue-500/20 text-sky-400 flex items-center justify-center font-mono font-bold text-xs border border-blue-400/30">
-              GB
-            </span>
-            <div>
-              <h3 className="text-base font-bold text-white tracking-tight flex items-center gap-2">
-                <span>Panel de Administración & CRM Operativo</span>
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-                  Backend Activo
-                </span>
-              </h3>
-              <p className="text-[11px] text-sky-300 font-mono">
-                Gastón Barea · CRM, Presupuestos, Pasarelas de Pago & Configuración
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2.5">
-            {isAuthenticated && (
-              <div className="flex items-center gap-2">
-                <div className="hidden sm:flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-mono text-[11px] font-bold">
-                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                  <span>Verificado: {verifiedUser?.email || 'gastonbarea.com@gmail.com'}</span>
+    <section
+      id="admin"
+      className="w-full min-h-[calc(100vh-4rem)] bg-[#F5F5F7] text-[#1D1D1F] flex flex-col"
+    >
+      {!isAuthenticated ? (
+        <VerifiedLoginPanel
+          onAuthenticated={handleVerifiedLogin}
+          onBackToSite={onClose}
+        />
+      ) : (
+        <div className="flex-1 flex flex-col lg:flex-row min-h-[calc(100vh-4rem)]">
+          {/* LEFT WORKSPACE SIDEBAR */}
+          <aside className="w-full lg:w-72 bg-[#0A0A0F] text-white border-b lg:border-b-0 lg:border-r border-white/10 p-5 sm:p-6 flex flex-col justify-between shrink-0">
+            <div className="space-y-6">
+              {/* Admin Session Profile Card */}
+              <div className="p-4 bg-white/[0.04] border border-white/10 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-mono uppercase tracking-wider px-2 py-0.5 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-semibold">
+                    Sesión Verificada
+                  </span>
+                  <span className="text-[11px] font-mono text-sky-400">
+                    Super Admin
+                  </span>
                 </div>
+                <div>
+                  <div className="font-display text-sm font-bold text-white">
+                    {verifiedUser?.name || 'Gastón Barea'}
+                  </div>
+                  <div className="text-xs text-sky-400 font-medium">
+                    {verifiedUser?.role || 'Super Admin & PMO Director'}
+                  </div>
+                  <div className="text-[11px] font-mono text-neutral-400 truncate mt-0.5">
+                    {verifiedUser?.email || 'gastonbarea.com@gmail.com'}
+                  </div>
+                </div>
+              </div>
+
+              {/* Sidebar Navigation */}
+              <nav className="space-y-1.5" aria-label="Menú del Panel de Control">
+                <div className="text-[11px] font-sans font-semibold uppercase tracking-wider text-neutral-400 px-2 pb-1">
+                  Módulos del Sistema
+                </div>
+
                 <button
                   type="button"
-                  onClick={handleLogout}
-                  className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-white/10 hover:bg-rose-600/80 hover:text-white text-slate-300 transition-colors cursor-pointer"
-                  title="Cerrar sesión segura"
+                  onClick={() => setActiveTab('crm')}
+                  className={`w-full px-3.5 py-2.5 text-xs font-sans font-semibold transition-all flex items-center gap-2.5 cursor-pointer ${
+                    activeTab === 'crm'
+                      ? 'bg-[#291B64] text-white border-l-2 border-sky-400'
+                      : 'text-neutral-300 hover:bg-white/[0.06] hover:text-white'
+                  }`}
                 >
-                  Cerrar Sesión
+                  <TrendingUp className="w-4 h-4 text-emerald-400" />
+                  <span>CRM & Oportunidades</span>
                 </button>
+
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('client_portal')}
+                  className={`w-full px-3.5 py-2.5 text-xs font-sans font-semibold transition-all flex items-center gap-2.5 cursor-pointer ${
+                    activeTab === 'client_portal'
+                      ? 'bg-[#291B64] text-white border-l-2 border-sky-400'
+                      : 'text-neutral-300 hover:bg-white/[0.06] hover:text-white'
+                  }`}
+                >
+                  <FolderGit2 className="w-4 h-4 text-sky-400" />
+                  <span>Portal Clientes & Soporte</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('blog')}
+                  className={`w-full px-3.5 py-2.5 text-xs font-sans font-semibold transition-all flex items-center justify-between cursor-pointer ${
+                    activeTab === 'blog'
+                      ? 'bg-[#291B64] text-white border-l-2 border-sky-400'
+                      : 'text-neutral-300 hover:bg-white/[0.06] hover:text-white'
+                  }`}
+                >
+                  <span className="inline-flex items-center gap-2.5">
+                    <BookOpen className="w-4 h-4 text-amber-400" />
+                    <span>Gestión de Blog</span>
+                  </span>
+                  <span className="text-[11px] font-mono px-1.5 py-0.5 bg-white/10 text-white">
+                    {blogPosts.length}
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('leads')}
+                  className={`w-full px-3.5 py-2.5 text-xs font-sans font-semibold transition-all flex items-center gap-2.5 cursor-pointer ${
+                    activeTab === 'leads'
+                      ? 'bg-[#291B64] text-white border-l-2 border-sky-400'
+                      : 'text-neutral-300 hover:bg-white/[0.06] hover:text-white'
+                  }`}
+                >
+                  <Users className="w-4 h-4 text-purple-400" />
+                  <span>Bandeja de Leads</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('settings')}
+                  className={`w-full px-3.5 py-2.5 text-xs font-sans font-semibold transition-all flex items-center gap-2.5 cursor-pointer ${
+                    activeTab === 'settings'
+                      ? 'bg-[#291B64] text-white border-l-2 border-sky-400'
+                      : 'text-neutral-300 hover:bg-white/[0.06] hover:text-white'
+                  }`}
+                >
+                  <Settings className="w-4 h-4 text-emerald-400" />
+                  <span>Configuración del Sitio</span>
+                </button>
+              </nav>
+            </div>
+
+            {/* Sidebar Footer Actions */}
+            <div className="pt-6 mt-6 border-t border-white/10 space-y-2">
+              <button
+                type="button"
+                onClick={onClose}
+                className="w-full px-3.5 py-2.5 text-xs font-sans font-medium text-neutral-300 hover:text-white hover:bg-white/[0.06] transition-colors flex items-center gap-2 cursor-pointer"
+              >
+                <Globe className="w-4 h-4 text-sky-400" />
+                <span>Volver al Sitio Web</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="w-full px-3.5 py-2.5 text-xs font-sans font-semibold text-rose-300 hover:text-white hover:bg-rose-600/30 border border-rose-500/20 transition-colors flex items-center gap-2 cursor-pointer"
+              >
+                <Lock className="w-4 h-4" />
+                <span>Cerrar Sesión Segura</span>
+              </button>
+            </div>
+          </aside>
+
+          {/* Main Content Area */}
+          <div className={`flex-1 min-w-0 ${activeTab === 'crm' ? 'p-0' : 'p-6 sm:p-8 lg:p-10'} bg-white flex flex-col`}>
+            {/* TAB 0: CRM OPERATIVO */}
+            {activeTab === 'crm' && (
+              <div className="flex-1 h-full">
+                <CrmDashboard passkey={passkeyInput || 'gaston2026'} onClose={onClose} />
               </div>
             )}
-            <button
-              type="button"
-              onClick={onClose}
-              className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          </div>
-        </div>
-
-        {/* Authentication Gate with Verified 2FA Panel */}
-        {!isAuthenticated ? (
-          <div className="flex-1 overflow-y-auto flex items-center justify-center p-4 bg-slate-50/50">
-            <VerifiedLoginPanel onAuthenticated={handleVerifiedLogin} />
-          </div>
-        ) : (
-          /* Authenticated Dashboard */
-          <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
-            
-            {/* Sidebar Navigation */}
-            <aside className="w-full md:w-64 bg-slate-50 border-r border-slate-200 p-4 shrink-0 flex md:flex-col gap-2 overflow-x-auto">
-              <button
-                type="button"
-                onClick={() => setActiveTab('crm')}
-                className={`flex-1 md:flex-none flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all text-left cursor-pointer ${
-                  activeTab === 'crm'
-                    ? 'bg-blue-600 text-white shadow-xs'
-                    : 'text-slate-700 hover:bg-slate-200/70'
-                }`}
-              >
-                <TrendingUp className="w-4 h-4 text-emerald-400" />
-                <span>CRM & Oportunidades</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setActiveTab('client_portal')}
-                className={`flex-1 md:flex-none flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all text-left cursor-pointer ${
-                  activeTab === 'client_portal'
-                    ? 'bg-blue-600 text-white shadow-xs'
-                    : 'text-slate-700 hover:bg-slate-200/70'
-                }`}
-              >
-                <FolderGit2 className="w-4 h-4 text-blue-500" />
-                <span>Portal Clientes & Soporte</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setActiveTab('settings')}
-                className={`flex-1 md:flex-none flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all text-left cursor-pointer ${
-                  activeTab === 'settings'
-                    ? 'bg-blue-600 text-white shadow-xs'
-                    : 'text-slate-700 hover:bg-slate-200/70'
-                }`}
-              >
-                <Settings className="w-4 h-4" />
-                <span>Configuración del Sitio</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setActiveTab('blog')}
-                className={`flex-1 md:flex-none flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all text-left cursor-pointer ${
-                  activeTab === 'blog'
-                    ? 'bg-blue-600 text-white shadow-xs'
-                    : 'text-slate-700 hover:bg-slate-200/70'
-                }`}
-              >
-                <BookOpen className="w-4 h-4" />
-                <span>Gestión de Blog ({blogPosts.length})</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setActiveTab('leads')}
-                className={`flex-1 md:flex-none flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all text-left cursor-pointer ${
-                  activeTab === 'leads'
-                    ? 'bg-blue-600 text-white shadow-xs'
-                    : 'text-slate-700 hover:bg-slate-200/70'
-                }`}
-              >
-                <Users className="w-4 h-4" />
-                <span>Bandeja de Leads</span>
-              </button>
-            </aside>
-
-            {/* Main Content Area */}
-            <div className={`flex-1 overflow-y-auto ${activeTab === 'crm' ? 'p-0' : 'p-6 sm:p-8'} bg-white flex flex-col`}>
-              
-              {/* TAB 0: CRM OPERATIVO */}
-              {activeTab === 'crm' && (
-                <div className="flex-1 h-full overflow-hidden">
-                  <CrmDashboard passkey={passkeyInput || 'gaston2026'} onClose={onClose} />
-                </div>
-              )}
 
               {/* TAB 1: SITE CONFIGURATION */}
               {activeTab === 'settings' && (
@@ -1460,8 +1471,6 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
           </div>
         )}
 
-      </div>
-
       {/* Embedded Post Editor Modal */}
       <PostEditorModal
         isOpen={isPostEditorOpen}
@@ -1469,6 +1478,6 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
         onSavePost={handlePostSaved}
         postToEdit={postToEdit}
       />
-    </div>
+    </section>
   );
 };

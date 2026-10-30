@@ -1,5 +1,39 @@
 import type { ClientProject, ConsultingInquiry, SupportTicket, ConsultingBooking } from '../types/clientPortal.ts';
 
+export interface ClientAccount {
+  id: string;
+  username: string;
+  email: string;
+  password: string;
+  name: string;
+  company: string;
+  role: string;
+  projectId: string;
+}
+
+export const CLIENT_ACCOUNTS: ClientAccount[] = [
+  {
+    id: 'usr-cli-001',
+    username: 'martin.arismendi',
+    email: 'martin@distribuidorasur.com.ar',
+    password: 'cliente2026',
+    name: 'Martín Arismendi',
+    company: 'Distribuidora del Sur S.A.',
+    role: 'Director de Operaciones',
+    projectId: 'proj-001',
+  },
+  {
+    id: 'usr-cli-002',
+    username: 'carolina.valenzuela',
+    email: 'cvalenzuela@novafintech.io',
+    password: 'cliente2026',
+    name: 'Lic. Carolina Valenzuela',
+    company: 'Nova Fintech Hub',
+    role: 'CTO & Co-Founder',
+    projectId: 'proj-002',
+  },
+];
+
 export const INITIAL_CLIENT_PROJECTS: ClientProject[] = [
   {
     id: 'proj-001',
