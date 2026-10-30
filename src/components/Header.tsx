@@ -275,37 +275,37 @@ export const Header: React.FC<HeaderProps> = ({
       <header
         className={`fixed top-0 left-0 right-0 z-50 w-full transition-colors duration-200 border-b ${
           isOverDarkStage
-            ? 'bg-[#08080C]/80 backdrop-blur-md text-white border-white/10'
-            : 'bg-white/95 backdrop-blur-md text-[#1D1D1F] border-black/[0.06]'
+            ? 'bg-[#08080C]/85 backdrop-blur-xl text-white border-white/10'
+            : 'bg-white/95 backdrop-blur-xl text-[#1D1D1F] border-black/[0.07]'
         }`}
       >
-        <div className="w-full flex items-center justify-between gap-4 sm:gap-8 px-4 sm:px-8 lg:px-12 h-16">
-          {/* Zone 1: FWA Menu Trigger + Brand Wordmark */}
-          <div className="flex items-center gap-3 sm:gap-5 shrink-0">
+        <div className="w-full flex items-center justify-between gap-3 sm:gap-6 px-4 sm:px-8 lg:px-12 h-16 sm:h-[68px]">
+          {/* Zone 1: Menu Trigger + Brand Wordmark */}
+          <div className="flex items-center gap-3 sm:gap-4 shrink-0">
             <button
               type="button"
               onClick={() => {
                 setSolucionesDropdownOpen(false);
                 setFwaMenuOpen(!fwaMenuOpen);
               }}
-              className={`px-3.5 py-2 text-xs font-mono font-bold tracking-wider transition-colors inline-flex items-center gap-2 cursor-pointer rounded-none whitespace-nowrap ${
+              className={`px-3 sm:px-3.5 py-2 text-[13px] font-sans font-medium tracking-[-0.01em] transition-all inline-flex items-center gap-2 cursor-pointer border whitespace-nowrap shrink-0 ${
                 fwaMenuOpen
-                  ? 'bg-[#291B64] text-white'
+                  ? 'bg-[#291B64] text-white border-[#291B64]'
                   : isOverDarkStage
-                  ? 'bg-white/10 text-white hover:bg-[#291B64]'
-                  : 'bg-[#F5F5F7] text-[#1D1D1F] hover:bg-[#291B64] hover:text-white'
+                  ? 'bg-white/[0.06] text-white border-white/15 hover:bg-white/[0.12] hover:border-white/25'
+                  : 'bg-[#F5F5F7] text-[#1D1D1F] border-black/[0.08] hover:bg-[#291B64] hover:text-white hover:border-[#291B64]'
               }`}
               aria-expanded={fwaMenuOpen}
               aria-label="Alternar menú principal de secciones"
             >
               {fwaMenuOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
-              <span>{fwaMenuOpen ? 'CERRAR' : 'SECCIONES'}</span>
+              <span>{fwaMenuOpen ? 'Cerrar' : 'Menú'}</span>
             </button>
 
             <a
               href="#inicio"
               onClick={(e) => handleNavClick(e, '#inicio')}
-              className={`font-display text-sm sm:text-lg font-extrabold tracking-wider whitespace-nowrap shrink-0 hover:opacity-80 transition-opacity ${
+              className={`font-display text-[15px] sm:text-[17px] font-bold tracking-[-0.02em] whitespace-nowrap shrink-0 hover:opacity-80 transition-opacity ${
                 isOverDarkStage ? 'text-white' : 'text-[#1D1D1F]'
               }`}
             >
@@ -315,7 +315,8 @@ export const Header: React.FC<HeaderProps> = ({
 
           {/* Zone 2: Direct Multi-Page Section Navigation (Inicio | Soluciones ▾ | Proyectos | Experience | Blog | Contacto) */}
           <nav
-            className={`hidden xl:flex items-center gap-7 text-xs font-mono font-semibold ${
+            aria-label="Navegación principal"
+            className={`hidden lg:flex items-center gap-5 xl:gap-8 text-[13.5px] xl:text-[14px] font-sans font-medium tracking-[-0.01em] ${
               isOverDarkStage ? 'text-neutral-300' : 'text-[#515154]'
             }`}
           >
@@ -323,14 +324,14 @@ export const Header: React.FC<HeaderProps> = ({
             <a
               href="#inicio"
               onClick={(e) => handleNavClick(e, '#inicio')}
-              className={`py-1 transition-colors whitespace-nowrap shrink-0 border-b-2 ${
+              className={`py-1.5 transition-colors whitespace-nowrap shrink-0 border-b-2 ${
                 activePage === 'inicio'
                   ? isOverDarkStage
-                    ? 'text-white border-emerald-400 font-bold'
-                    : 'text-[#291B64] border-[#291B64] font-bold'
+                    ? 'text-white border-emerald-400 font-semibold'
+                    : 'text-[#1D1D1F] border-[#291B64] font-semibold'
                   : isOverDarkStage
                   ? 'border-transparent hover:text-white'
-                  : 'border-transparent hover:text-[#291B64]'
+                  : 'border-transparent hover:text-[#1D1D1F]'
               }`}
             >
               Inicio
@@ -346,21 +347,21 @@ export const Header: React.FC<HeaderProps> = ({
               <button
                 type="button"
                 onClick={() => setSolucionesDropdownOpen((prev) => !prev)}
-                className={`py-1 inline-flex items-center gap-1.5 transition-colors whitespace-nowrap shrink-0 border-b-2 cursor-pointer ${
+                className={`py-1.5 inline-flex items-center gap-1.5 transition-colors whitespace-nowrap shrink-0 border-b-2 cursor-pointer ${
                   isSolucionesActive
                     ? isOverDarkStage
-                      ? 'text-white border-emerald-400 font-bold'
-                      : 'text-[#291B64] border-[#291B64] font-bold'
+                      ? 'text-white border-emerald-400 font-semibold'
+                      : 'text-[#1D1D1F] border-[#291B64] font-semibold'
                     : isOverDarkStage
                     ? 'border-transparent hover:text-white'
-                    : 'border-transparent hover:text-[#291B64]'
+                    : 'border-transparent hover:text-[#1D1D1F]'
                 }`}
                 aria-expanded={solucionesDropdownOpen}
               >
                 <span>Soluciones</span>
                 <ChevronDown
-                  className={`w-3.5 h-3.5 transition-transform duration-150 ${
-                    solucionesDropdownOpen ? 'rotate-180' : ''
+                  className={`w-3.5 h-3.5 opacity-75 transition-transform duration-150 ${
+                    solucionesDropdownOpen ? 'rotate-180 opacity-100' : ''
                   }`}
                 />
               </button>
@@ -369,16 +370,16 @@ export const Header: React.FC<HeaderProps> = ({
                 <div className="absolute left-0 top-full pt-3 w-[440px] z-50">
                   <div className="bg-[#0D0D12] text-white border border-white/15 shadow-2xl p-5 space-y-4 text-left">
                     <div className="flex items-center justify-between pb-3 border-b border-white/10">
-                      <span className="text-[11px] font-mono text-emerald-400 font-bold">
-                        SOLUCIONES · IA SERVICES & INGENIERÍA
+                      <span className="text-xs font-sans font-semibold tracking-tight text-emerald-400">
+                        Soluciones · IA Services & Ingeniería
                       </span>
                       <a
                         href="#servicios"
                         onClick={(e) => handleNavClick(e, '#servicios')}
-                        className="text-[11px] font-mono text-neutral-300 hover:text-white inline-flex items-center gap-1"
+                        className="text-xs font-sans font-medium text-neutral-300 hover:text-white inline-flex items-center gap-1 transition-colors"
                       >
                         <span>Ver todas</span>
-                        <ArrowRight className="w-3 h-3" />
+                        <ArrowRight className="w-3.5 h-3.5" />
                       </a>
                     </div>
 
@@ -388,23 +389,23 @@ export const Header: React.FC<HeaderProps> = ({
                           key={sub.code}
                           href={sub.href}
                           onClick={(e) => handleNavClick(e, sub.href)}
-                          className="group py-3 first:pt-0 last:pb-0 flex items-start justify-between gap-3 hover:bg-white/[0.04] px-2 -mx-2 transition-colors"
+                          className="group py-3 first:pt-0 last:pb-0 flex items-start justify-between gap-3 hover:bg-white/[0.04] px-2.5 -mx-2.5 transition-colors"
                         >
                           <div className="space-y-0.5 min-w-0">
                             <div className="flex items-center gap-2">
-                              <span className="text-[11px] font-mono text-emerald-400 font-bold tabular-nums">
+                              <span className="text-xs font-sans font-semibold text-emerald-400 tabular-nums">
                                 {sub.code}.
                               </span>
-                              <span className="font-display text-sm font-bold text-white group-hover:text-emerald-300 transition-colors truncate">
+                              <span className="font-display text-[14px] font-semibold tracking-[-0.01em] text-white group-hover:text-emerald-300 transition-colors truncate">
                                 {sub.label}
                               </span>
                               {sub.badge && (
-                                <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 bg-[#291B64] text-emerald-300">
+                                <span className="text-[10px] font-sans font-semibold px-2 py-0.5 bg-[#291B64] text-emerald-300">
                                   {sub.badge}
                                 </span>
                               )}
                             </div>
-                            <p className="text-[11px] font-sans text-neutral-400 line-clamp-1 pl-5">
+                            <p className="text-xs font-sans text-neutral-400 line-clamp-1 pl-5">
                               {sub.sublabel}
                             </p>
                           </div>
@@ -417,7 +418,7 @@ export const Header: React.FC<HeaderProps> = ({
                       <a
                         href="#ia-services"
                         onClick={(e) => handleNavClick(e, '#ia-services')}
-                        className="px-3.5 py-2 bg-[#291B64] hover:bg-[#382586] text-white text-[11px] font-mono font-bold inline-flex items-center gap-1.5 transition-colors"
+                        className="px-3.5 py-2 bg-[#291B64] hover:bg-[#382586] text-white text-xs font-sans font-semibold inline-flex items-center gap-1.5 transition-colors"
                       >
                         <Sparkles className="w-3.5 h-3.5 text-emerald-300" />
                         <span>Abrir Estructurador IA</span>
@@ -425,7 +426,7 @@ export const Header: React.FC<HeaderProps> = ({
                       <a
                         href="#servicios"
                         onClick={(e) => handleNavClick(e, '#servicios')}
-                        className="text-[11px] font-mono text-neutral-300 hover:text-white inline-flex items-center gap-1"
+                        className="text-xs font-sans font-medium text-neutral-300 hover:text-white inline-flex items-center gap-1 transition-colors"
                       >
                         <span>Matriz de Soluciones</span>
                         <ArrowRight className="w-3.5 h-3.5" />
@@ -440,31 +441,31 @@ export const Header: React.FC<HeaderProps> = ({
             <a
               href="#proyectos"
               onClick={(e) => handleNavClick(e, '#proyectos')}
-              className={`py-1 transition-colors whitespace-nowrap shrink-0 border-b-2 ${
+              className={`py-1.5 transition-colors whitespace-nowrap shrink-0 border-b-2 ${
                 activePage === 'proyectos'
                   ? isOverDarkStage
-                    ? 'text-white border-emerald-400 font-bold'
-                    : 'text-[#291B64] border-[#291B64] font-bold'
+                    ? 'text-white border-emerald-400 font-semibold'
+                    : 'text-[#1D1D1F] border-[#291B64] font-semibold'
                   : isOverDarkStage
                   ? 'border-transparent hover:text-white'
-                  : 'border-transparent hover:text-[#291B64]'
+                  : 'border-transparent hover:text-[#1D1D1F]'
               }`}
             >
               Proyectos
             </a>
 
-            {/* 4. Experience (formerly Trayectoria) */}
+            {/* 4. Experience */}
             <a
               href="#experience"
               onClick={(e) => handleNavClick(e, '#experience')}
-              className={`py-1 transition-colors whitespace-nowrap shrink-0 border-b-2 ${
+              className={`py-1.5 transition-colors whitespace-nowrap shrink-0 border-b-2 ${
                 activePage === 'trayectoria'
                   ? isOverDarkStage
-                    ? 'text-white border-emerald-400 font-bold'
-                    : 'text-[#291B64] border-[#291B64] font-bold'
+                    ? 'text-white border-emerald-400 font-semibold'
+                    : 'text-[#1D1D1F] border-[#291B64] font-semibold'
                   : isOverDarkStage
                   ? 'border-transparent hover:text-white'
-                  : 'border-transparent hover:text-[#291B64]'
+                  : 'border-transparent hover:text-[#1D1D1F]'
               }`}
             >
               Experience
@@ -474,14 +475,14 @@ export const Header: React.FC<HeaderProps> = ({
             <a
               href="#blog"
               onClick={(e) => handleNavClick(e, '#blog')}
-              className={`py-1 transition-colors whitespace-nowrap shrink-0 border-b-2 ${
+              className={`py-1.5 transition-colors whitespace-nowrap shrink-0 border-b-2 ${
                 activePage === 'blog'
                   ? isOverDarkStage
-                    ? 'text-white border-emerald-400 font-bold'
-                    : 'text-[#291B64] border-[#291B64] font-bold'
+                    ? 'text-white border-emerald-400 font-semibold'
+                    : 'text-[#1D1D1F] border-[#291B64] font-semibold'
                   : isOverDarkStage
                   ? 'border-transparent hover:text-white'
-                  : 'border-transparent hover:text-[#291B64]'
+                  : 'border-transparent hover:text-[#1D1D1F]'
               }`}
             >
               Blog
@@ -491,22 +492,43 @@ export const Header: React.FC<HeaderProps> = ({
             <a
               href="#contacto"
               onClick={(e) => handleNavClick(e, '#contacto')}
-              className={`py-1 transition-colors whitespace-nowrap shrink-0 border-b-2 ${
+              className={`py-1.5 transition-colors whitespace-nowrap shrink-0 border-b-2 ${
                 activePage === 'contacto'
                   ? isOverDarkStage
-                    ? 'text-white border-emerald-400 font-bold'
-                    : 'text-[#291B64] border-[#291B64] font-bold'
+                    ? 'text-white border-emerald-400 font-semibold'
+                    : 'text-[#1D1D1F] border-[#291B64] font-semibold'
                   : isOverDarkStage
                   ? 'border-transparent hover:text-white'
-                  : 'border-transparent hover:text-[#291B64]'
+                  : 'border-transparent hover:text-[#1D1D1F]'
               }`}
             >
               Contacto
             </a>
           </nav>
 
-          {/* Zone 3: Primary Action */}
-          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+          {/* Zone 3: Client Portal Access + Primary Action */}
+          <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
+            {onClientPortalClick && (
+              <button
+                type="button"
+                onClick={() => {
+                  setFwaMenuOpen(false);
+                  setSolucionesDropdownOpen(false);
+                  onClientPortalClick();
+                }}
+                className={`px-3 sm:px-3.5 py-2 text-[12.5px] sm:text-[13px] font-sans font-semibold tracking-[-0.01em] transition-all inline-flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer border ${
+                  isOverDarkStage
+                    ? 'bg-white/[0.06] text-white border-white/15 hover:bg-white/[0.14] hover:border-white/30'
+                    : 'bg-[#F5F5F7] text-[#1D1D1F] border-black/10 hover:border-[#291B64]/40 hover:text-[#291B64] hover:bg-[#291B64]/[0.05]'
+                }`}
+                aria-label="Abrir Portal Clientes"
+              >
+                <UserCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                <span className="hidden md:inline">Portal Clientes</span>
+                <span className="md:hidden">Clientes</span>
+              </button>
+            )}
+
             <button
               type="button"
               onClick={() => {
@@ -514,9 +536,10 @@ export const Header: React.FC<HeaderProps> = ({
                 setSolucionesDropdownOpen(false);
                 onScheduleClick();
               }}
-              className="px-4 sm:px-5 py-2.5 text-xs font-mono font-bold text-white bg-[#291B64] rounded-none hover:bg-[#382586] transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+              className="px-3.5 sm:px-4 py-2 text-[12.5px] sm:text-[13px] font-sans font-semibold tracking-[-0.01em] text-white bg-[#291B64] hover:bg-[#382586] transition-colors inline-flex items-center gap-2 whitespace-nowrap shrink-0 cursor-pointer border border-[#291B64]"
             >
-              <span className="hidden sm:inline">Agendar Google Meet Pro</span>
+              <Video className="w-3.5 h-3.5 hidden sm:inline shrink-0" />
+              <span className="hidden sm:inline">Agendar Meet Pro</span>
               <span className="sm:hidden">Meet Pro</span>
             </button>
           </div>
