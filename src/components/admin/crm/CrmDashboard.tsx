@@ -633,7 +633,7 @@ export const CrmDashboard: React.FC<CrmDashboardProps> = ({ passkey = 'gaston202
               <span className="font-mono text-xs px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-800 font-bold uppercase tracking-wider">
                 Operaciones Comerciales
               </span>
-              <span className="text-[11px] font-mono text-slate-400">Stack: Render + Vercel + Supabase</span>
+              <span className="text-[11px] font-mono text-slate-400">Stack: Vercel + Supabase + Sender</span>
             </div>
             <h2 className="text-xl font-bold tracking-tight text-slate-900 mt-1">
               CRM Operativo & Gestión de Servicios

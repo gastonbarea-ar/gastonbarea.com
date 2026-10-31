@@ -50,7 +50,7 @@ app.use((req, res, next) => {
 
 app.use(express.json());
 
-// Render & Cloud Health Check Endpoints
+// Cloud Health Check Endpoints
 app.get(['/api/health', '/health'], (_req, res) => {
   res.status(200).json({
     status: 'ok',
@@ -608,7 +608,7 @@ app.post('/api/save-contact', async (req, res) => {
   }
 });
 
-// Render / Supabase Webhook Endpoint for external database event triggers
+// Supabase Webhook Endpoint for external database event triggers
 app.post('/api/webhooks/supabase', async (req, res) => {
   try {
     const webhookSecret = process.env.WEBHOOK_SECRET;
@@ -1114,7 +1114,7 @@ app.patch('/api/admin/leads/:type/:id', requireAdminAuth, async (req, res) => {
 });
 
 // ==========================================
-// CRM API ENDPOINTS (Render & Supabase)
+// CRM API ENDPOINTS (Vercel & Supabase)
 // ==========================================
 
 // 10. CRM: Get Overview & Metrics

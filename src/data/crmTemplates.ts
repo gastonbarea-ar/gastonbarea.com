@@ -259,7 +259,7 @@ Gastón Barea`,
       },
       {
         description: 'Estrategia de Producto, Selección de Proveedores Cloud y Reducción de Costos Operativos',
-        deliverable: 'Auditoría mensual de gastos de infraestructura (AWS/Vercel/Render/Supabase) y roadmap tecnológico trimestral',
+        deliverable: 'Auditoría mensual de gastos de infraestructura (AWS/Vercel/Supabase) y roadmap tecnológico trimestral',
         hours: 15,
         unitPrice: 1000,
         quantity: 1,

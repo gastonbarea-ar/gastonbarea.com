@@ -43,7 +43,7 @@ export const PROJECTS_CATALOG: ProductionProject[] = [
       'Generador dinámico de alcance técnico y presupuesto por fases verificables',
       'Portal de Clientes integrado con seguimiento de hitos y servidores Staging',
     ],
-    stack: ['React 19', 'TypeScript', 'Node.js / Express', 'Gemini AI', 'Tailwind CSS', 'Render Cloud'],
+    stack: ['React 19', 'TypeScript', 'Vercel Serverless', 'Supabase', 'Gemini AI', 'Tailwind CSS'],
     impactMetrics: '100% Automatización de Pre-Ingeniería · Operativo 24/7',
     liveUrl: 'https://gastonbarea.com',
     solutionRef: '02. IA Services: Gemelos Digitales, Agentes Inteligentes & BI',

@@ -1,10 +1,9 @@
-import { Resend } from 'resend';
 import { SITE_CONFIG } from '../data/siteConfig.ts';
 
-const resendApiKey = process.env.RESEND_API_KEY;
-const resend = resendApiKey ? new Resend(resendApiKey) : null;
+const senderApiKey = process.env.SENDER_API_KEY;
 const notificationEmail = process.env.NOTIFICATION_EMAIL || SITE_CONFIG.email || 'gastonbarea.com@gmail.com';
-const fromEmail = process.env.FROM_EMAIL || 'Gastón Barea <onboarding@resend.dev>';
+const fromEmail = process.env.FROM_EMAIL || 'gaston@gastonbarea.com';
+const fromName = process.env.FROM_NAME || 'Gastón Barea';
 
 export interface ProposalPayload {
   organizationType: string;
@@ -29,8 +28,47 @@ export interface ContactPayload {
   requirements: string;
 }
 
+interface SenderEmailMessage {
+  to: { email: string; name?: string };
+  subject: string;
+  html: string;
+}
+
 /**
- * Generates an executive, Apple/Vercel-inspired responsive HTML email
+ * Dispatches transactional email via Sender API (https://api.sender.net/v2/message/send)
+ */
+async function dispatchSenderEmail(message: SenderEmailMessage) {
+  const response = await fetch('https://api.sender.net/v2/message/send', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${senderApiKey}`,
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+    },
+    body: JSON.stringify({
+      from: {
+        email: fromEmail,
+        name: fromName,
+      },
+      to: {
+        email: message.to.email,
+        name: message.to.name || message.to.email.split('@')[0],
+      },
+      subject: message.subject,
+      html: message.html,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text().catch(() => '');
+    throw new Error(`Sender API HTTP ${response.status}: ${errorText}`);
+  }
+
+  return response.json().catch(() => ({ status: 'sent' }));
+}
+
+/**
+ * Generates an executive responsive HTML email
  */
 function buildProposalHtml(data: ProposalPayload): string {
   const calendlyUrl = process.env.VITE_CALENDLY_URL || SITE_CONFIG.booking.calendlyUrl;
@@ -156,13 +194,13 @@ function buildProposalHtml(data: ProposalPayload): string {
 }
 
 /**
- * Dispatches automated emails for new proposals:
+ * Dispatches automated emails via Sender API for new proposals:
  * 1. To the client (if email was provided)
  * 2. To Gastón Barea (immediate notification alert)
  */
 export async function sendProposalAutomation(payload: ProposalPayload) {
-  if (!resend) {
-    console.info('[Worker Automation] RESEND_API_KEY no configurado aún. Correo simulado exitosamente:');
+  if (!senderApiKey || senderApiKey === 'your_sender_api_token') {
+    console.info('[Email Notification - Sender] SENDER_API_KEY pendiente de configurar. Correo registrado en modo local:');
     console.info(`- Notificación a: ${notificationEmail}`);
     if (payload.clientEmail) {
       console.info(`- Confirmación a cliente: ${payload.clientEmail}`);
@@ -177,9 +215,8 @@ export async function sendProposalAutomation(payload: ProposalPayload) {
     // 1. Send confirmation to client if provided
     if (payload.clientEmail && /\S+@\S+\.\S+/.test(payload.clientEmail)) {
       emailPromises.push(
-        resend.emails.send({
-          from: fromEmail,
-          to: payload.clientEmail,
+        dispatchSenderEmail({
+          to: { email: payload.clientEmail, name: payload.clientName },
           subject: `Especificación de Arquitectura: ${payload.architectureTitle} [Gastón Barea]`,
           html: htmlContent,
         })
@@ -188,9 +225,8 @@ export async function sendProposalAutomation(payload: ProposalPayload) {
 
     // 2. Send instant briefing alert to Gastón
     emailPromises.push(
-      resend.emails.send({
-        from: fromEmail,
-        to: notificationEmail,
+      dispatchSenderEmail({
+        to: { email: notificationEmail, name: 'Gastón Barea' },
         subject: `[NUEVO PROSPECTO] ${payload.companyName || payload.organizationType} - Urgencia: ${payload.urgency || 'Media'}`,
         html: `
           <div style="font-family:sans-serif;padding:16px;">
@@ -214,17 +250,17 @@ export async function sendProposalAutomation(payload: ProposalPayload) {
     const results = await Promise.all(emailPromises);
     return { success: true, results };
   } catch (error: any) {
-    console.error('[Worker Automation] Error enviando correos automatizados:', error);
+    console.error('[Sender Email Automation] Error enviando correos automatizados:', error);
     return { success: false, error: error.message };
   }
 }
 
 /**
- * Dispatches automated notifications for contact form inquiries
+ * Dispatches automated notifications via Sender API for contact form inquiries
  */
 export async function sendContactAutomation(payload: ContactPayload) {
-  if (!resend) {
-    console.info('[Worker Automation] RESEND_API_KEY no configurado aún. Consulta simulada exitosamente:');
+  if (!senderApiKey || senderApiKey === 'your_sender_api_token') {
+    console.info('[Email Notification - Sender] SENDER_API_KEY pendiente de configurar. Consulta registrada en modo local:');
     console.info(`- Alerta para Gastón: ${notificationEmail}`);
     console.info(`- Agradecimiento para: ${payload.email}`);
     return { success: true, mocked: true };
@@ -233,9 +269,8 @@ export async function sendContactAutomation(payload: ContactPayload) {
   try {
     const emailPromises: Promise<any>[] = [
       // Alert to Gastón
-      resend.emails.send({
-        from: fromEmail,
-        to: notificationEmail,
+      dispatchSenderEmail({
+        to: { email: notificationEmail, name: 'Gastón Barea' },
         subject: `[CONTACTO WEB] Consulta de ${payload.name} (${payload.company || 'Particular'})`,
         html: `
           <div style="font-family:sans-serif;padding:16px;">
@@ -251,9 +286,8 @@ export async function sendContactAutomation(payload: ContactPayload) {
         `,
       }),
       // Auto-reply to client
-      resend.emails.send({
-        from: fromEmail,
-        to: payload.email,
+      dispatchSenderEmail({
+        to: { email: payload.email, name: payload.name },
         subject: `Hemos recibido tu consulta técnica [Gastón Barea]`,
         html: `
           <div style="font-family:sans-serif;padding:20px;max-width:550px;margin:0 auto;color:#334155;">
@@ -269,7 +303,7 @@ export async function sendContactAutomation(payload: ContactPayload) {
     const results = await Promise.all(emailPromises);
     return { success: true, results };
   } catch (error: any) {
-    console.error('[Worker Automation] Error en envío de consulta:', error);
+    console.error('[Sender Email Automation] Error en envío de consulta:', error);
     return { success: false, error: error.message };
   }
 }
