@@ -1,10 +1,22 @@
-import { PageSectionId } from '../components/Header.ts';
 import {
   PROJECTS_CATALOG,
-  ProductionProject,
-  ProjectStatus,
-  ProjectCategory,
+  type ProductionProject,
+  type ProjectStatus,
+  type ProjectCategory,
 } from '../data/projectsData.ts';
+
+export type PageSectionId =
+  | 'inicio'
+  | 'servicios'
+  | 'ia-services'
+  | 'bioeconomia'
+  | 'proyectos'
+  | 'trayectoria'
+  | 'blog'
+  | 'contacto'
+  | 'portal-clientes'
+  | 'admin'
+  | 'solucion-ia';
 
 export interface MatchedSolution {
   serviceCode: string;

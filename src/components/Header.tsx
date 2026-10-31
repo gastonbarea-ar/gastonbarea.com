@@ -15,19 +15,9 @@ import {
   LayoutDashboard,
 } from 'lucide-react';
 import { SITE_CONFIG } from '../data/siteConfig';
+import type { PageSectionId } from '../lib/domainLogic';
 
-export type PageSectionId =
-  | 'inicio'
-  | 'servicios'
-  | 'ia-services'
-  | 'bioeconomia'
-  | 'proyectos'
-  | 'trayectoria'
-  | 'blog'
-  | 'contacto'
-  | 'portal-clientes'
-  | 'admin'
-  | 'solucion-ia';
+export type { PageSectionId };
 
 interface HeaderProps {
   activePage?: PageSectionId;
