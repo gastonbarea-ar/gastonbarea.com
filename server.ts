@@ -2486,12 +2486,33 @@ async function startServer() {
   const isProduction = process.env.NODE_ENV === 'production';
 
   if (!isProduction) {
-    const { createServer: createViteServer } = await import('vite');
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: 'spa',
+    let viteMiddleware: any = null;
+    const viteReady = import('vite')
+      .then(({ createServer: createViteServer }) =>
+        createViteServer({
+          server: { middlewareMode: true },
+          appType: 'spa',
+        })
+      )
+      .then((vite) => {
+        viteMiddleware = vite.middlewares;
+        return viteMiddleware;
+      })
+      .catch((err) => {
+        console.error('Error initializing Vite dev middleware:', err);
+        return null;
+      });
+
+    app.use(async (req, res, next) => {
+      if (req.path.startsWith('/api/') || req.path === '/health') {
+        return next();
+      }
+      const mw = viteMiddleware || (await viteReady);
+      if (mw) {
+        return mw(req, res, next);
+      }
+      next();
     });
-    app.use(vite.middlewares);
   } else {
     // Serve static files in production
     const distPath = path.join(__dirname, 'dist');
@@ -2518,3 +2539,4 @@ async function startServer() {
 }
 
 startServer();
+

@@ -8,7 +8,7 @@ export const INITIAL_BLOG_POSTS: BlogPost[] = [
     excerpt:
       'Análisis sobre la integración de telemetría IoT, bases de datos PostgreSQL y sistemas ERP para medir conversión de biomasa, eficiencia energética y trazabilidad de lote.',
     category: 'Innovación & Negocios',
-    coverImage: '',
+    coverImage: '/assets/bioeconomy-crops.jpg',
     publishedAt: '2026-10-18',
     readTime: '6 min',
     featured: true,
@@ -60,7 +60,7 @@ export const INITIAL_BLOG_POSTS: BlogPost[] = [
     excerpt:
       'Por qué fracasan los desarrollos de software tradicionales y cómo la metodología por hitos verificables (40/40/20) en entornos de Staging protege la inversión.',
     category: 'Modern Tech Stack',
-    coverImage: '',
+    coverImage: '/assets/industry-4-0.jpg',
     publishedAt: '2026-10-12',
     readTime: '5 min',
     featured: false,

@@ -311,20 +311,20 @@ export const HomeBlocksView: React.FC<HomeBlocksViewProps> = ({
       </section>
 
       {/* =====================================================================
-          BLOQUE 3: PROYECTOS REALIZADOS & EN PRODUCCIÓN (Nueva Sección en Home)
+          BLOQUE 3: PROYECTOS REALIZADOS & EN PRODUCCIÓN (Industria 4.0)
          ===================================================================== */}
       <section className="w-full py-20 md:py-28 bg-[#F3F6F4] text-[#1D1D1F]">
         <div className="w-full px-4 sm:px-8 lg:px-12 xl:px-16 space-y-14 text-left">
           <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 pb-8 border-b border-emerald-950/10">
             <div className="space-y-3 max-w-3xl">
               <div className="text-xs font-mono text-emerald-900 font-semibold">
-                BLOQUE 02 · PROYECTOS REALIZADOS & EN PRODUCCIÓN
+                BLOQUE 02 · INDUSTRIA 4.0 · PROYECTOS REALIZADOS & EN PRODUCCIÓN
               </div>
               <h2
                 className="font-display text-3xl sm:text-5xl font-bold tracking-tight text-[#1D1D1F] leading-[1.08]"
                 style={{ textWrap: 'balance' }}
               >
-                Arquitecturas operativas en producción y despliegues ejecutados.
+                Arquitecturas de Industria 4.0 operativas en producción y despliegues ejecutados.
               </h2>
             </div>
 
@@ -337,6 +337,51 @@ export const HomeBlocksView: React.FC<HomeBlocksViewProps> = ({
               <span>Ver Todos los Proyectos ({PROJECTS_CATALOG.length})</span>
               <ArrowRight className="w-4 h-4" />
             </button>
+          </div>
+
+          {/* Industry 4.0 Visual Showcase Banner */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 bg-[#0D0D12] text-white overflow-hidden items-stretch">
+            <div className="lg:col-span-7 relative min-h-[280px] sm:min-h-[360px] bg-black overflow-hidden">
+              <img
+                src="/assets/industry-4-0.jpg"
+                alt="Ingeniería de Industria 4.0, automatización industrial y control de planta en tiempo real"
+                className="w-full h-full object-cover object-center"
+                loading="lazy"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
+              <div className="absolute bottom-5 left-5 right-5 flex flex-wrap items-center justify-between gap-2 text-xs font-mono text-white/90">
+                <span>INDUSTRIA 4.0 · TELEMETRÍA EN PLANTA & SISTEMAS CIBERFÍSICOS</span>
+                <span className="text-emerald-400 font-bold">EN PRODUCCIÓN 24/7</span>
+              </div>
+            </div>
+
+            <div className="lg:col-span-5 p-8 sm:p-10 flex flex-col justify-between space-y-6">
+              <div className="space-y-3">
+                <div className="text-xs font-mono text-emerald-400 font-semibold">
+                  CONVERGENCIA OT / IT · PLANTA CONECTADA
+                </div>
+                <h3 className="font-display text-2xl sm:text-3xl font-bold text-white leading-snug">
+                  Automatización industrial, sensores IoT y ERP sincronizados en tiempo real.
+                </h3>
+                <p className="text-xs sm:text-sm text-neutral-300 leading-relaxed">
+                  Integramos líneas de producción, celdas robóticas y control de calidad en planta con bases de datos PostgreSQL, tableros predictivos de IA y Odoo MRP v18 sin costos de licencias privativas.
+                </p>
+              </div>
+
+              <div className="pt-4 border-t border-white/15 flex flex-wrap items-center justify-between gap-4 text-xs font-mono">
+                <span className="text-emerald-400 font-bold">
+                  -42% mermas operativas · 99.98% uptime
+                </span>
+                <button
+                  type="button"
+                  onClick={() => onNavigatePage('proyectos')}
+                  className="text-white hover:text-emerald-400 font-bold inline-flex items-center gap-1.5 cursor-pointer"
+                >
+                  <span>Explorar despliegues industriales</span>
+                  <ArrowUpRight className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
           </div>
 
           {/* Featured Production Projects Grid */}
@@ -471,77 +516,102 @@ export const HomeBlocksView: React.FC<HomeBlocksViewProps> = ({
       </section>
 
       {/* =====================================================================
-          BLOQUE 5: BLOG & PUBLICACIONES DESTACADAS
+          BLOQUE 5: BIOECONOMÍA, CULTIVOS SOSTENIBLES & PUBLICACIONES DESTACADAS
          ===================================================================== */}
-      <section className="w-full py-20 md:py-28 bg-[#F7F7FA] text-[#1D1D1F]">
+      <section className="w-full py-20 md:py-28 bg-[#0D261E] text-white">
         <div className="w-full px-4 sm:px-8 lg:px-12 xl:px-16 space-y-12 text-left">
-          {/* Blog Block Header */}
-          <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 pb-6 border-b border-black/[0.08]">
+          {/* Blog & Bioeconomy Block Header in Green Tones */}
+          <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 pb-6 border-b border-emerald-400/20">
             <div className="space-y-3 max-w-2xl">
-              <div className="text-xs font-mono text-[#291B64] font-semibold">
-                BLOQUE 04 · BLOG & PUBLICACIONES DE GASTÓN BAREA
+              <div className="text-xs font-mono text-emerald-400 font-semibold">
+                BLOQUE 04 · BIOECONOMÍA, TRAZABILIDAD DE CULTIVOS & PUBLICACIONES
               </div>
               <h2
-                className="font-display text-3xl sm:text-5xl font-bold tracking-tight text-[#1D1D1F] leading-[1.08]"
+                className="font-display text-3xl sm:text-5xl font-bold tracking-tight text-white leading-[1.08]"
                 style={{ textWrap: 'balance' }}
               >
-                Artículos, análisis técnico y notas sobre bioeconomía e IA.
+                Artículos, análisis técnico y notas sobre bioeconomía, agroindustria e IA.
               </h2>
             </div>
 
             <div className="flex flex-wrap items-center gap-3 shrink-0">
               <button
                 type="button"
-                onClick={() => setIsEditorOpen(true)}
-                className="px-4 py-3 text-xs font-mono font-semibold text-[#1D1D1F] bg-white hover:bg-black/[0.05] rounded-none transition-colors inline-flex items-center gap-2 cursor-pointer"
+                onClick={() => onNavigatePage('bioeconomia')}
+                className="px-4 py-3 text-xs font-mono font-semibold text-emerald-950 bg-emerald-400 hover:bg-emerald-300 rounded-none transition-colors inline-flex items-center gap-2 cursor-pointer"
               >
-                <PlusCircle className="w-4 h-4 text-[#291B64]" />
+                <span>Ver Vertical Bioeconomía</span>
+                <ArrowUpRight className="w-4 h-4" />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setIsEditorOpen(true)}
+                className="px-4 py-3 text-xs font-mono font-semibold text-white bg-white/10 hover:bg-white/20 rounded-none transition-colors inline-flex items-center gap-2 cursor-pointer"
+              >
+                <PlusCircle className="w-4 h-4 text-emerald-400" />
                 <span>Nueva Publicación</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => onNavigatePage('blog')}
-                className="px-6 py-3.5 text-xs font-mono font-bold text-white bg-[#291B64] hover:bg-[#382586] rounded-none transition-colors inline-flex items-center gap-2 cursor-pointer"
+                className="px-6 py-3.5 text-xs font-mono font-bold text-white bg-[#164233] hover:bg-[#1E5643] border border-emerald-400/30 rounded-none transition-colors inline-flex items-center gap-2 cursor-pointer"
               >
-                <BookOpen className="w-4 h-4" />
+                <BookOpen className="w-4 h-4 text-emerald-300" />
                 <span>Abrir Página Completa del Blog ({posts.length})</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
             </div>
           </div>
 
-          {/* Editorial Magazine Split: Featured Article (7 cols) + Recent Articles (5 cols) */}
+          {/* Editorial Magazine Split: Featured Bioeconomy Article with Green Crop Photo (7 cols) + Recent Articles (5 cols) */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-stretch">
-            {/* Featured Lead Article */}
+            {/* Featured Lead Article with Green Crop Visual */}
             {featuredPost && (
               <article
                 onClick={() => setSelectedPostForReading(featuredPost)}
-                className="lg:col-span-7 p-8 sm:p-10 bg-white flex flex-col justify-between space-y-8 cursor-pointer group hover:bg-[#120D2B] hover:text-white transition-colors"
+                className="lg:col-span-7 bg-[#123328] border border-emerald-400/20 flex flex-col justify-between overflow-hidden cursor-pointer group hover:bg-[#163E31] transition-colors"
               >
-                <div className="space-y-4">
-                  <div className="flex flex-wrap items-center gap-2 text-xs font-mono text-[#291B64] group-hover:text-emerald-400">
-                    <span className="font-bold">DESTACADO DEL BLOG</span>
-                    <span aria-hidden="true">·</span>
-                    <span>{featuredPost.category}</span>
-                    <span aria-hidden="true">·</span>
-                    <span>{featuredPost.publishedAt}</span>
-                    <span aria-hidden="true">·</span>
-                    <span>{featuredPost.readTime}</span>
+                <div>
+                  <div className="relative h-64 sm:h-72 w-full overflow-hidden bg-[#091A14]">
+                    <img
+                      src="/assets/bioeconomy-crops.jpg"
+                      alt="Cultivos sostenibles, bioeconomía y trazabilidad digital agroindustrial"
+                      className="w-full h-full object-cover object-center group-hover:scale-[1.02] transition-transform duration-200"
+                      loading="lazy"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-[#123328] via-transparent to-transparent" />
+                    <div className="absolute bottom-4 left-6 right-6 flex flex-wrap items-center justify-between gap-2 text-xs font-mono text-emerald-300">
+                      <span>BIOECONOMÍA · CULTIVOS & BIOMASA CERTIFICADA</span>
+                      <span>PASAPORTE DIGITAL DE LOTE</span>
+                    </div>
                   </div>
 
-                  <h3 className="font-display text-2xl sm:text-3xl font-bold text-[#1D1D1F] group-hover:text-white leading-tight transition-colors">
-                    {featuredPost.title}
-                  </h3>
+                  <div className="p-8 sm:p-10 space-y-4">
+                    <div className="flex flex-wrap items-center gap-2 text-xs font-mono text-emerald-400">
+                      <span className="font-bold">DESTACADO DEL BLOG</span>
+                      <span aria-hidden="true">·</span>
+                      <span>{featuredPost.category}</span>
+                      <span aria-hidden="true">·</span>
+                      <span>{featuredPost.publishedAt}</span>
+                      <span aria-hidden="true">·</span>
+                      <span>{featuredPost.readTime}</span>
+                    </div>
 
-                  <p className="text-sm sm:text-base text-[#515154] group-hover:text-neutral-300 leading-relaxed">
-                    {featuredPost.excerpt}
-                  </p>
+                    <h3 className="font-display text-2xl sm:text-3xl font-bold text-white leading-tight transition-colors">
+                      {featuredPost.title}
+                    </h3>
+
+                    <p className="text-sm sm:text-base text-emerald-100/85 leading-relaxed">
+                      {featuredPost.excerpt}
+                    </p>
+                  </div>
                 </div>
 
-                <div className="pt-6 border-t border-black/[0.08] group-hover:border-white/15 flex flex-wrap items-center justify-between gap-4">
-                  <div className="flex items-center gap-3 text-xs font-mono text-[#515154] group-hover:text-neutral-300">
-                    <span className="inline-flex items-center gap-1.5 text-[#291B64] group-hover:text-emerald-400 font-semibold">
+                <div className="px-8 sm:px-10 pb-8 pt-6 border-t border-emerald-400/15 flex flex-wrap items-center justify-between gap-4">
+                  <div className="flex items-center gap-3 text-xs font-mono text-emerald-200/80">
+                    <span className="inline-flex items-center gap-1.5 text-emerald-400 font-semibold">
                       <Play className="w-3.5 h-3.5" />
                       <span>Incluye Video YouTube</span>
                     </span>
@@ -549,7 +619,7 @@ export const HomeBlocksView: React.FC<HomeBlocksViewProps> = ({
                     <span>Por {featuredPost.author.name}</span>
                   </div>
 
-                  <span className="text-xs font-mono font-bold text-[#291B64] group-hover:text-white inline-flex items-center gap-1.5">
+                  <span className="text-xs font-mono font-bold text-emerald-300 group-hover:text-white inline-flex items-center gap-1.5">
                     <span>Leer artículo completo</span>
                     <ArrowRight className="w-4 h-4" />
                   </span>
@@ -558,32 +628,32 @@ export const HomeBlocksView: React.FC<HomeBlocksViewProps> = ({
             )}
 
             {/* Right Column: Secondary Articles List */}
-            <div className="lg:col-span-5 flex flex-col justify-between divide-y divide-black/[0.08] bg-white p-6 sm:p-8">
+            <div className="lg:col-span-5 flex flex-col justify-between divide-y divide-emerald-900/10 bg-[#EFF6F2] text-[#1D1D1F] p-6 sm:p-8">
               <div className="space-y-6">
-                <div className="text-xs font-mono font-bold text-[#515154]">
+                <div className="text-xs font-mono font-bold text-emerald-900">
                   ÚLTIMAS PUBLICACIONES EJECUTIVAS
                 </div>
 
-                <div className="divide-y divide-black/[0.08]">
+                <div className="divide-y divide-emerald-950/10">
                   {secondaryPosts.map((post, idx) => (
                     <article
                       key={post.id}
                       onClick={() => setSelectedPostForReading(post)}
                       className="py-5 first:pt-0 last:pb-0 group cursor-pointer space-y-2"
                     >
-                      <div className="flex flex-wrap items-center gap-2 text-xs font-mono text-[#515154]">
-                        <span className="text-[#291B64] font-semibold">{post.category}</span>
+                      <div className="flex flex-wrap items-center gap-2 text-xs font-mono text-emerald-900/70">
+                        <span className="text-emerald-800 font-semibold">{post.category}</span>
                         <span aria-hidden="true">·</span>
                         <span>{post.publishedAt}</span>
                         <span aria-hidden="true">·</span>
                         <span>{post.readTime}</span>
                       </div>
 
-                      <h4 className="font-display text-lg font-bold text-[#1D1D1F] group-hover:text-[#291B64] transition-colors leading-snug">
+                      <h4 className="font-display text-lg font-bold text-[#0D261E] group-hover:text-emerald-700 transition-colors leading-snug">
                         0{idx + 2}. {post.title}
                       </h4>
 
-                      <p className="text-xs text-[#515154] line-clamp-2 leading-relaxed">
+                      <p className="text-xs text-[#3A4D44] line-clamp-2 leading-relaxed">
                         {post.excerpt}
                       </p>
                     </article>
@@ -591,14 +661,14 @@ export const HomeBlocksView: React.FC<HomeBlocksViewProps> = ({
                 </div>
               </div>
 
-              <div className="pt-6 mt-6 border-t border-black/[0.08] flex items-center justify-between">
-                <span className="text-xs text-[#515154]">
+              <div className="pt-6 mt-6 border-t border-emerald-950/10 flex items-center justify-between">
+                <span className="text-xs text-[#3A4D44]">
                   ¿Querés explorar todos los artículos o filtrar por temática?
                 </span>
                 <button
                   type="button"
                   onClick={() => onNavigatePage('blog')}
-                  className="text-xs font-mono font-bold text-[#291B64] hover:underline inline-flex items-center gap-1 cursor-pointer shrink-0"
+                  className="text-xs font-mono font-bold text-emerald-900 hover:underline inline-flex items-center gap-1 cursor-pointer shrink-0"
                 >
                   <span>Ir al Blog</span>
                   <ArrowRight className="w-3.5 h-3.5" />
