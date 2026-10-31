@@ -20,11 +20,16 @@ import { AiWebNavigatorDock } from './components/AiWebNavigatorDock';
 import { ScheduleModal } from './components/ScheduleModal';
 import { AdminDashboardModal } from './components/admin/AdminDashboardModal';
 import { ClientPortalModal } from './components/client/ClientPortalModal';
+import { CustomSolutionPage } from './components/CustomSolutionPage';
 import { SITE_CONFIG } from './data/siteConfig';
 import {
   resolvePageFromHash,
   resolveServiceCodeFromHash,
+  CustomAiSolutionBlueprint,
+  buildCustomSolutionBlueprint,
 } from './lib/domainLogic';
+
+const CUSTOM_SOLUTION_STORAGE_KEY = 'gb_custom_ai_solution_v1';
 
 const PAGE_LABELS: Record<PageSectionId, string> = {
   inicio: 'Inicio · Gemelo Digital',
@@ -37,6 +42,7 @@ const PAGE_LABELS: Record<PageSectionId, string> = {
   contacto: 'Contacto Ejecutivo & NDA',
   'portal-clientes': 'Portal Clientes · Seguimiento & Soporte SLA',
   admin: 'Panel de Control & CRM Operativo',
+  'solucion-ia': 'Solución Estratégica Diseñada con IA a Medida',
 };
 
 const PAGE_ORDER: PageSectionId[] = [
@@ -56,10 +62,38 @@ export default function App() {
   const [customMessageForContact, setCustomMessageForContact] = useState<string>('');
   const [digitalTwinPrompt, setDigitalTwinPrompt] = useState<string>('');
   const [highlightedServiceCode, setHighlightedServiceCode] = useState<string>('');
+  const [customSolutionBlueprint, setCustomSolutionBlueprint] =
+    useState<CustomAiSolutionBlueprint>(() => {
+      try {
+        const saved = sessionStorage.getItem(CUSTOM_SOLUTION_STORAGE_KEY);
+        if (saved) {
+          return JSON.parse(saved);
+        }
+      } catch {
+        // Ignore storage errors
+      }
+      return buildCustomSolutionBlueprint(
+        'Integrar IA, Gemelo Digital y trazabilidad operativa en nuestra empresa'
+      );
+    });
 
   // Schedule Modal state
   const [isScheduleOpen, setIsScheduleOpen] = useState<boolean>(false);
   const [scheduleContext, setScheduleContext] = useState<string>('');
+
+  const handleUpdateCustomBlueprint = (blueprint: CustomAiSolutionBlueprint) => {
+    setCustomSolutionBlueprint(blueprint);
+    try {
+      sessionStorage.setItem(CUSTOM_SOLUTION_STORAGE_KEY, JSON.stringify(blueprint));
+    } catch {
+      // Ignore storage errors
+    }
+  };
+
+  const handleOpenCustomSolution = (blueprint: CustomAiSolutionBlueprint) => {
+    handleUpdateCustomBlueprint(blueprint);
+    handleNavigatePage('solucion-ia');
+  };
 
   const handleNavigatePage = (page: PageSectionId, serviceCode?: string) => {
     if (serviceCode) {
@@ -205,6 +239,7 @@ export default function App() {
               onDiagnosticoClick={() => handleNavigatePage('ia-services')}
               onClientPortalClick={() => handleNavigatePage('portal-clientes')}
               onNavigateToSolution={handleNavigateToSolution}
+              onOpenCustomSolution={handleOpenCustomSolution}
             />
 
             {/* HOME BLOCKS: Customized Architectural Blocks (Soluciones + IA Services + Proyectos + Experience + Blog + Contacto) */}
@@ -245,6 +280,18 @@ export default function App() {
             </div>
 
             {/* Render Selected Dedicated Section Page */}
+            {activePage === 'solucion-ia' && (
+              <CustomSolutionPage
+                blueprint={customSolutionBlueprint}
+                onUpdateBlueprint={handleUpdateCustomBlueprint}
+                onScheduleClick={openScheduleModal}
+                onWhatsAppClick={handleOpenWhatsApp}
+                onClientPortalClick={() => handleNavigatePage('portal-clientes')}
+                onNavigateToSection={handleNavigateToSolution}
+                onSelectProjectForContact={handleSelectProjectForContact}
+              />
+            )}
+
             {activePage === 'servicios' && (
               <ServicesBentoSection
                 onSelectService={handleSelectService}

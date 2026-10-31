@@ -26,7 +26,8 @@ export type PageSectionId =
   | 'blog'
   | 'contacto'
   | 'portal-clientes'
-  | 'admin';
+  | 'admin'
+  | 'solucion-ia';
 
 interface HeaderProps {
   activePage?: PageSectionId;

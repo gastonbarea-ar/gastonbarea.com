@@ -16,7 +16,11 @@ import {
   Minimize2,
 } from 'lucide-react';
 import { SITE_CONFIG, SiteConfig } from '../data/siteConfig';
-import { extractYoutubeId } from '../lib/domainLogic';
+import {
+  extractYoutubeId,
+  CustomAiSolutionBlueprint,
+  buildCustomSolutionBlueprint,
+} from '../lib/domainLogic';
 
 interface MatchedSolution {
   serviceCode: string;
@@ -34,6 +38,7 @@ interface HeroProps {
   onDiagnosticoClick: () => void;
   onClientPortalClick?: () => void;
   onNavigateToSolution?: (sectionId: string, serviceCode?: string, promptContext?: string) => void;
+  onOpenCustomSolution?: (blueprint: CustomAiSolutionBlueprint) => void;
 }
 
 interface ChannelVideoItem {
@@ -53,6 +58,7 @@ export const Hero: React.FC<HeroProps> = ({
   onDiagnosticoClick,
   onClientPortalClick,
   onNavigateToSolution,
+  onOpenCustomSolution,
 }) => {
   const [liveConfig, setLiveConfig] = useState<SiteConfig>(SITE_CONFIG);
   const [isMuted, setIsMuted] = useState<boolean>(true);
@@ -69,8 +75,13 @@ export const Hero: React.FC<HeroProps> = ({
   // Interactive Web AI Solution Finder State
   const [aiQuery, setAiQuery] = useState<string>('');
   const [isAiThinking, setIsAiThinking] = useState<boolean>(false);
+  const [lastBlueprint, setLastBlueprint] = useState<CustomAiSolutionBlueprint>(() =>
+    buildCustomSolutionBlueprint(
+      'Integrar Inteligencia Artificial, Gemelo Digital interactivo y trazabilidad operativa'
+    )
+  );
   const [aiResponseText, setAiResponseText] = useState<string>(
-    'Toda esta plataforma opera como mi Gemelo Digital entrenado con 30 años en el sector tecnológico-productivo y 14 años dirigiendo proyectos con clientes. Escribí qué desafío querés resolver o elegí un eje para abrir su página dedicada.'
+    'Toda esta plataforma opera como mi Gemelo Digital entrenado con 30 años en el sector tecnológico-productivo y 14 años dirigiendo proyectos con clientes. Escribí qué desafío querés resolver en la barra: la IA reorganizará todo el contenido y creará una página de solución con servicios a medida para tu necesidad.'
   );
   const [matchedSolution, setMatchedSolution] = useState<MatchedSolution>({
     serviceCode: '02',
@@ -216,7 +227,7 @@ export const Hero: React.FC<HeroProps> = ({
     },
   ];
 
-  const handleAskWebAi = async (customPrompt?: string) => {
+  const handleAskWebAi = async (customPrompt?: string, openDedicatedPage = true) => {
     const promptToSend = (customPrompt ?? aiQuery).trim();
     if (!promptToSend || isAiThinking) return;
 
@@ -224,25 +235,33 @@ export const Hero: React.FC<HeroProps> = ({
     setIsAiThinking(true);
 
     try {
-      const response = await fetch('/api/digital-twin/chat', {
+      const response = await fetch('/api/ai-custom-solution', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          message: promptToSend,
-          history: [],
+          query: promptToSend,
         }),
       });
       const data = await response.json();
-      if (data.reply) {
-        setAiResponseText(data.reply);
-      }
-      if (data.matchedSolution) {
-        setMatchedSolution(data.matchedSolution);
+      const blueprint: CustomAiSolutionBlueprint =
+        data?.blueprint || buildCustomSolutionBlueprint(promptToSend);
+
+      setLastBlueprint(blueprint);
+      setAiResponseText(blueprint.executiveDiagnosis);
+      setMatchedSolution(blueprint.matchedSolution);
+
+      if (openDedicatedPage && onOpenCustomSolution) {
+        onOpenCustomSolution(blueprint);
       }
     } catch {
-      setAiResponseText(
-        'Desde mis 30 años en el sector tecnológico-productivo y 14 años dirigiendo proyectos con clientes, estructuramos esta solución en 3 hitos verificables (40% arquitectura, 40% validación en Staging y 20% producción). Podés abrir la página de la solución recomendada a la derecha.'
-      );
+      const fallbackBlueprint = buildCustomSolutionBlueprint(promptToSend);
+      setLastBlueprint(fallbackBlueprint);
+      setAiResponseText(fallbackBlueprint.executiveDiagnosis);
+      setMatchedSolution(fallbackBlueprint.matchedSolution);
+
+      if (openDedicatedPage && onOpenCustomSolution) {
+        onOpenCustomSolution(fallbackBlueprint);
+      }
     } finally {
       setIsAiThinking(false);
     }
@@ -534,13 +553,13 @@ export const Hero: React.FC<HeroProps> = ({
         </div>
       </div>
 
-      {/* BLOQUE 2: BUSCADOR DE SOLUCIONES CON IA (Diseño Abierto, Sin Marcos Pesados) */}
+      {/* BLOQUE 2: BUSCADOR Y ESTRUCTURADOR DE SOLUCIONES CON IA */}
       <div className="w-full px-4 sm:px-8 lg:px-12 xl:px-16 py-16 md:py-20 bg-[#F7F7FA]">
         <div className="w-full space-y-10 text-left">
           <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6">
             <div className="space-y-2 max-w-2xl">
               <div className="text-xs font-mono text-[#291B64] font-semibold">
-                BLOQUE INTERACTIVO · GEMELO DIGITAL EN VIVO
+                BLOQUE INTERACTIVO · REORGANIZADOR DE SOLUCIONES CON IA EN VIVO
               </div>
               <h2
                 className="font-display text-2xl sm:text-4xl font-bold tracking-tight text-[#1D1D1F]"
@@ -550,7 +569,7 @@ export const Hero: React.FC<HeroProps> = ({
               </h2>
             </div>
             <p className="text-xs sm:text-sm text-[#515154] max-w-md leading-relaxed">
-              Consultá en lenguaje natural o elegí un eje. La IA evaluará tu necesidad con el criterio de Gastón Barea y te abrirá la sección correspondiente.
+              Escribí tu consulta en la barra o elegí un eje estratégico. La IA reorganizará todo el contenido creando una página de solución con servicios a medida, hoja de ruta 40·40·20 y proyectos en producción afines.
             </p>
           </div>
 
@@ -563,7 +582,7 @@ export const Hero: React.FC<HeroProps> = ({
                   <button
                     key={intent.code}
                     type="button"
-                    onClick={() => handleAskWebAi(intent.query)}
+                    onClick={() => handleAskWebAi(intent.query, true)}
                     disabled={isAiThinking}
                     className={`px-4 py-2 text-xs font-semibold rounded-none transition-colors cursor-pointer whitespace-nowrap ${
                       isSelected
@@ -580,7 +599,7 @@ export const Hero: React.FC<HeroProps> = ({
             <form
               onSubmit={(e) => {
                 e.preventDefault();
-                handleAskWebAi();
+                handleAskWebAi(undefined, true);
               }}
               className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 p-2 rounded-none bg-white shadow-xs"
             >
@@ -590,7 +609,7 @@ export const Hero: React.FC<HeroProps> = ({
                   type="text"
                   value={aiQuery}
                   onChange={(e) => setAiQuery(e.target.value)}
-                  placeholder="Escribí tu necesidad (ej: 'Integrar IA en nuestra empresa', 'Trazabilidad en bioeconomía', 'Implementar Odoo B2B2C')..."
+                  placeholder="Describí tu necesidad (ej: 'Automatizar planta industrial con IoT', 'Trazabilidad en bioeconomía', 'Implementar Odoo B2B2C')..."
                   className="w-full text-sm bg-transparent text-[#1D1D1F] placeholder:text-slate-400 focus:outline-none"
                 />
               </div>
@@ -602,11 +621,11 @@ export const Hero: React.FC<HeroProps> = ({
                 {isAiThinking ? (
                   <>
                     <RefreshCw className="w-4 h-4 animate-spin" />
-                    <span>Analizando...</span>
+                    <span>Diseñando Solución a Medida...</span>
                   </>
                 ) : (
                   <>
-                    <span>Consultar al Gemelo Digital</span>
+                    <span>Generar Solución a Medida con IA</span>
                     <Send className="w-3.5 h-3.5" />
                   </>
                 )}
@@ -616,41 +635,65 @@ export const Hero: React.FC<HeroProps> = ({
 
           {/* Open Two-Column AI Result (Tonal surfaces, zero heavy borders) */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch pt-2">
-            {/* Left (7 cols): Gastón's AI Synthesis */}
-            <div className="lg:col-span-7 p-6 sm:p-8 bg-white flex flex-col justify-between space-y-5">
-              <div className="space-y-3">
+            {/* Left (7 cols): Gastón's AI Synthesis + Preview of Tailored Services */}
+            <div className="lg:col-span-7 p-6 sm:p-8 bg-white flex flex-col justify-between space-y-6">
+              <div className="space-y-4">
                 <div className="flex flex-wrap items-center justify-between gap-2 text-xs font-mono text-slate-500">
-                  <span className="text-[#291B64] font-semibold">Respuesta del Gemelo Digital</span>
+                  <span className="text-[#291B64] font-semibold">
+                    ARQUITECTURA SINTETIZADA · {lastBlueprint.query.toUpperCase()}
+                  </span>
                   <span>30 Años Tech · 14 Años PMO</span>
                 </div>
-                <p className="text-sm sm:text-base text-[#1D1D1F] leading-relaxed whitespace-pre-line">
+
+                <h3 className="font-display text-lg sm:text-xl font-bold text-[#1D1D1F]">
+                  {lastBlueprint.solutionTitle}
+                </h3>
+
+                <p className="text-sm text-[#515154] leading-relaxed whitespace-pre-line">
                   {aiResponseText}
                 </p>
+
+                {/* Preview of the 3 bespoke services created */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
+                  {lastBlueprint.tailoredServices.map((srv) => (
+                    <div
+                      key={srv.code}
+                      className="p-3.5 bg-[#F7F7FA] border-l-2 border-[#291B64] space-y-1"
+                    >
+                      <div className="text-[11px] font-mono font-bold text-[#291B64]">
+                        MÓDULO {srv.code} · {srv.impactMetric}
+                      </div>
+                      <div className="text-xs font-semibold text-[#1D1D1F] leading-snug">
+                        {srv.title}
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
 
               <div className="pt-4 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-500">
                 <span>Ejecución auditada: 40% Arquitectura · 40% Staging · 20% Producción</span>
                 <button
                   type="button"
-                  onClick={() =>
-                    onScheduleClick(
-                      `[DIAGNÓSTICO IA EN PORTADA]\nSolución: ${matchedSolution.serviceTitle}\nSíntesis: ${aiResponseText}`
-                    )
-                  }
+                  onClick={() => {
+                    if (onOpenCustomSolution) {
+                      onOpenCustomSolution(lastBlueprint);
+                    }
+                  }}
                   className="font-semibold text-[#291B64] hover:underline inline-flex items-center gap-1 cursor-pointer"
                 >
-                  <span>Validar en Google Meet Pro</span>
+                  <span>Abrir Página Completa de esta Solución (#solucion-ia)</span>
                   <ArrowRight className="w-3.5 h-3.5" />
                 </button>
               </div>
             </div>
 
-            {/* Right (5 cols): Recommended Solution Page */}
+            {/* Right (5 cols): Dedicated Personalized Solution Action Card */}
             <div className="lg:col-span-5 p-6 sm:p-8 bg-[#18103C] text-white flex flex-col justify-between space-y-6">
               <div className="space-y-3">
                 <div className="flex flex-wrap items-center justify-between gap-2 text-xs font-mono text-emerald-400">
-                  <span>Solución Recomendada</span>
-                  <span>Plazo: {matchedSolution.timeline}</span>
+                  <span>PÁGINA DE SOLUCIÓN A MEDIDA</span>
+                  <span>Plazo: {lastBlueprint.estimatedTimeline}</span>
                 </div>
                 <h3 className="font-display text-xl sm:text-2xl font-bold text-white leading-snug">
                   {matchedSolution.serviceTitle}
@@ -660,7 +703,20 @@ export const Hero: React.FC<HeroProps> = ({
                 </p>
               </div>
 
-              <div className="flex flex-wrap items-center gap-3 pt-2">
+              <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (onOpenCustomSolution) {
+                      onOpenCustomSolution(lastBlueprint);
+                    }
+                  }}
+                  className="px-5 py-3.5 text-xs font-semibold text-white bg-[#291B64] hover:bg-[#382586] rounded-none transition-colors inline-flex items-center justify-center gap-2 cursor-pointer whitespace-nowrap"
+                >
+                  <span>Ver Solución Diseñada a Medida</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </button>
+
                 <button
                   type="button"
                   onClick={() => {
@@ -672,18 +728,9 @@ export const Hero: React.FC<HeroProps> = ({
                       );
                     }
                   }}
-                  className="px-5 py-3 text-xs font-semibold text-white bg-[#291B64] hover:bg-[#382586] rounded-none transition-colors inline-flex items-center gap-2 cursor-pointer whitespace-nowrap"
+                  className="px-4 py-3.5 text-xs font-semibold text-white bg-white/10 hover:bg-white/20 rounded-none transition-colors cursor-pointer whitespace-nowrap text-center"
                 >
-                  <span>{matchedSolution.ctaLabel}</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </button>
-
-                <button
-                  type="button"
-                  onClick={onDiagnosticoClick}
-                  className="px-4 py-3 text-xs font-semibold text-white bg-white/10 hover:bg-white/20 rounded-none transition-colors cursor-pointer whitespace-nowrap"
-                >
-                  Abrir Estructurador IA
+                  {matchedSolution.ctaLabel}
                 </button>
               </div>
             </div>

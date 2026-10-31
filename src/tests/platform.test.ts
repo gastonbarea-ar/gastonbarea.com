@@ -9,6 +9,7 @@ import {
   extractYoutubeId,
   filterProjectsCatalog,
   validateContactForm,
+  buildCustomSolutionBlueprint,
 } from '../lib/domainLogic.ts';
 import { PROJECTS_CATALOG } from '../data/projectsData.ts';
 import { SITE_CONFIG } from '../data/siteConfig.ts';
@@ -39,6 +40,8 @@ describe('1. Enrutamiento y Navegación de Secciones (resolvePageFromHash & reso
     assert.equal(resolvePageFromHash('#admin'), 'admin');
     assert.equal(resolvePageFromHash('#dashboard'), 'admin');
     assert.equal(resolvePageFromHash('#crm'), 'admin');
+    assert.equal(resolvePageFromHash('#solucion-ia'), 'solucion-ia');
+    assert.equal(resolvePageFromHash('#solucion-personalizada'), 'solucion-ia');
     assert.ok(CLIENT_ACCOUNTS.length >= 6);
     assert.equal(CLIENT_ACCOUNTS[0].username, 'martin.arismendi');
   });
@@ -224,4 +227,32 @@ describe('6. Integridad de Datos de Configuración, Blog, CRM y Portal de Client
     assert.ok(registeredWithoutService.length >= 3);
   });
 });
+
+describe('7. Motor de Reorganización Estratégica y Soluciones a Medida con IA (buildCustomSolutionBlueprint)', () => {
+  it('debe construir 3 servicios a medida, 3 fases 40/40/20 y priorizar proyectos de bioeconomía ante consultas agro/bio', () => {
+    const bp = buildCustomSolutionBlueprint('Trazabilidad de cultivos y valorización de biomasa en planta');
+    assert.equal(bp.tailoredServices.length, 3);
+    assert.equal(bp.roadmapPhases.length, 3);
+    assert.equal(bp.roadmapPhases[0].percentage, '40%');
+    assert.equal(bp.roadmapPhases[1].percentage, '40%');
+    assert.equal(bp.roadmapPhases[2].percentage, '20%');
+    assert.equal(bp.recommendedProjectIds[0], 'trazabilidad-bioeconomia-iot');
+    assert.ok(bp.solutionTitle.includes('Bioeconomía'));
+  });
+
+  it('debe reorganizar módulos hacia Industria 4.0 y OEE cuando se consulta sobre planta industrial o sensores', () => {
+    const bp = buildCustomSolutionBlueprint('Automatización de planta Industria 4.0 y monitoreo OEE');
+    assert.equal(bp.tailoredServices.length, 3);
+    assert.ok(bp.solutionTitle.includes('Industria 4.0'));
+    assert.ok(bp.recommendedProjectIds.includes('infraestructura-critica-linux-cluster'));
+  });
+
+  it('debe reorganizar módulos hacia Odoo Community ERP v18 y B2B2C ante consultas de inventario o e-commerce mayorista', () => {
+    const bp = buildCustomSolutionBlueprint('Implementar Odoo ERP v18 con tienda B2B mayorista y stock');
+    assert.equal(bp.tailoredServices.length, 3);
+    assert.equal(bp.recommendedProjectIds[0], 'odoo-v18-b2b2c-multideposito');
+    assert.ok(bp.solutionTitle.includes('Odoo'));
+  });
+});
+
 

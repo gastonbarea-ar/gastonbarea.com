@@ -26,6 +26,7 @@ import {
   matchWebSolution,
   generateRuleBasedProposal,
   maskEmail,
+  buildCustomSolutionBlueprint,
 } from './src/lib/domainLogic.ts';
 
 dotenv.config();
@@ -340,6 +341,7 @@ app.post('/api/digital-twin/chat', async (req, res) => {
     }
 
     const matchedSolution = matchWebSolution(message);
+    const fallbackBlueprint = buildCustomSolutionBlueprint(message);
 
     if (ai) {
       const formattedHistory = Array.isArray(history)
@@ -357,7 +359,7 @@ Solución detectada dentro de la web: "${matchedSolution.serviceTitle}" (${match
 Responde en 2 párrafos ágiles y ejecutivos como la inteligencia viva de gastonbarea.com (con la voz y experiencia de 30 años en el sector tecnológico-productivo y 14 años dirigiendo proyectos con clientes de Gastón Barea). Orienta al usuario exactamente a cómo resolvemos su problema y por qué la solución "${matchedSolution.serviceTitle}" dentro de la web es el camino indicado.`;
 
       const response = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
+        model: 'gemini-3.8-flash',
         contents: fullPrompt,
         config: {
           systemInstruction: GASTON_DIGITAL_TWIN_SYSTEM_INSTRUCTION,
@@ -369,39 +371,158 @@ Responde en 2 párrafos ágiles y ejecutivos como la inteligencia viva de gaston
           reply: response.text,
           matchedSolution,
           suggestedAction: matchedSolution.ctaLabel,
+          blueprint: {
+            ...fallbackBlueprint,
+            executiveDiagnosis: response.text,
+            isAiGenerated: true,
+          },
         });
       }
     }
 
-    // Intelligent domain-aware fallback if AI key/quota is unavailable
-    const lower = message.toLowerCase();
-    let reply = '';
-    if (lower.includes('bio') || lower.includes('agro') || lower.includes('circular') || lower.includes('biomasa')) {
-      reply = `Para tu iniciativa de bioeconomía y producción sostenible, dentro de la web hemos diseñado la vertical "${matchedSolution.serviceTitle}". Combino mis 30 años en el sector tecnológico-productivo con telemetría IoT, trazabilidad digital de lotes biológicos y valorización de biomasa en tiempo real.\n\nTe recomiendo explorar el módulo interactivo de Bioeconomía aquí abajo o generar directamente la Hoja de Ruta técnica para definir sensores, arquitectura de datos y retorno de inversión.`;
-    } else if (lower.includes('ia') || lower.includes('inteligencia') || lower.includes('gemelo') || lower.includes('agent')) {
-      reply = `Esta misma plataforma web es un ejemplo vivo de nuestra unidad "${matchedSolution.serviceTitle}". Integramos modelos de IA generativa, Gemelos Digitales interactivos y agentes entrenados con la documentación y bases de datos propias de tu organización.\n\nPodés ir directo al bloque 02 (IA Services) en la sección de Soluciones para conocer los entregables o estructurar un prototipo funcional en menos de 4 semanas.`;
-    } else if (lower.includes('odoo') || lower.includes('erp') || lower.includes('ecommerce') || lower.includes('b2b')) {
-      reply = `La solución ideal dentro de nuestra plataforma es "${matchedSolution.serviceTitle}". Desplegamos Odoo Community v18 sobre contenedores Docker en Linux —sin pagar licencias perpetuas por usuario— integrado en tiempo real con portales mayoristas B2B y minoristas B2C.\n\nCon 14 años dirigiendo proyectos junto a clientes, aseguramos una migración ordenada de stock, listas de precios y facturación mediante hitos auditables.`;
-    } else if (lower.includes('dirección') || lower.includes('proyecto') || lower.includes('pmo') || lower.includes('etapa') || lower.includes('trabaj')) {
-      reply = `Tu requerimiento encaja directamente con "${matchedSolution.serviceTitle}". Aporto 14 años específicos liderando proyectos complejos con clientes y 30 años en el sector tecnológico-productivo.\n\nTrabajamos bajo el esquema 40% inicio de arquitectura, 40% validación funcional en entorno Staging y 20% salida a producción, con seguimiento 24/7 desde el Portal de Clientes.`;
-    } else {
-      reply = `Analizando tu consulta desde mis 30 años en el sector tecnológico-productivo y 14 años dirigiendo proyectos con clientes, la solución recomendada dentro de gastonbarea.com es "${matchedSolution.serviceTitle}".\n\nAbajo te habilité el acceso directo a la solución correspondiente dentro de la web, junto con la opción de estructurar el plan de trabajo por etapas o agendar una sesión ejecutiva de 30 minutos en Google Meet Pro.`;
-    }
-
     return res.json({
-      reply,
+      reply: fallbackBlueprint.executiveDiagnosis,
       matchedSolution,
       suggestedAction: matchedSolution.ctaLabel,
+      blueprint: fallbackBlueprint,
     });
   } catch (err) {
     console.error('Error in /api/digital-twin/chat:', err);
-    const matchedSolution = matchWebSolution(req.body?.message || '');
+    const rawMsg = req.body?.message || '';
+    const matchedSolution = matchWebSolution(rawMsg);
+    const fallbackBlueprint = buildCustomSolutionBlueprint(rawMsg);
     return res.json({
-      reply: `Desde la plataforma interactiva de Gastón Barea (30 años en el sector tecnológico-productivo y 14 años dirigiendo proyectos con clientes), te recomendamos explorar la solución "${matchedSolution.serviceTitle}" o agendar una sesión de 30 minutos por Google Meet Pro.`,
+      reply: fallbackBlueprint.executiveDiagnosis,
       matchedSolution,
       suggestedAction: matchedSolution.ctaLabel,
+      blueprint: fallbackBlueprint,
     });
   }
+});
+
+// Dedicated AI Custom Solution Synthesizer (Reorganizes services, 40/40/20 roadmap & production projects)
+app.post('/api/ai-custom-solution', async (req, res) => {
+  const rawQuery = (req.body?.query || '').trim();
+  if (!rawQuery) {
+    return res.status(400).json({ error: 'Consulta requerida para diseñar la solución' });
+  }
+
+  const baseBlueprint = buildCustomSolutionBlueprint(rawQuery);
+
+  if (ai) {
+    try {
+      const prompt = `El usuario realizó la siguiente consulta en la barra estratégica de gastonbarea.com:
+"${rawQuery}"
+
+Diseña una solución tecnológica y de dirección ejecutiva PMO reorganizando el contenido y creando 3 servicios/módulos a medida para sus necesidades.
+Ids válidos de proyectos en catálogo para reordenar según relevancia (recommendedProjectIds):
+- "gemelo-digital-gastonbarea"
+- "trazabilidad-bioeconomia-iot"
+- "odoo-v18-b2b2c-multideposito"
+- "ebt-plataforma-analitica-productiva"
+- "agente-rag-operaciones-b2b"
+- "infraestructura-critica-linux-cluster"`;
+
+      const response = await ai.models.generateContent({
+        model: 'gemini-3.8-flash',
+        contents: prompt,
+        config: {
+          systemInstruction: GASTON_DIGITAL_TWIN_SYSTEM_INSTRUCTION,
+          responseMimeType: 'application/json',
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              solutionTitle: { type: Type.STRING },
+              executiveDiagnosis: { type: Type.STRING },
+              primaryVertical: { type: Type.STRING },
+              estimatedTimeline: { type: Type.STRING },
+              recommendedStack: {
+                type: Type.ARRAY,
+                items: { type: Type.STRING },
+              },
+              tailoredServices: {
+                type: Type.ARRAY,
+                items: {
+                  type: Type.OBJECT,
+                  properties: {
+                    code: { type: Type.STRING },
+                    title: { type: Type.STRING },
+                    problemSolved: { type: Type.STRING },
+                    technicalApproach: { type: Type.STRING },
+                    deliverable: { type: Type.STRING },
+                    impactMetric: { type: Type.STRING },
+                  },
+                  required: [
+                    'code',
+                    'title',
+                    'problemSolved',
+                    'technicalApproach',
+                    'deliverable',
+                    'impactMetric',
+                  ],
+                },
+              },
+              roadmapPhases: {
+                type: Type.ARRAY,
+                items: {
+                  type: Type.OBJECT,
+                  properties: {
+                    phaseCode: { type: Type.STRING },
+                    percentage: { type: Type.STRING },
+                    title: { type: Type.STRING },
+                    duration: { type: Type.STRING },
+                    deliverable: { type: Type.STRING },
+                    verificationCriteria: { type: Type.STRING },
+                  },
+                  required: [
+                    'phaseCode',
+                    'percentage',
+                    'title',
+                    'duration',
+                    'deliverable',
+                    'verificationCriteria',
+                  ],
+                },
+              },
+              recommendedProjectIds: {
+                type: Type.ARRAY,
+                items: { type: Type.STRING },
+              },
+            },
+            required: [
+              'solutionTitle',
+              'executiveDiagnosis',
+              'primaryVertical',
+              'estimatedTimeline',
+              'recommendedStack',
+              'tailoredServices',
+              'roadmapPhases',
+              'recommendedProjectIds',
+            ],
+          },
+        },
+      });
+
+      if (response.text) {
+        const parsed = JSON.parse(response.text);
+        return res.json({
+          blueprint: {
+            ...baseBlueprint,
+            ...parsed,
+            id: `sol-ai-${Date.now()}`,
+            query: rawQuery,
+            createdAt: new Date().toISOString(),
+            matchedSolution: baseBlueprint.matchedSolution,
+            isAiGenerated: true,
+          },
+        });
+      }
+    } catch (err) {
+      console.error('Fallback to deterministic synthesizer in /api/ai-custom-solution:', err);
+    }
+  }
+
+  return res.json({ blueprint: baseBlueprint });
 });
 
 // Private server-side endpoint for saving diagnosis proposals
