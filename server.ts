@@ -50,16 +50,6 @@ app.use((req, res, next) => {
 
 app.use(express.json());
 
-// Cloud Health Check Endpoints
-app.get(['/api/health', '/health'], (_req, res) => {
-  res.status(200).json({
-    status: 'ok',
-    service: 'gastonbarea.com',
-    environment: process.env.NODE_ENV || 'development',
-    timestamp: new Date().toISOString(),
-  });
-});
-
 // Initialize Gemini Client
 const apiKey = process.env.GEMINI_API_KEY;
 let ai: GoogleGenAI | null = null;
@@ -75,17 +65,91 @@ if (apiKey) {
   });
 }
 
-// Server-side private Supabase Client (No public VITE_ prefix needed)
-const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+// Server-side private Supabase Client (Supports manual env vars + Vercel-Supabase official integration vars)
+const supabaseUrl =
+  process.env.SUPABASE_URL ||
+  process.env.NEXT_PUBLIC_SUPABASE_URL ||
+  process.env.VITE_SUPABASE_URL;
 const supabaseKey =
   process.env.SUPABASE_SERVICE_ROLE_KEY ||
   process.env.SUPABASE_ANON_KEY ||
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
   process.env.VITE_SUPABASE_ANON_KEY;
 
 const supabase =
   supabaseUrl && supabaseKey && !supabaseUrl.includes('your-project-id')
     ? createClient(supabaseUrl, supabaseKey)
     : null;
+
+// Cloud Health & Infrastructure Diagnostic Endpoints
+app.get(['/api/health', '/health', '/api/infrastructure/status'], async (_req, res) => {
+  let supabaseConnected = false;
+  let supabaseError: string | null = null;
+  let schemaTablesReady = false;
+
+  let projectHost: string | null = null;
+  if (supabaseUrl && !supabaseUrl.includes('your-project-id')) {
+    try {
+      projectHost = new URL(supabaseUrl).host;
+    } catch {
+      projectHost = 'configured';
+    }
+  }
+
+  if (supabase) {
+    try {
+      const { error: settingsErr } = await supabase
+        .from('site_settings')
+        .select('id')
+        .limit(1);
+
+      if (!settingsErr) {
+        supabaseConnected = true;
+        schemaTablesReady = true;
+      } else if (settingsErr.code === '42P01' || settingsErr.message?.includes('does not exist')) {
+        // Connected to Supabase instance, but schema.sql hasn't been executed yet
+        supabaseConnected = true;
+        schemaTablesReady = false;
+        supabaseError = 'Conectado a Supabase, pero falta ejecutar supabase/schema.sql en el SQL Editor.';
+      } else {
+        supabaseError = settingsErr.message;
+      }
+    } catch (err: any) {
+      supabaseError = err?.message || 'No se pudo conectar al servidor de Supabase (verificar si está activo).';
+    }
+  }
+
+  res.status(200).json({
+    status: 'ok',
+    service: 'gastonbarea.com',
+    environment: process.env.NODE_ENV || 'development',
+    runtime: process.env.VERCEL ? 'vercel-serverless' : 'node-server',
+    infrastructure: {
+      supabase: {
+        configured: Boolean(supabase),
+        connected: supabaseConnected,
+        schemaTablesReady,
+        persistenceMode: supabaseConnected && schemaTablesReady ? 'postgresql_live' : 'in_memory_fallback',
+        projectHost,
+        keyType: process.env.SUPABASE_SERVICE_ROLE_KEY
+          ? 'service_role'
+          : process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY
+          ? 'anon'
+          : 'none',
+        diagnostic: supabaseError,
+      },
+      geminiAi: {
+        configured: Boolean(apiKey),
+      },
+      senderEmail: {
+        configured: Boolean(process.env.SENDER_API_KEY),
+        notificationEmail: process.env.NOTIFICATION_EMAIL || 'gastonbarea.com@gmail.com',
+        fromEmail: process.env.FROM_EMAIL || 'gaston@gastonbarea.com',
+      },
+    },
+    timestamp: new Date().toISOString(),
+  });
+});
 
 // Dynamic In-Memory Cache (Synched with Supabase when available)
 let cachedSiteConfig = { ...SITE_CONFIG };
@@ -1122,11 +1186,13 @@ app.get('/api/crm/overview', requireAdminAuth, async (_req, res) => {
   // If Supabase is connected, attempt sync
   if (supabase) {
     try {
-      const [oppsRes, quotesRes, paysRes, configRes] = await Promise.all([
+      const [oppsRes, quotesRes, paysRes, configRes, compsRes, cntsRes] = await Promise.all([
         supabase.from('crm_opportunities').select('*').order('created_at', { ascending: false }),
         supabase.from('crm_quotes').select('*').order('created_at', { ascending: false }),
         supabase.from('crm_payments').select('*').order('created_at', { ascending: false }),
         supabase.from('crm_settings').select('*').eq('id', 'payment_gateways').single(),
+        supabase.from('crm_companies').select('*').order('created_at', { ascending: false }),
+        supabase.from('crm_contacts').select('*').order('created_at', { ascending: false }),
       ]);
 
       if (!oppsRes.error && oppsRes.data && oppsRes.data.length > 0) {
@@ -1137,6 +1203,8 @@ app.get('/api/crm/overview', requireAdminAuth, async (_req, res) => {
           clientEmail: o.client_email,
           clientPhone: o.client_phone,
           company: o.company,
+          companyId: o.company_id,
+          contactId: o.contact_id,
           serviceCategory: o.service_category,
           stage: o.stage,
           value: Number(o.value) || 0,
@@ -1198,6 +1266,44 @@ app.get('/api/crm/overview', requireAdminAuth, async (_req, res) => {
 
       if (!configRes.error && configRes.data?.config) {
         cachedPaymentConfig = configRes.data.config;
+      }
+
+      if (!compsRes.error && compsRes.data && compsRes.data.length > 0) {
+        cachedCrmCompanies = compsRes.data.map((c: any) => ({
+          id: c.id,
+          name: c.name,
+          taxId: c.tax_id,
+          industry: c.industry,
+          website: c.website,
+          phone: c.phone,
+          email: c.email,
+          location: c.location || 'Argentina',
+          tier: c.tier || 'pyme',
+          notes: c.notes,
+          createdAt: c.created_at,
+          updatedAt: c.updated_at,
+        }));
+      }
+
+      if (!cntsRes.error && cntsRes.data && cntsRes.data.length > 0) {
+        cachedCrmContacts = cntsRes.data.map((c: any) => ({
+          id: c.id,
+          fullName: c.full_name,
+          email: c.email,
+          username: c.username,
+          password: c.password || 'cliente2026',
+          phone: c.phone,
+          roleTitle: c.role_title,
+          contactType: c.contact_type || 'individual',
+          companyId: c.company_id,
+          companyName: c.company_name,
+          portalAccessStatus: c.portal_access_status || 'active',
+          hasActiveService: Boolean(c.has_active_service),
+          linkedProjectId: c.linked_project_id,
+          notes: c.notes,
+          createdAt: c.created_at,
+          updatedAt: c.updated_at,
+        }));
       }
     } catch (err) {
       console.warn('Supabase CRM fetch fallback to memory:', err);
@@ -1341,7 +1447,7 @@ app.get('/api/crm/directory', requireAdminAuth, (_req, res) => {
   });
 });
 
-app.post('/api/crm/companies', requireAdminAuth, (req, res) => {
+app.post('/api/crm/companies', requireAdminAuth, async (req, res) => {
   const body = req.body || {};
   if (!body.name || !String(body.name).trim()) {
     return res.status(400).json({ error: 'El nombre de la empresa o corporación es requerido.' });
@@ -1361,10 +1467,32 @@ app.post('/api/crm/companies', requireAdminAuth, (req, res) => {
     updatedAt: new Date().toISOString(),
   };
   cachedCrmCompanies.unshift(newCompany);
+
+  if (supabase) {
+    try {
+      await supabase.from('crm_companies').upsert({
+        id: newCompany.id,
+        name: newCompany.name,
+        tax_id: newCompany.taxId || null,
+        industry: newCompany.industry,
+        website: newCompany.website || null,
+        phone: newCompany.phone || null,
+        email: newCompany.email || null,
+        location: newCompany.location,
+        tier: newCompany.tier,
+        notes: newCompany.notes || null,
+        created_at: newCompany.createdAt,
+        updated_at: newCompany.updatedAt,
+      });
+    } catch (err) {
+      console.error('Error saving company to Supabase:', err);
+    }
+  }
+
   return res.json({ success: true, company: newCompany });
 });
 
-app.put('/api/crm/companies/:id', requireAdminAuth, (req, res) => {
+app.put('/api/crm/companies/:id', requireAdminAuth, async (req, res) => {
   const { id } = req.params;
   const idx = cachedCrmCompanies.findIndex((c) => c.id === id);
   if (idx === -1) {
@@ -1382,20 +1510,51 @@ app.put('/api/crm/companies/:id', requireAdminAuth, (req, res) => {
     cnt.companyId === id ? { ...cnt, companyName: updated.name } : cnt
   );
 
+  if (supabase) {
+    try {
+      await supabase
+        .from('crm_companies')
+        .update({
+          name: updated.name,
+          tax_id: updated.taxId || null,
+          industry: updated.industry,
+          website: updated.website || null,
+          phone: updated.phone || null,
+          email: updated.email || null,
+          location: updated.location,
+          tier: updated.tier,
+          notes: updated.notes || null,
+          updated_at: updated.updatedAt,
+        })
+        .eq('id', id);
+    } catch (err) {
+      console.error('Error updating company in Supabase:', err);
+    }
+  }
+
   return res.json({ success: true, company: updated });
 });
 
-app.delete('/api/crm/companies/:id', requireAdminAuth, (req, res) => {
+app.delete('/api/crm/companies/:id', requireAdminAuth, async (req, res) => {
   const { id } = req.params;
   cachedCrmCompanies = cachedCrmCompanies.filter((c) => c.id !== id);
   // Unlink contacts into individual contacts or clear companyId
   cachedCrmContacts = cachedCrmContacts.map((cnt) =>
     cnt.companyId === id ? { ...cnt, companyId: undefined, contactType: 'individual' as const } : cnt
   );
+
+  if (supabase) {
+    try {
+      await supabase.from('crm_companies').delete().eq('id', id);
+    } catch (err) {
+      console.error('Error deleting company from Supabase:', err);
+    }
+  }
+
   return res.json({ success: true, id });
 });
 
-app.post('/api/crm/contacts', requireAdminAuth, (req, res) => {
+app.post('/api/crm/contacts', requireAdminAuth, async (req, res) => {
   const body = req.body || {};
   if (!body.fullName || !body.email) {
     return res.status(400).json({ error: 'Nombre completo y correo electrónico son requeridos.' });
@@ -1461,10 +1620,36 @@ app.post('/api/crm/contacts', requireAdminAuth, (req, res) => {
   };
 
   cachedCrmContacts.unshift(newContact);
+
+  if (supabase) {
+    try {
+      await supabase.from('crm_contacts').upsert({
+        id: newContact.id,
+        full_name: newContact.fullName,
+        email: newContact.email,
+        username: newContact.username,
+        password: newContact.password,
+        phone: newContact.phone || null,
+        role_title: newContact.roleTitle,
+        contact_type: newContact.contactType,
+        company_id: newContact.companyId || null,
+        company_name: newContact.companyName || null,
+        portal_access_status: newContact.portalAccessStatus,
+        has_active_service: newContact.hasActiveService,
+        linked_project_id: newContact.linkedProjectId || null,
+        notes: newContact.notes || null,
+        created_at: newContact.createdAt,
+        updated_at: newContact.updatedAt,
+      });
+    } catch (err) {
+      console.error('Error saving contact to Supabase:', err);
+    }
+  }
+
   return res.json({ success: true, contact: newContact });
 });
 
-app.put('/api/crm/contacts/:id', requireAdminAuth, (req, res) => {
+app.put('/api/crm/contacts/:id', requireAdminAuth, async (req, res) => {
   const { id } = req.params;
   const idx = cachedCrmContacts.findIndex((c) => c.id === id);
   if (idx === -1) {
@@ -1485,12 +1670,48 @@ app.put('/api/crm/contacts/:id', requireAdminAuth, (req, res) => {
     updatedAt: new Date().toISOString(),
   };
   cachedCrmContacts[idx] = updated;
+
+  if (supabase) {
+    try {
+      await supabase
+        .from('crm_contacts')
+        .update({
+          full_name: updated.fullName,
+          email: updated.email,
+          username: updated.username,
+          password: updated.password,
+          phone: updated.phone || null,
+          role_title: updated.roleTitle,
+          contact_type: updated.contactType,
+          company_id: updated.companyId || null,
+          company_name: updated.companyName || null,
+          portal_access_status: updated.portalAccessStatus,
+          has_active_service: updated.hasActiveService,
+          linked_project_id: updated.linkedProjectId || null,
+          notes: updated.notes || null,
+          updated_at: updated.updatedAt,
+        })
+        .eq('id', id);
+    } catch (err) {
+      console.error('Error updating contact in Supabase:', err);
+    }
+  }
+
   return res.json({ success: true, contact: updated });
 });
 
-app.delete('/api/crm/contacts/:id', requireAdminAuth, (req, res) => {
+app.delete('/api/crm/contacts/:id', requireAdminAuth, async (req, res) => {
   const { id } = req.params;
   cachedCrmContacts = cachedCrmContacts.filter((c) => c.id !== id);
+
+  if (supabase) {
+    try {
+      await supabase.from('crm_contacts').delete().eq('id', id);
+    } catch (err) {
+      console.error('Error deleting contact from Supabase:', err);
+    }
+  }
+
   return res.json({ success: true, id });
 });
 
