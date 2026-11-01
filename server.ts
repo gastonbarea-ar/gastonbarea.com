@@ -106,6 +106,7 @@ app.get(['/api/health', '/health', '/api/infrastructure/status'], async (_req, r
       if (!settingsErr) {
         supabaseConnected = true;
         schemaTablesReady = true;
+        await ensureSupabaseSeeded();
       } else if (
         settingsErr.code === '42P01' ||
         settingsErr.code === 'PGRST205' ||
@@ -209,20 +210,251 @@ const activeAdminSessions = new Map<string, AdminSession>();
 const activeOtpCodes = new Map<string, { code: string; expiresAt: number; attempts: number }>();
 const loginAttemptTracker = new Map<string, { count: number; lockedUntil: number }>();
 
+// Automatic One-Time Initial Seed for Empty Supabase Tables
+let supabaseSeedAttempted = false;
+async function ensureSupabaseSeeded() {
+  if (!supabase || supabaseSeedAttempted) return;
+  supabaseSeedAttempted = true;
+
+  try {
+    // 1. Seed site_settings if missing
+    const { data: siteData } = await supabase
+      .from('site_settings')
+      .select('id')
+      .eq('id', 'current')
+      .maybeSingle();
+    if (!siteData) {
+      await supabase.from('site_settings').upsert({
+        id: 'current',
+        config: cachedSiteConfig,
+        updated_at: new Date().toISOString(),
+      });
+    }
+
+    // 2. Seed crm_settings (payment_gateways) if missing
+    const { data: payCfgData } = await supabase
+      .from('crm_settings')
+      .select('id')
+      .eq('id', 'payment_gateways')
+      .maybeSingle();
+    if (!payCfgData) {
+      await supabase.from('crm_settings').upsert({
+        id: 'payment_gateways',
+        config: cachedPaymentConfig,
+        updated_at: new Date().toISOString(),
+      });
+    }
+
+    // 3. Seed blog_posts if empty
+    const { count: blogCount } = await supabase
+      .from('blog_posts')
+      .select('*', { count: 'exact', head: true });
+    if (blogCount === 0 && INITIAL_BLOG_POSTS.length > 0) {
+      await supabase.from('blog_posts').upsert(
+        INITIAL_BLOG_POSTS.map((post) => ({
+          id: post.id,
+          slug: post.slug,
+          title: post.title,
+          excerpt: post.excerpt,
+          category: post.category,
+          cover_image: post.coverImage || null,
+          published_at: post.publishedAt,
+          read_time: post.readTime || '5 min',
+          featured: Boolean(post.featured),
+          author: post.author,
+          tags: post.tags || [],
+          blocks: post.blocks || [],
+        }))
+      );
+    }
+
+    // 4. Seed crm_companies if empty
+    const { count: compCount } = await supabase
+      .from('crm_companies')
+      .select('*', { count: 'exact', head: true });
+    if (compCount === 0 && INITIAL_CRM_COMPANIES.length > 0) {
+      await supabase.from('crm_companies').upsert(
+        INITIAL_CRM_COMPANIES.map((c) => ({
+          id: c.id,
+          name: c.name,
+          tax_id: c.taxId || null,
+          industry: c.industry,
+          website: c.website || null,
+          phone: c.phone || null,
+          email: c.email || null,
+          location: c.location || 'Argentina',
+          tier: c.tier || 'pyme',
+          notes: c.notes || null,
+          created_at: c.createdAt,
+          updated_at: c.updatedAt,
+        }))
+      );
+    }
+
+    // 5. Seed crm_contacts if empty
+    const { count: cntCount } = await supabase
+      .from('crm_contacts')
+      .select('*', { count: 'exact', head: true });
+    if (cntCount === 0 && INITIAL_CRM_CONTACTS.length > 0) {
+      await supabase.from('crm_contacts').upsert(
+        INITIAL_CRM_CONTACTS.map((c) => ({
+          id: c.id,
+          full_name: c.fullName,
+          email: c.email,
+          username: c.username,
+          password: c.password || 'cliente2026',
+          phone: c.phone || null,
+          role_title: c.roleTitle,
+          contact_type: c.contactType || 'individual',
+          company_id: c.companyId || null,
+          company_name: c.companyName || null,
+          portal_access_status: c.portalAccessStatus || 'active',
+          has_active_service: Boolean(c.hasActiveService),
+          linked_project_id: c.linkedProjectId || null,
+          notes: c.notes || null,
+          created_at: c.createdAt,
+          updated_at: c.updatedAt,
+        }))
+      );
+    }
+
+    // 6. Seed crm_opportunities if empty
+    const { count: oppCount } = await supabase
+      .from('crm_opportunities')
+      .select('*', { count: 'exact', head: true });
+    if (oppCount === 0 && INITIAL_CRM_OPPORTUNITIES.length > 0) {
+      await supabase.from('crm_opportunities').upsert(
+        INITIAL_CRM_OPPORTUNITIES.map((o) => ({
+          id: o.id,
+          title: o.title,
+          client_name: o.clientName,
+          client_email: o.clientEmail,
+          client_phone: o.clientPhone || null,
+          company: o.company || null,
+          company_id: o.companyId || null,
+          contact_id: o.contactId || null,
+          service_category: o.serviceCategory,
+          stage: o.stage,
+          value: o.value,
+          currency: o.currency || 'USD',
+          probability: o.probability,
+          expected_close_date: o.expectedCloseDate || null,
+          notes: o.notes || null,
+          source: o.source || 'manual',
+          created_at: o.createdAt,
+          updated_at: o.updatedAt,
+          linked_quote_id: o.linkedQuoteId || null,
+        }))
+      );
+    }
+
+    // 7. Seed crm_quotes if empty
+    const { count: quoteCount } = await supabase
+      .from('crm_quotes')
+      .select('*', { count: 'exact', head: true });
+    if (quoteCount === 0 && INITIAL_CRM_QUOTES.length > 0) {
+      await supabase.from('crm_quotes').upsert(
+        INITIAL_CRM_QUOTES.map((q) => ({
+          id: q.id,
+          quote_number: q.quoteNumber,
+          opportunity_id: q.opportunityId || null,
+          client_name: q.clientName,
+          client_email: q.clientEmail,
+          client_company: q.clientCompany || null,
+          client_tax_id: q.clientTaxId || null,
+          service_category: q.serviceCategory,
+          title: q.title,
+          currency: q.currency || 'USD',
+          items: q.items || [],
+          subtotal: q.subtotal,
+          tax_percent: q.taxPercent,
+          total: q.total,
+          timeline: q.timeline,
+          milestones: q.milestones || [],
+          terms_and_conditions: q.termsAndConditions || [],
+          status: q.status,
+          valid_until: q.validUntil,
+          created_at: q.createdAt,
+          updated_at: q.updatedAt,
+          preferred_payment_method: q.preferredPaymentMethod || null,
+          payment_link: q.paymentLink || null,
+        }))
+      );
+    }
+
+    // 8. Seed crm_payments if empty
+    const { count: payCount } = await supabase
+      .from('crm_payments')
+      .select('*', { count: 'exact', head: true });
+    if (payCount === 0 && INITIAL_CRM_PAYMENTS.length > 0) {
+      await supabase.from('crm_payments').upsert(
+        INITIAL_CRM_PAYMENTS.map((p) => ({
+          id: p.id,
+          quote_id: p.quoteId || null,
+          opportunity_id: p.opportunityId || null,
+          client_name: p.clientName,
+          amount: p.amount,
+          currency: p.currency || 'USD',
+          method: p.method,
+          status: p.status,
+          transaction_ref: p.transactionRef || null,
+          notes: p.notes || null,
+          created_at: p.createdAt,
+          confirmed_at: p.confirmedAt || null,
+        }))
+      );
+    }
+  } catch (err) {
+    console.warn('[Supabase Seed] Non-blocking check:', err);
+  }
+}
+
+// Helper to resolve AdminSession (supports both in-memory & stateless Vercel Serverless tokens)
+function resolveAdminSession(token?: string): AdminSession | null {
+  if (!token) return null;
+  if (activeAdminSessions.has(token)) {
+    const session = activeAdminSessions.get(token)!;
+    if (Date.now() < session.expiresAt) {
+      return session;
+    }
+    activeAdminSessions.delete(token);
+    return null;
+  }
+
+  // Stateless Vercel Serverless token format: gb_sec_<timestamp>_<random>
+  if (token.startsWith('gb_sec_')) {
+    const parts = token.split('_');
+    const issuedAt = Number(parts[2]);
+    if (!Number.isNaN(issuedAt) && issuedAt > 0) {
+      const expiresAt = issuedAt + 72 * 60 * 60 * 1000;
+      if (Date.now() < expiresAt) {
+        const statelessSession: AdminSession = {
+          token,
+          email: 'gastonbarea.com@gmail.com',
+          name: 'Gastón Barea',
+          role: 'Director & Software Architect',
+          createdAt: new Date(issuedAt).toISOString(),
+          expiresAt,
+          ip: 'serverless',
+        };
+        activeAdminSessions.set(token, statelessSession);
+        return statelessSession;
+      }
+    }
+  }
+  return null;
+}
+
 // Verified Admin Authentication Middleware
 function requireAdminAuth(req: express.Request, res: express.Response, next: express.NextFunction) {
   const masterPasskey = process.env.ADMIN_PASSKEY || 'gaston2026';
   const token = (req.headers['x-admin-token'] as string) || (req.headers.authorization?.replace(/^Bearer\s+/i, ''));
 
-  // 1. Verify Active Session Token
-  if (token && activeAdminSessions.has(token)) {
-    const session = activeAdminSessions.get(token)!;
-    if (Date.now() < session.expiresAt) {
-      (req as any).adminUser = session;
-      return next();
-    } else {
-      activeAdminSessions.delete(token);
-    }
+  // 1. Verify Active or Stateless Session Token
+  const session = resolveAdminSession(token);
+  if (session) {
+    (req as any).adminUser = session;
+    return next();
   }
 
   // 2. Compatibility fallback with Master Passkey
@@ -940,24 +1172,20 @@ app.post('/api/admin/auth/resend-code', (req, res) => {
 // 1.4 Validate Current Active Session
 app.get('/api/admin/auth/verify-session', (req, res) => {
   const token = (req.headers['x-admin-token'] as string) || (req.headers.authorization?.replace(/^Bearer\s+/i, ''));
+  const session = resolveAdminSession(token);
 
-  if (token && activeAdminSessions.has(token)) {
-    const session = activeAdminSessions.get(token)!;
-    if (Date.now() < session.expiresAt) {
-      return res.json({
-        success: true,
-        authenticated: true,
-        user: {
-          email: session.email,
-          name: session.name,
-          role: session.role,
-          verifiedAt: session.createdAt,
-          expiresAt: new Date(session.expiresAt).toISOString(),
-        },
-      });
-    } else {
-      activeAdminSessions.delete(token);
-    }
+  if (session) {
+    return res.json({
+      success: true,
+      authenticated: true,
+      user: {
+        email: session.email,
+        name: session.name,
+        role: session.role,
+        verifiedAt: session.createdAt,
+        expiresAt: new Date(session.expiresAt).toISOString(),
+      },
+    });
   }
 
   return res.status(401).json({ success: false, authenticated: false, error: 'Sesión no válida o expirada' });
@@ -996,6 +1224,7 @@ app.post('/api/admin/auth', (req, res) => {
 app.get('/api/site-config', async (_req, res) => {
   if (supabase) {
     try {
+      await ensureSupabaseSeeded();
       const { data, error } = await supabase
         .from('site_settings')
         .select('config')
@@ -1194,6 +1423,7 @@ app.get('/api/crm/overview', requireAdminAuth, async (_req, res) => {
   // If Supabase is connected, attempt sync
   if (supabase) {
     try {
+      await ensureSupabaseSeeded();
       const [oppsRes, quotesRes, paysRes, configRes, compsRes, cntsRes] = await Promise.all([
         supabase.from('crm_opportunities').select('*').order('created_at', { ascending: false }),
         supabase.from('crm_quotes').select('*').order('created_at', { ascending: false }),
@@ -2241,7 +2471,7 @@ function getClientFromRequest(req: express.Request) {
 }
 
 // 0. Client Auth: Direct Login with Username/Email + Password
-app.post('/api/client/auth/login', (req, res) => {
+app.post('/api/client/auth/login', async (req, res) => {
   const { usernameOrEmail, email, username, password } = req.body || {};
   const identifier = (usernameOrEmail || email || username || '').toLowerCase().trim();
   const cleanPassword = (password || '').trim();
@@ -2251,6 +2481,35 @@ app.post('/api/client/auth/login', (req, res) => {
       success: false,
       error: 'Ingresa tu usuario (o correo electrónico) y contraseña.',
     });
+  }
+
+  if (supabase) {
+    try {
+      await ensureSupabaseSeeded();
+      const { data: cnts } = await supabase.from('crm_contacts').select('*');
+      if (cnts && cnts.length > 0) {
+        cachedCrmContacts = cnts.map((c: any) => ({
+          id: c.id,
+          fullName: c.full_name,
+          email: c.email,
+          username: c.username,
+          password: c.password || 'cliente2026',
+          phone: c.phone,
+          roleTitle: c.role_title,
+          contactType: c.contact_type || 'individual',
+          companyId: c.company_id,
+          companyName: c.company_name,
+          portalAccessStatus: c.portal_access_status || 'active',
+          hasActiveService: Boolean(c.has_active_service),
+          linkedProjectId: c.linked_project_id,
+          notes: c.notes,
+          createdAt: c.created_at,
+          updatedAt: c.updated_at,
+        }));
+      }
+    } catch (err) {
+      console.warn('Client login Supabase contacts sync fallback:', err);
+    }
   }
 
   // Match against CRM Contacts (which includes all corporate & individual portal users)
@@ -2320,7 +2579,7 @@ app.post('/api/client/auth/login', (req, res) => {
 });
 
 // 0.1 Client Auth: Open Registration (Corporate Member or Individual Contact — No active service required)
-app.post('/api/client/auth/register', (req, res) => {
+app.post('/api/client/auth/register', async (req, res) => {
   const {
     fullName,
     email,
@@ -2404,6 +2663,26 @@ app.post('/api/client/auth/register', (req, res) => {
       cachedCrmCompanies.unshift(newComp);
       resolvedCompanyId = newComp.id;
       resolvedCompanyName = newComp.name;
+
+      if (supabase) {
+        try {
+          await supabase.from('crm_companies').upsert({
+            id: newComp.id,
+            name: newComp.name,
+            tax_id: newComp.taxId || null,
+            industry: newComp.industry,
+            phone: newComp.phone || null,
+            email: newComp.email || null,
+            location: newComp.location,
+            tier: newComp.tier,
+            notes: newComp.notes,
+            created_at: newComp.createdAt,
+            updated_at: newComp.updatedAt,
+          });
+        } catch (err) {
+          console.error('Error saving registered company to Supabase:', err);
+        }
+      }
     }
   }
 
@@ -2432,6 +2711,31 @@ app.post('/api/client/auth/register', (req, res) => {
   };
 
   cachedCrmContacts.unshift(newContact);
+
+  if (supabase) {
+    try {
+      await supabase.from('crm_contacts').upsert({
+        id: newContact.id,
+        full_name: newContact.fullName,
+        email: newContact.email,
+        username: newContact.username,
+        password: newContact.password,
+        phone: newContact.phone || null,
+        role_title: newContact.roleTitle,
+        contact_type: newContact.contactType,
+        company_id: newContact.companyId || null,
+        company_name: newContact.companyName || null,
+        portal_access_status: newContact.portalAccessStatus,
+        has_active_service: newContact.hasActiveService,
+        linked_project_id: newContact.linkedProjectId || null,
+        notes: newContact.notes,
+        created_at: newContact.createdAt,
+        updated_at: newContact.updatedAt,
+      });
+    } catch (err) {
+      console.error('Error saving registered contact to Supabase:', err);
+    }
+  }
 
   const clientToken = `gb_cli_${Date.now()}_${Math.random().toString(36).substring(2)}`;
   const session = {
