@@ -67,8 +67,13 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
   const [passkeyInput, setPasskeyInput] = useState<string>('');
   const [authError, setAuthError] = useState<string>('');
 
-  // Active Tab: 'crm' | 'client_portal' | 'settings' | 'blog' | 'leads'
-  const [activeTab, setActiveTab] = useState<'crm' | 'client_portal' | 'settings' | 'blog' | 'leads'>('crm');
+  // Active Tab: 'crm' | 'client_portal' | 'settings' | 'blog' | 'leads' | 'infrastructure'
+  const [activeTab, setActiveTab] = useState<'crm' | 'client_portal' | 'settings' | 'blog' | 'leads' | 'infrastructure'>('crm');
+  const [infraStatus, setInfraStatus] = useState<any>(null);
+  const [isLoadingInfra, setIsLoadingInfra] = useState<boolean>(false);
+  const [testEmailTarget, setTestEmailTarget] = useState<string>('notificaciones@gastonbarea.com');
+  const [isSendingTestEmail, setIsSendingTestEmail] = useState<boolean>(false);
+  const [testEmailFeedback, setTestEmailFeedback] = useState<{ ok: boolean; msg: string } | null>(null);
 
   // Client Portal Admin State
   const [clientPortalData, setClientPortalData] = useState<{
@@ -142,14 +147,66 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
       .catch((e) => console.warn('Could not fetch blog posts:', e));
   }, [isOpen]);
 
-  // Load leads or client portal when switching tabs
+  // Load leads, client portal, or infrastructure status when switching tabs
   useEffect(() => {
     if (activeTab === 'leads' && isAuthenticated) {
       loadLeads();
     } else if (activeTab === 'client_portal' && isAuthenticated) {
       loadClientPortalData();
+    } else if (activeTab === 'infrastructure' && isAuthenticated) {
+      loadInfraStatus();
     }
   }, [activeTab, isAuthenticated]);
+
+  const loadInfraStatus = () => {
+    setIsLoadingInfra(true);
+    fetch('/api/health')
+      .then((res) => res.json())
+      .then((data) => {
+        setInfraStatus(data);
+      })
+      .catch((e) => console.error('Error fetching /api/health:', e))
+      .finally(() => setIsLoadingInfra(false));
+  };
+
+  const handleSendTestEmail = async () => {
+    setIsSendingTestEmail(true);
+    setTestEmailFeedback(null);
+    const token = localStorage.getItem('gb_admin_token') || sessionToken;
+    const passkey = localStorage.getItem('gb_master_passkey') || 'gaston2026';
+
+    try {
+      const res = await fetch('/api/admin/test-email', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-token': token,
+          'x-admin-passkey': passkey,
+        },
+        body: JSON.stringify({ to: testEmailTarget }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setTestEmailFeedback({
+          ok: true,
+          msg: `¡Correo enviado con éxito desde ${data.fromEmail} hacia ${data.targetEmail} vía ${data.provider}!`,
+        });
+        loadInfraStatus();
+      } else {
+        setTestEmailFeedback({
+          ok: false,
+          msg: data.error || 'No se pudo despachar el correo de prueba.',
+        });
+      }
+    } catch (err: any) {
+      setTestEmailFeedback({
+        ok: false,
+        msg: err?.message || 'Error de red al probar el envío de correo.',
+      });
+    } finally {
+      setIsSendingTestEmail(false);
+    }
+  };
 
   const loadClientPortalData = () => {
     const token = localStorage.getItem('gb_admin_token') || sessionToken;
@@ -482,6 +539,19 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
                 >
                   <Settings className="w-4 h-4 text-emerald-400" />
                   <span>Configuración del Sitio</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('infrastructure')}
+                  className={`w-full px-3.5 py-2.5 text-xs font-sans font-semibold transition-all flex items-center gap-2.5 cursor-pointer ${
+                    activeTab === 'infrastructure'
+                      ? 'bg-[#291B64] text-white border-l-2 border-sky-400'
+                      : 'text-neutral-300 hover:bg-white/[0.06] hover:text-white'
+                  }`}
+                >
+                  <ShieldCheck className="w-4 h-4 text-cyan-400" />
+                  <span>DNS, Correo & Stack</span>
                 </button>
               </nav>
             </div>
@@ -1513,6 +1583,260 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
                         ))}
                       </div>
                     )}
+                  </div>
+                </div>
+              )}
+
+              {/* TAB 5: INFRASTRUCTURE, DNS, CYBERPANEL & RESEND.COM */}
+              {activeTab === 'infrastructure' && (
+                <div className="space-y-6 max-w-4xl">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 pb-4">
+                    <div>
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-[10px] font-mono uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold">
+                          gastonbarea.com · Producción Activa
+                        </span>
+                        <span className="text-[11px] font-mono text-slate-500">
+                          Cloudflare + Vercel + Supabase + CyberPanel (138.219.41.106) + Resend.com
+                        </span>
+                      </div>
+                      <h4 className="text-lg font-bold text-slate-900">
+                        Estado de Infraestructura, Correo Oficial & Variables de Entorno
+                      </h4>
+                      <p className="text-xs text-slate-500">
+                        Diagnóstico en vivo de la base de datos PostgreSQL, servidor de correo CyberPanel (notificaciones@gastonbarea.com), envíos por Resend.com y motor Gemini IA.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={loadInfraStatus}
+                      className="px-3.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold transition-colors flex items-center gap-1.5 self-start cursor-pointer"
+                    >
+                      <RefreshCw className={`w-3.5 h-3.5 text-slate-600 ${isLoadingInfra ? 'animate-spin' : ''}`} />
+                      <span>Verificar Stack</span>
+                    </button>
+                  </div>
+
+                  {/* Live Status Cards */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-mono font-bold uppercase text-slate-500">
+                          Base de Datos PostgreSQL
+                        </span>
+                        <span
+                          className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-full ${
+                            infraStatus?.infrastructure?.supabase?.persistenceMode === 'postgresql_live'
+                              ? 'bg-emerald-100 text-emerald-800'
+                              : 'bg-amber-100 text-amber-800'
+                          }`}
+                        >
+                          {infraStatus?.infrastructure?.supabase?.persistenceMode === 'postgresql_live'
+                            ? '✓ ACTIVO (LIVE)'
+                            : 'EN VERIFICACIÓN'}
+                        </span>
+                      </div>
+                      <div className="text-sm font-bold text-slate-900">Supabase PostgreSQL</div>
+                      <div className="text-[11px] font-mono text-slate-600 truncate">
+                        Host: {infraStatus?.infrastructure?.supabase?.projectHost || 'fovrtxiqtfcsrrtbqeoc.supabase.co'}
+                      </div>
+                    </div>
+
+                    <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-mono font-bold uppercase text-slate-500">
+                          Correo Transaccional
+                        </span>
+                        <span
+                          className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-full ${
+                            infraStatus?.infrastructure?.emailService?.configured
+                              ? 'bg-emerald-100 text-emerald-800'
+                              : 'bg-amber-100 text-amber-800'
+                          }`}
+                        >
+                          {infraStatus?.infrastructure?.emailService?.configured
+                            ? '✓ API KEY ACTIVA'
+                            : 'FALTA API KEY EN VERCEL'}
+                        </span>
+                      </div>
+                      <div className="text-sm font-bold text-slate-900">
+                        Resend.com + CyberPanel
+                      </div>
+                      <div className="text-[11px] font-mono text-slate-600">
+                        Cuenta: {infraStatus?.infrastructure?.emailService?.fromEmail || 'notificaciones@gastonbarea.com'} · IP: 138.219.41.106
+                      </div>
+                    </div>
+
+                    <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-mono font-bold uppercase text-slate-500">
+                          Motor Generativo IA
+                        </span>
+                        <span
+                          className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-full ${
+                            infraStatus?.infrastructure?.geminiAi?.configured
+                              ? 'bg-emerald-100 text-emerald-800'
+                              : 'bg-amber-100 text-amber-800'
+                          }`}
+                        >
+                          {infraStatus?.infrastructure?.geminiAi?.configured
+                            ? '✓ GEMINI EN VIVO'
+                            : 'MODO DETERMINÍSTICO'}
+                        </span>
+                      </div>
+                      <div className="text-sm font-bold text-slate-900">Google AI Studio (Gemini)</div>
+                      <div className="text-[11px] font-mono text-slate-600">
+                        Variable: GEMINI_API_KEY
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Live Email Test Box */}
+                  <div className="p-5 rounded-2xl bg-blue-50/60 border border-blue-200 space-y-3">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <div>
+                        <h5 className="text-xs font-mono font-bold uppercase text-blue-800 flex items-center gap-1.5">
+                          <Mail className="w-4 h-4" />
+                          <span>Prueba de Envío en Vivo (notificaciones@gastonbarea.com vía Resend.com)</span>
+                        </h5>
+                        <p className="text-xs text-slate-600 mt-0.5">
+                          Verifica que el dominio gastonbarea.com en Resend.com despache correos hacia tu casilla de CyberPanel o correo personal.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                      <input
+                        type="email"
+                        value={testEmailTarget}
+                        onChange={(e) => setTestEmailTarget(e.target.value)}
+                        placeholder="notificaciones@gastonbarea.com"
+                        className="flex-1 px-3.5 py-2 bg-white border border-slate-300 rounded-xl text-xs font-mono text-slate-900"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleSendTestEmail}
+                        disabled={isSendingTestEmail || !testEmailTarget.trim()}
+                        className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                      >
+                        {isSendingTestEmail ? (
+                          <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <Send className="w-3.5 h-3.5" />
+                        )}
+                        <span>Enviar Correo de Prueba</span>
+                      </button>
+                    </div>
+
+                    {testEmailFeedback && (
+                      <div
+                        className={`p-3 rounded-xl text-xs font-medium flex items-center gap-2 ${
+                          testEmailFeedback.ok
+                            ? 'bg-emerald-100 text-emerald-900 border border-emerald-300'
+                            : 'bg-rose-100 text-rose-900 border border-rose-300'
+                        }`}
+                      >
+                        {testEmailFeedback.ok ? (
+                          <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-700" />
+                        ) : (
+                          <AlertCircle className="w-4 h-4 shrink-0 text-rose-700" />
+                        )}
+                        <span>{testEmailFeedback.msg}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Vercel Environment Variables Reference */}
+                  <div className="p-5 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
+                    <h5 className="text-xs font-mono font-bold uppercase text-slate-800">
+                      1. Variables para agregar en Vercel → Project Settings → Environment Variables
+                    </h5>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left border-collapse text-xs">
+                        <thead>
+                          <tr className="border-b border-slate-200 text-slate-500 font-mono text-[11px]">
+                            <th className="py-2 pr-3">Nombre de Variable (Key)</th>
+                            <th className="py-2 pr-3">Valor a Pegar (Value)</th>
+                            <th className="py-2">Función en gastonbarea.com</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-200/70 font-mono text-[11px]">
+                          <tr>
+                            <td className="py-2.5 pr-3 font-bold text-blue-700">RESEND_API_KEY</td>
+                            <td className="py-2.5 pr-3 text-slate-700">re_xxxxxxxxx (tu API Key de Resend.com)</td>
+                            <td className="py-2.5 font-sans text-slate-600">
+                              Envío automático desde notificaciones@gastonbarea.com (también compatible si la cargás como SENDER_API_KEY).
+                            </td>
+                          </tr>
+                          <tr>
+                            <td className="py-2.5 pr-3 font-bold text-blue-700">GEMINI_API_KEY</td>
+                            <td className="py-2.5 pr-3 text-slate-700">AIzaSyxxxxxxx (tu clave de Google AI Studio)</td>
+                            <td className="py-2.5 font-sans text-slate-600">
+                              Activa la generación en vivo del Estructurador de Proyectos y el Gemelo Digital.
+                            </td>
+                          </tr>
+                          <tr>
+                            <td className="py-2.5 pr-3 font-bold text-slate-800">FROM_EMAIL</td>
+                            <td className="py-2.5 pr-3 text-emerald-700 font-bold">notificaciones@gastonbarea.com</td>
+                            <td className="py-2.5 font-sans text-slate-600">
+                              Ya preconfigurado por defecto en el código (casilla activa en CyberPanel).
+                            </td>
+                          </tr>
+                          <tr>
+                            <td className="py-2.5 pr-3 font-bold text-slate-800">NOTIFICATION_EMAIL</td>
+                            <td className="py-2.5 pr-3 text-emerald-700 font-bold">notificaciones@gastonbarea.com</td>
+                            <td className="py-2.5 font-sans text-slate-600">
+                              Recibe alertas inmediatas de nuevos diagnósticos y contactos (con copia de respaldo).
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* Cloudflare DNS Architecture Table (CyberPanel + Resend Coexistence) */}
+                  <div className="p-5 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
+                    <h5 className="text-xs font-mono font-bold uppercase text-slate-800">
+                      2. Registros DNS en Cloudflare (Coexistencia CyberPanel 138.219.41.106 + Resend.com)
+                    </h5>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left border-collapse text-xs">
+                        <thead>
+                          <tr className="border-b border-slate-200 text-slate-500 font-mono text-[11px]">
+                            <th className="py-2 pr-3">Tipo</th>
+                            <th className="py-2 pr-3">Nombre</th>
+                            <th className="py-2 pr-3">Contenido / Destino</th>
+                            <th className="py-2">Proxy / Notas</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-200/70 font-mono text-[11px]">
+                          <tr>
+                            <td className="py-2 pr-3 font-bold text-slate-900">A</td>
+                            <td className="py-2 pr-3 text-blue-700">mail</td>
+                            <td className="py-2 pr-3 text-slate-800">138.219.41.106</td>
+                            <td className="py-2 font-sans text-slate-600">DNS Only (Nube Gris) · Servidor CyberPanel</td>
+                          </tr>
+                          <tr>
+                            <td className="py-2 pr-3 font-bold text-slate-900">MX</td>
+                            <td className="py-2 pr-3 text-blue-700">@</td>
+                            <td className="py-2 pr-3 text-slate-800">mail.gastonbarea.com (Prioridad 10)</td>
+                            <td className="py-2 font-sans text-slate-600">Recibe correos entrantes en notificaciones@gastonbarea.com</td>
+                          </tr>
+                          <tr>
+                            <td className="py-2 pr-3 font-bold text-slate-900">TXT (SPF)</td>
+                            <td className="py-2 pr-3 text-blue-700">@</td>
+                            <td className="py-2 pr-3 text-emerald-800 font-bold">v=spf1 a mx ip4:138.219.41.106 include:amazonses.com ~all</td>
+                            <td className="py-2 font-sans text-slate-600">Unifica CyberPanel + Resend.com sin conflictos</td>
+                          </tr>
+                          <tr>
+                            <td className="py-2 pr-3 font-bold text-slate-900">TXT (DKIM)</td>
+                            <td className="py-2 pr-3 text-blue-700">resend._domainkey</td>
+                            <td className="py-2 pr-3 text-slate-700">(Clave pública DKIM verificada en Resend)</td>
+                            <td className="py-2 font-sans text-slate-600">Firma criptográfica saliente de Resend.com</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
                 </div>
               )}

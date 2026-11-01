@@ -1,9 +1,68 @@
 import { SITE_CONFIG } from '../data/siteConfig.ts';
 
-const senderApiKey = process.env.SENDER_API_KEY;
-const notificationEmail = process.env.NOTIFICATION_EMAIL || SITE_CONFIG.email || 'gastonbarea.com@gmail.com';
-const fromEmail = process.env.FROM_EMAIL || 'gaston@gastonbarea.com';
-const fromName = process.env.FROM_NAME || 'Gastón Barea';
+function resolveEmailConfig() {
+  const rawResendKey = process.env.RESEND_API_KEY?.trim() || '';
+  const rawSenderKey = process.env.SENDER_API_KEY?.trim() || '';
+
+  const isPlaceholder = (val: string) =>
+    !val ||
+    val === 'your_sender_api_token' ||
+    val === 're_your_resend_api_key' ||
+    val === 'MY_RESEND_API_KEY';
+
+  const activeApiKey = !isPlaceholder(rawResendKey)
+    ? rawResendKey
+    : !isPlaceholder(rawSenderKey)
+    ? rawSenderKey
+    : '';
+
+  // Use Resend.com by default (or whenever RESEND_API_KEY is set or key starts with re_)
+  const useSenderNet =
+    process.env.EMAIL_PROVIDER?.toLowerCase() === 'sender' &&
+    !rawResendKey &&
+    !activeApiKey.startsWith('re_');
+
+  const fromEmail = process.env.FROM_EMAIL?.trim() || 'notificaciones@gastonbarea.com';
+  const fromName = process.env.FROM_NAME?.trim() || 'Gastón Barea';
+  const notificationEmail =
+    process.env.NOTIFICATION_EMAIL?.trim() || 'notificaciones@gastonbarea.com';
+  const backupNotificationEmail =
+    process.env.BACKUP_NOTIFICATION_EMAIL?.trim() ||
+    SITE_CONFIG.email ||
+    'gastonbarea.com@gmail.com';
+
+  return {
+    activeApiKey,
+    configured: Boolean(activeApiKey),
+    provider: useSenderNet ? 'sender.net' : 'resend.com',
+    keySource: !isPlaceholder(rawResendKey)
+      ? 'RESEND_API_KEY'
+      : !isPlaceholder(rawSenderKey)
+      ? 'SENDER_API_KEY'
+      : 'none',
+    fromEmail,
+    fromName,
+    notificationEmail,
+    backupNotificationEmail,
+    cyberpanelServerIp: '138.219.41.106',
+    domain: 'gastonbarea.com',
+  };
+}
+
+export function getEmailConfigStatus() {
+  const cfg = resolveEmailConfig();
+  return {
+    configured: cfg.configured,
+    provider: cfg.provider,
+    keySource: cfg.keySource,
+    fromEmail: cfg.fromEmail,
+    fromName: cfg.fromName,
+    notificationEmail: cfg.notificationEmail,
+    backupNotificationEmail: cfg.backupNotificationEmail,
+    cyberpanelServerIp: cfg.cyberpanelServerIp,
+    domain: cfg.domain,
+  };
+}
 
 export interface ProposalPayload {
   organizationType: string;
@@ -28,31 +87,69 @@ export interface ContactPayload {
   requirements: string;
 }
 
-interface SenderEmailMessage {
-  to: { email: string; name?: string };
+interface OutboundEmailMessage {
+  to: { email: string; name?: string } | { email: string; name?: string }[];
   subject: string;
   html: string;
+  replyTo?: string;
 }
 
 /**
- * Dispatches transactional email via Sender API (https://api.sender.net/v2/message/send)
+ * Dispatches transactional email via Resend.com API (https://api.resend.com/emails)
+ * with automatic compatibility fallback for Sender.net if explicitly configured.
  */
-async function dispatchSenderEmail(message: SenderEmailMessage) {
+async function dispatchTransactionalEmail(message: OutboundEmailMessage) {
+  const cfg = resolveEmailConfig();
+  const recipients = Array.isArray(message.to) ? message.to : [message.to];
+  const uniqueEmails = Array.from(
+    new Set(recipients.map((r) => r.email.trim()).filter((e) => /\S+@\S+\.\S+/.test(e)))
+  );
+
+  if (uniqueEmails.length === 0) {
+    throw new Error('No se especificó ningún destinatario válido.');
+  }
+
+  if (cfg.provider === 'resend.com') {
+    const response = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${cfg.activeApiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        from: `${cfg.fromName} <${cfg.fromEmail}>`,
+        to: uniqueEmails,
+        reply_to: message.replyTo || cfg.notificationEmail,
+        subject: message.subject,
+        html: message.html,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text().catch(() => '');
+      throw new Error(`Resend API HTTP ${response.status}: ${errorText}`);
+    }
+
+    return response.json().catch(() => ({ status: 'sent', provider: 'resend.com' }));
+  }
+
+  // Fallback to Sender.net if explicitly chosen
+  const primaryRecipient = recipients[0];
   const response = await fetch('https://api.sender.net/v2/message/send', {
     method: 'POST',
     headers: {
-      Authorization: `Bearer ${senderApiKey}`,
+      Authorization: `Bearer ${cfg.activeApiKey}`,
       'Content-Type': 'application/json',
       Accept: 'application/json',
     },
     body: JSON.stringify({
       from: {
-        email: fromEmail,
-        name: fromName,
+        email: cfg.fromEmail,
+        name: cfg.fromName,
       },
       to: {
-        email: message.to.email,
-        name: message.to.name || message.to.email.split('@')[0],
+        email: primaryRecipient.email,
+        name: primaryRecipient.name || primaryRecipient.email.split('@')[0],
       },
       subject: message.subject,
       html: message.html,
@@ -64,13 +161,14 @@ async function dispatchSenderEmail(message: SenderEmailMessage) {
     throw new Error(`Sender API HTTP ${response.status}: ${errorText}`);
   }
 
-  return response.json().catch(() => ({ status: 'sent' }));
+  return response.json().catch(() => ({ status: 'sent', provider: 'sender.net' }));
 }
 
 /**
  * Generates an executive responsive HTML email
  */
 function buildProposalHtml(data: ProposalPayload): string {
+  const cfg = resolveEmailConfig();
   const calendlyUrl = process.env.VITE_CALENDLY_URL || SITE_CONFIG.booking.calendlyUrl;
   const stackItems = (data.recommendedStack || [])
     .map(
@@ -179,7 +277,7 @@ function buildProposalHtml(data: ProposalPayload): string {
               <div style="margin-top:4px;">Chubut, Patagonia Argentina · Proyectos Remotos Globales</div>
               <div style="margin-top:4px;font-size:11px;color:#94a3b8;">
                 <a href="https://gastonbarea.com" style="color:#2563eb;text-decoration:none;">gastonbarea.com</a> · 
-                <a href="mailto:${notificationEmail}" style="color:#2563eb;text-decoration:none;">${notificationEmail}</a>
+                <a href="mailto:${cfg.fromEmail}" style="color:#2563eb;text-decoration:none;">${cfg.fromEmail}</a>
               </div>
             </td>
           </tr>
@@ -194,18 +292,22 @@ function buildProposalHtml(data: ProposalPayload): string {
 }
 
 /**
- * Dispatches automated emails via Sender API for new proposals:
+ * Dispatches automated emails via Resend.com for new proposals:
  * 1. To the client (if email was provided)
- * 2. To Gastón Barea (immediate notification alert)
+ * 2. To Gastón Barea (notificaciones@gastonbarea.com + backup email)
  */
 export async function sendProposalAutomation(payload: ProposalPayload) {
-  if (!senderApiKey || senderApiKey === 'your_sender_api_token') {
-    console.info('[Email Notification - Sender] SENDER_API_KEY pendiente de configurar. Correo registrado en modo local:');
-    console.info(`- Notificación a: ${notificationEmail}`);
+  const cfg = resolveEmailConfig();
+
+  if (!cfg.configured) {
+    console.info(
+      '[Email Notification - Resend] RESEND_API_KEY / SENDER_API_KEY pendiente de configurar. Correo registrado en modo local:'
+    );
+    console.info(`- Notificación a: ${cfg.notificationEmail}`);
     if (payload.clientEmail) {
       console.info(`- Confirmación a cliente: ${payload.clientEmail}`);
     }
-    return { success: true, mocked: true };
+    return { success: true, mocked: true, provider: cfg.provider };
   }
 
   try {
@@ -215,22 +317,31 @@ export async function sendProposalAutomation(payload: ProposalPayload) {
     // 1. Send confirmation to client if provided
     if (payload.clientEmail && /\S+@\S+\.\S+/.test(payload.clientEmail)) {
       emailPromises.push(
-        dispatchSenderEmail({
+        dispatchTransactionalEmail({
           to: { email: payload.clientEmail, name: payload.clientName },
+          replyTo: cfg.notificationEmail,
           subject: `Especificación de Arquitectura: ${payload.architectureTitle} [Gastón Barea]`,
           html: htmlContent,
         })
       );
     }
 
-    // 2. Send instant briefing alert to Gastón
+    // 2. Send instant briefing alert to Gastón (notificaciones@gastonbarea.com + backup)
+    const internalRecipients = [
+      { email: cfg.notificationEmail, name: 'Gastón Barea' },
+      ...(cfg.backupNotificationEmail && cfg.backupNotificationEmail !== cfg.notificationEmail
+        ? [{ email: cfg.backupNotificationEmail, name: 'Gastón Barea' }]
+        : []),
+    ];
+
     emailPromises.push(
-      dispatchSenderEmail({
-        to: { email: notificationEmail, name: 'Gastón Barea' },
+      dispatchTransactionalEmail({
+        to: internalRecipients,
+        replyTo: payload.clientEmail || cfg.notificationEmail,
         subject: `[NUEVO PROSPECTO] ${payload.companyName || payload.organizationType} - Urgencia: ${payload.urgency || 'Media'}`,
         html: `
           <div style="font-family:sans-serif;padding:16px;">
-            <h2 style="color:#1e3a8a;">Nuevo Diagnóstico Generado</h2>
+            <h2 style="color:#1e3a8a;">Nuevo Diagnóstico Generado en gastonbarea.com</h2>
             <p><strong>Organización:</strong> ${payload.organizationType} (${payload.companyName || 'No indicado'})</p>
             <p><strong>Desafío Principal:</strong> ${payload.primaryChallenge}</p>
             <p><strong>Stack Actual:</strong> ${(payload.currentStack || []).join(', ') || 'Sin especificar'}</p>
@@ -248,33 +359,45 @@ export async function sendProposalAutomation(payload: ProposalPayload) {
     );
 
     const results = await Promise.all(emailPromises);
-    return { success: true, results };
+    return { success: true, provider: cfg.provider, results };
   } catch (error: any) {
-    console.error('[Sender Email Automation] Error enviando correos automatizados:', error);
-    return { success: false, error: error.message };
+    console.error('[Email Automation] Error enviando correos automatizados:', error);
+    return { success: false, provider: cfg.provider, error: error.message };
   }
 }
 
 /**
- * Dispatches automated notifications via Sender API for contact form inquiries
+ * Dispatches automated notifications via Resend.com for contact form inquiries
  */
 export async function sendContactAutomation(payload: ContactPayload) {
-  if (!senderApiKey || senderApiKey === 'your_sender_api_token') {
-    console.info('[Email Notification - Sender] SENDER_API_KEY pendiente de configurar. Consulta registrada en modo local:');
-    console.info(`- Alerta para Gastón: ${notificationEmail}`);
+  const cfg = resolveEmailConfig();
+
+  if (!cfg.configured) {
+    console.info(
+      '[Email Notification - Resend] RESEND_API_KEY / SENDER_API_KEY pendiente de configurar. Consulta registrada en modo local:'
+    );
+    console.info(`- Alerta para Gastón: ${cfg.notificationEmail}`);
     console.info(`- Agradecimiento para: ${payload.email}`);
-    return { success: true, mocked: true };
+    return { success: true, mocked: true, provider: cfg.provider };
   }
 
   try {
+    const internalRecipients = [
+      { email: cfg.notificationEmail, name: 'Gastón Barea' },
+      ...(cfg.backupNotificationEmail && cfg.backupNotificationEmail !== cfg.notificationEmail
+        ? [{ email: cfg.backupNotificationEmail, name: 'Gastón Barea' }]
+        : []),
+    ];
+
     const emailPromises: Promise<any>[] = [
       // Alert to Gastón
-      dispatchSenderEmail({
-        to: { email: notificationEmail, name: 'Gastón Barea' },
+      dispatchTransactionalEmail({
+        to: internalRecipients,
+        replyTo: payload.email,
         subject: `[CONTACTO WEB] Consulta de ${payload.name} (${payload.company || 'Particular'})`,
         html: `
           <div style="font-family:sans-serif;padding:16px;">
-            <h2 style="color:#1e3a8a;">Nueva Consulta de Contacto Directo</h2>
+            <h2 style="color:#1e3a8a;">Nueva Consulta de Contacto Directo en gastonbarea.com</h2>
             <p><strong>Nombre:</strong> ${payload.name}</p>
             <p><strong>Email:</strong> ${payload.email}</p>
             <p><strong>Empresa:</strong> ${payload.company || 'N/A'}</p>
@@ -286,24 +409,105 @@ export async function sendContactAutomation(payload: ContactPayload) {
         `,
       }),
       // Auto-reply to client
-      dispatchSenderEmail({
+      dispatchTransactionalEmail({
         to: { email: payload.email, name: payload.name },
+        replyTo: cfg.notificationEmail,
         subject: `Hemos recibido tu consulta técnica [Gastón Barea]`,
         html: `
           <div style="font-family:sans-serif;padding:20px;max-width:550px;margin:0 auto;color:#334155;">
             <h3 style="color:#0f172a;">Hola ${payload.name},</h3>
             <p>Muchas gracias por ponerte en contacto. He recibido tu mensaje respecto al área de <strong>${payload.serviceArea}</strong>.</p>
             <p>Revisaré los requerimientos técnicos y te responderé en el transcurso del día para evaluar la viabilidad o coordinar una llamada de diagnóstico.</p>
-            <p style="margin-top:24px;">Atentamente,<br><strong>Gastón Barea</strong><br><span style="font-size:12px;color:#64748b;">Arquitecto de Software & Consultor Tecnológico</span></p>
+            <p style="margin-top:24px;">Atentamente,<br><strong>Gastón Barea</strong><br><span style="font-size:12px;color:#64748b;">Arquitecto de Software & Consultor Tecnológico · gastonbarea.com</span></p>
           </div>
         `,
       }),
     ];
 
     const results = await Promise.all(emailPromises);
-    return { success: true, results };
+    return { success: true, provider: cfg.provider, results };
   } catch (error: any) {
-    console.error('[Sender Email Automation] Error en envío de consulta:', error);
-    return { success: false, error: error.message };
+    console.error('[Email Automation] Error en envío de consulta:', error);
+    return { success: false, provider: cfg.provider, error: error.message };
+  }
+}
+
+/**
+ * Sends a live diagnostic test email via Resend.com to verify CyberPanel + Resend + Vercel stack
+ */
+export async function sendTestTransactionalEmail(recipientOverride?: string) {
+  const cfg = resolveEmailConfig();
+  const targetEmail = (recipientOverride || cfg.notificationEmail).trim();
+
+  if (!cfg.configured) {
+    return {
+      success: false,
+      configured: false,
+      provider: cfg.provider,
+      fromEmail: cfg.fromEmail,
+      targetEmail,
+      error:
+        'Aún no se detectó RESEND_API_KEY (o SENDER_API_KEY) en las variables de entorno de Vercel. Agregala en Vercel → Project Settings → Environment Variables y hacé Redeploy.',
+    };
+  }
+
+  try {
+    const result = await dispatchTransactionalEmail({
+      to: { email: targetEmail, name: 'Gastón Barea' },
+      replyTo: cfg.notificationEmail,
+      subject: `✓ Prueba de Correo Transaccional Activa · gastonbarea.com`,
+      html: `
+        <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;padding:24px;max-width:560px;margin:0 auto;background:#ffffff;border:1px solid #e2e8f0;border-radius:14px;color:#0f172a;">
+          <div style="font-family:monospace;font-size:11px;font-weight:700;color:#2563eb;text-transform:uppercase;letter-spacing:1px;">
+            INFRAESTRUCTURA VERIFICADA · GASTONBAREA.COM
+          </div>
+          <h2 style="margin:8px 0 12px 0;color:#0f172a;font-size:18px;">
+            ¡Conexión Resend.com + CyberPanel (138.219.41.106) Operativa!
+          </h2>
+          <p style="font-size:14px;line-height:1.6;color:#334155;">
+            Este correo confirma que el motor de notificaciones de <strong>gastonbarea.com</strong> está autenticado y despachando desde <strong>${cfg.fromEmail}</strong>.
+          </p>
+          <table width="100%" cellpadding="8" cellspacing="0" style="margin:16px 0;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;font-size:12px;font-family:monospace;">
+            <tr>
+              <td style="color:#64748b;">Remitente (From):</td>
+              <td style="font-weight:700;color:#0f172a;">${cfg.fromName} &lt;${cfg.fromEmail}&gt;</td>
+            </tr>
+            <tr>
+              <td style="color:#64748b;">Destinatario (To):</td>
+              <td style="font-weight:700;color:#0f172a;">${targetEmail}</td>
+            </tr>
+            <tr>
+              <td style="color:#64748b;">Servidor Correo Entrante:</td>
+              <td style="font-weight:700;color:#0f172a;">CyberPanel (${cfg.cyberpanelServerIp})</td>
+            </tr>
+            <tr>
+              <td style="color:#64748b;">Proveedor Saliente API:</td>
+              <td style="font-weight:700;color:#16a34a;">${cfg.provider} (${cfg.keySource})</td>
+            </tr>
+          </table>
+          <p style="font-size:12px;color:#64748b;margin-bottom:0;">
+            Fecha de verificación: ${new Date().toISOString()}
+          </p>
+        </div>
+      `,
+    });
+
+    return {
+      success: true,
+      configured: true,
+      provider: cfg.provider,
+      fromEmail: cfg.fromEmail,
+      targetEmail,
+      result,
+    };
+  } catch (err: any) {
+    return {
+      success: false,
+      configured: true,
+      provider: cfg.provider,
+      fromEmail: cfg.fromEmail,
+      targetEmail,
+      error: err?.message || 'Error al despachar el correo de prueba.',
+    };
   }
 }

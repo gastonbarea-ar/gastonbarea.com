@@ -4,7 +4,12 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { GoogleGenAI, Type } from '@google/genai';
 import { createClient } from '@supabase/supabase-js';
-import { sendProposalAutomation, sendContactAutomation } from './src/services/emailAutomation.ts';
+import {
+  sendProposalAutomation,
+  sendContactAutomation,
+  sendTestTransactionalEmail,
+  getEmailConfigStatus,
+} from './src/services/emailAutomation.ts';
 import { SITE_CONFIG } from './src/data/siteConfig.ts';
 import { INITIAL_BLOG_POSTS } from './src/data/blogData.ts';
 import {
@@ -150,10 +155,15 @@ app.get(['/api/health', '/health', '/api/infrastructure/status'], async (_req, r
       geminiAi: {
         configured: Boolean(apiKey),
       },
+      emailService: getEmailConfigStatus(),
       senderEmail: {
-        configured: Boolean(process.env.SENDER_API_KEY),
-        notificationEmail: process.env.NOTIFICATION_EMAIL || 'gastonbarea.com@gmail.com',
-        fromEmail: process.env.FROM_EMAIL || 'gaston@gastonbarea.com',
+        configured: getEmailConfigStatus().configured,
+        provider: getEmailConfigStatus().provider,
+        keySource: getEmailConfigStatus().keySource,
+        notificationEmail: getEmailConfigStatus().notificationEmail,
+        fromEmail: getEmailConfigStatus().fromEmail,
+        cyberpanelServerIp: getEmailConfigStatus().cyberpanelServerIp,
+        domain: getEmailConfigStatus().domain,
       },
     },
     timestamp: new Date().toISOString(),
@@ -968,6 +978,7 @@ app.post('/api/admin/auth/login', (req, res) => {
 
   const validIdentifiers = [
     'gastonbarea.com@gmail.com',
+    'notificaciones@gastonbarea.com',
     'gaston@gastonbarea.com',
     'admin@gastonbarea.com',
     'gaston.barea',
@@ -1035,6 +1046,7 @@ app.post('/api/admin/auth/verify-step-1', (req, res) => {
 
   const validEmails = [
     'gastonbarea.com@gmail.com',
+    'notificaciones@gastonbarea.com',
     'gaston@gastonbarea.com',
     'admin@gastonbarea.com',
     'admin',
@@ -3134,6 +3146,23 @@ app.patch('/api/admin/client-portal/tickets/:id', requireAdminAuth, (req, res) =
   }
 
   return res.json({ success: true, ticket });
+});
+
+// 12. Admin Side: Live Test Transactional Email (Resend.com + CyberPanel notificaciones@gastonbarea.com)
+app.post('/api/admin/test-email', requireAdminAuth, async (req, res) => {
+  try {
+    const recipient = (req.body?.to || '').trim() || undefined;
+    const testResult = await sendTestTransactionalEmail(recipient);
+    if (!testResult.success) {
+      return res.status(400).json(testResult);
+    }
+    return res.json(testResult);
+  } catch (err: any) {
+    return res.status(500).json({
+      success: false,
+      error: err?.message || 'Error inesperado al probar envío de correo.',
+    });
+  }
 });
 
 async function startServer() {
