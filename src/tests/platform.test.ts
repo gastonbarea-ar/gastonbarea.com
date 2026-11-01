@@ -7,6 +7,7 @@ import {
   generateRuleBasedProposal,
   maskEmail,
   extractYoutubeId,
+  isValidPublicDirectVideoUrl,
   filterProjectsCatalog,
   validateContactForm,
   buildCustomSolutionBlueprint,
@@ -157,7 +158,7 @@ describe('4. Catálogo y Filtrado de Proyectos Realizados & En Producción', () 
   });
 });
 
-describe('5. Utilidades de Seguridad, Validación y Video (maskEmail, extractYoutubeId, validateContactForm)', () => {
+describe('5. Utilidades de Seguridad, Validación y Video (maskEmail, extractYoutubeId, isValidPublicDirectVideoUrl, validateContactForm)', () => {
   it('debe enmascarar correos electrónicos preservando privacidad', () => {
     assert.equal(maskEmail('gastonbarea.com@gmail.com'), 'ga***m@gmail.com');
     assert.equal(maskEmail('invalido'), '***@***');
@@ -170,6 +171,28 @@ describe('5. Utilidades de Seguridad, Validación y Video (maskEmail, extractYou
       'XVYUP8Pz-hE'
     );
     assert.equal(extractYoutubeId('XVYUP8Pz-hE'), 'XVYUP8Pz-hE');
+  });
+
+  it('debe validar URLs públicas de video Cloudflare R2 (.mp4/.webm) y rechazar endpoints privados S3 (*.r2.cloudflarestorage.com)', () => {
+    assert.equal(
+      isValidPublicDirectVideoUrl(
+        'https://pub-eae6e588df744c44ab3e62f36cc7875d.r2.dev/gemini_generated_video_05630b9d.mp4'
+      ),
+      true
+    );
+    assert.equal(
+      isValidPublicDirectVideoUrl(
+        'https://9b32f0a2e23de4ef4eb71f41ca9ee3f6.r2.cloudflarestorage.com/media-gaston'
+      ),
+      false
+    );
+    assert.equal(
+      isValidPublicDirectVideoUrl(
+        'https://9b32f0a2e23de4ef4eb71f41ca9ee3f6.r2.cloudflarestorage.com/media-gaston/video.mp4'
+      ),
+      false
+    );
+    assert.equal(isValidPublicDirectVideoUrl('https://pub-eae6e588df744c44ab3e62f36cc7875d.r2.dev/'), false);
   });
 
   it('debe validar correctamente el formulario ejecutivo de contacto', () => {
@@ -195,9 +218,13 @@ describe('5. Utilidades de Seguridad, Validación y Video (maskEmail, extractYou
 });
 
 describe('6. Integridad de Datos de Configuración, Blog, CRM y Portal de Clientes', () => {
-  it('debe mantener la configuración principal de GASTONBAREA.COM coherente', () => {
+  it('debe mantener la configuración principal de GASTONBAREA.COM coherente con stream directo Cloudflare R2', () => {
     assert.equal(SITE_CONFIG.domain, 'gastonbarea.com');
     assert.equal(SITE_CONFIG.presentationVideo.youtubeId, 'XVYUP8Pz-hE');
+    assert.equal(
+      isValidPublicDirectVideoUrl(SITE_CONFIG.presentationVideo.directVideoUrl || ''),
+      true
+    );
     assert.ok(INITIAL_BLOG_POSTS.length > 0);
     assert.ok(INITIAL_CRM_OPPORTUNITIES.length > 0);
     assert.ok(INITIAL_CRM_QUOTES.length > 0);

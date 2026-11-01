@@ -678,7 +678,7 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
 
                       <div>
                         <label className="block text-xs font-medium text-slate-700 mb-1">
-                          URL de Video Directo .mp4 / .webm (Cloudflare R2 / CDN - Opcional)
+                          URL Pública de Video Directo .mp4 / .webm (Cloudflare R2 / CDN - Opcional)
                         </label>
                         <input
                           type="url"
@@ -692,12 +692,26 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
                               },
                             })
                           }
-                          placeholder="Ej: https://pub-xxxx.r2.dev/presentacion-gaston-barea.mp4 (Si se deja vacío, usa YouTube)"
+                          placeholder="Ej: https://pub-xxxx.r2.dev/presentacion.mp4 o https://cdn.gastonbarea.com/presentacion.mp4"
                           className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-xl text-xs font-mono text-slate-900"
                         />
-                        <p className="text-[11px] text-slate-500 mt-1">
-                          Al pegar un link público de Cloudflare R2 o CDN (.mp4/.webm), el reproductor cambia automáticamente a HTML5 nativo con object-fit: cover y cero consumo de ancho de banda en tu servidor.
-                        </p>
+                        {siteConfig.presentationVideo?.directVideoUrl?.includes('r2.cloudflarestorage.com') ? (
+                          <div className="mt-2 p-2.5 rounded-lg bg-amber-50 border border-amber-300 text-[11px] text-amber-900 leading-relaxed">
+                            <strong>⚠️ Atención:</strong> La URL <code>*.r2.cloudflarestorage.com</code> es el <strong>endpoint privado de la API S3</strong> (bloquea el acceso desde navegadores) y además apunta solo al bucket <code>/media-gaston</code> sin el archivo <code>.mp4</code>.<br />
+                            <strong>Cómo obtener el link público en 3 clics:</strong> En Cloudflare R2 → Bucket <code>media-gaston</code> → pestaña <strong>Settings</strong> → en <strong>Public Development URL (r2.dev)</strong> hacé clic en <em>Enable</em> (o conectá <code>cdn.gastonbarea.com</code> en Custom Domains) y agregá al final el nombre de tu archivo: <code>https://pub-xxxx.r2.dev/tu-video.mp4</code>.
+                          </div>
+                        ) : siteConfig.presentationVideo?.directVideoUrl &&
+                          !/\.(mp4|webm|m3u8|mov)(\?.*)?$/i.test(
+                            siteConfig.presentationVideo.directVideoUrl.trim()
+                          ) ? (
+                          <div className="mt-2 p-2.5 rounded-lg bg-amber-50 border border-amber-300 text-[11px] text-amber-900 leading-relaxed">
+                            <strong>⚠️ Falta el nombre del archivo de video:</strong> Asegurate de que la URL termine con el nombre del archivo subido al bucket (por ejemplo: <code>/presentacion.mp4</code>).
+                          </div>
+                        ) : (
+                          <p className="text-[11px] text-slate-500 mt-1">
+                            Al pegar un link público de Cloudflare R2 (<code>https://pub-xxxx.r2.dev/archivo.mp4</code> o <code>https://cdn.gastonbarea.com/archivo.mp4</code>), el reproductor cambia automáticamente a HTML5 nativo con object-fit: cover.
+                          </p>
+                        )}
                       </div>
 
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

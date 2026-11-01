@@ -67,6 +67,8 @@ export const Hero: React.FC<HeroProps> = ({
   const [showVideoSelector, setShowVideoSelector] = useState<boolean>(false);
   const [overrideYoutubeId, setOverrideYoutubeId] = useState<string>('');
   const [overrideDirectVideoUrl, setOverrideDirectVideoUrl] = useState<string>('');
+  const [directVideoError, setDirectVideoError] = useState<string>('');
+  const [directVideoLoadFailed, setDirectVideoLoadFailed] = useState<boolean>(false);
   const [videoFitMode, setVideoFitMode] = useState<'cover' | 'contain'>('cover');
 
   const [isImmersionActive, setIsImmersionActive] = useState<boolean>(false);
@@ -114,8 +116,33 @@ export const Hero: React.FC<HeroProps> = ({
       ? videoConfig.youtubeId
       : 'XVYUP8Pz-hE';
   const primaryYoutubeId = overrideYoutubeId || resolvedConfigId;
-  const activeDirectVideoUrl =
+
+  const rawDirectVideoUrl =
     overrideDirectVideoUrl || videoConfig.directVideoUrl?.trim() || '';
+
+  const isPrivateR2S3Endpoint = (url: string) =>
+    url.toLowerCase().includes('r2.cloudflarestorage.com');
+
+  const hasPlayableVideoPath = (url: string) => {
+    if (!url) return false;
+    if (isPrivateR2S3Endpoint(url)) return false;
+    try {
+      const parsed = new URL(url);
+      // Must have a path beyond "/" (e.g. /video.mp4)
+      return parsed.pathname.length > 1 && /\.(mp4|webm|m3u8|mov)(\?.*)?$/i.test(parsed.pathname);
+    } catch {
+      return /\.(mp4|webm|m3u8|mov)(\?.*)?$/i.test(url);
+    }
+  };
+
+  const activeDirectVideoUrl =
+    rawDirectVideoUrl &&
+    !isPrivateR2S3Endpoint(rawDirectVideoUrl) &&
+    hasPlayableVideoPath(rawDirectVideoUrl) &&
+    !directVideoLoadFailed
+      ? rawDirectVideoUrl
+      : '';
+
   const youtubeChannelUrl = liveConfig.social?.youtube || 'https://www.youtube.com/@gastonbarea';
 
   const channelPlaylist: ChannelVideoItem[] = [
@@ -169,12 +196,28 @@ export const Hero: React.FC<HeroProps> = ({
     const trimmed = customYoutubeInput.trim();
     if (!trimmed) return;
 
-    // Detect if user pasted a direct MP4/WebM/HLS URL (e.g. Cloudflare R2 / CDN)
+    if (isPrivateR2S3Endpoint(trimmed)) {
+      setDirectVideoError(
+        'La URL *.r2.cloudflarestorage.com es el endpoint privado de la API S3 del bucket (no reproduce en navegadores) y además falta el nombre del archivo .mp4. En Cloudflare R2 entrá a tu bucket "media-gaston" → pestaña "Settings" → habilitá "Public Development URL (r2.dev)" o "Custom Domains" y copiá el link público terminado en /tu-video.mp4.'
+      );
+      return;
+    }
+
     if (
-      /\.(mp4|webm|m3u8)(\?.*)?$/i.test(trimmed) ||
-      trimmed.includes('r2.dev/') ||
-      trimmed.includes('cloudflare')
+      (trimmed.includes('r2.dev') || trimmed.includes('cloudflare') || trimmed.startsWith('http')) &&
+      !extractYoutubeId(trimmed) &&
+      !hasPlayableVideoPath(trimmed)
     ) {
+      setDirectVideoError(
+        'A la URL le falta el nombre del archivo de video al final (por ejemplo: https://pub-xxxx.r2.dev/presentacion.mp4). Entrá al objeto dentro del bucket "media-gaston" y copiá su Public URL completa con extensión .mp4 o .webm.'
+      );
+      return;
+    }
+
+    // Detect if user pasted a valid direct MP4/WebM/HLS URL (e.g. Cloudflare R2 pub-*.r2.dev / CDN)
+    if (hasPlayableVideoPath(trimmed)) {
+      setDirectVideoError('');
+      setDirectVideoLoadFailed(false);
       setOverrideDirectVideoUrl(trimmed);
       setIsImmersionActive(true);
       setIsMuted(false);
@@ -185,6 +228,8 @@ export const Hero: React.FC<HeroProps> = ({
 
     const extracted = extractYoutubeId(trimmed);
     if (extracted) {
+      setDirectVideoError('');
+      setDirectVideoLoadFailed(false);
       setOverrideDirectVideoUrl('');
       setOverrideYoutubeId(extracted);
       setIsImmersionActive(true);
@@ -273,29 +318,39 @@ export const Hero: React.FC<HeroProps> = ({
       <div className="w-full pt-16 bg-[#08080C] text-white overflow-hidden">
         {/* Optional YouTube or Cloudflare R2 Direct MP4 URL Loader Bar */}
         {showVideoSelector && (
-          <form
-            onSubmit={handleApplyCustomVideo}
-            className="w-full px-4 sm:px-8 lg:px-12 py-3.5 bg-[#12121A] flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 border-b border-white/10"
-          >
-            <div className="text-xs font-mono text-neutral-300">
-              Pegá una URL directa <strong className="text-emerald-400">.mp4 / Cloudflare R2</strong> o el ID/URL de <strong className="text-white">YouTube</strong>:
-            </div>
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-              <input
-                type="text"
-                value={customYoutubeInput}
-                onChange={(e) => setCustomYoutubeInput(e.target.value)}
-                placeholder="https://pub-xxx.r2.dev/video.mp4 o https://youtu.be/XVYUP8Pz-hE"
-                className="px-3.5 py-2 text-xs font-mono bg-black/60 text-white rounded-none border border-white/15 focus:outline-none focus:border-white sm:min-w-[340px]"
-              />
-              <button
-                type="submit"
-                className="px-4 py-2 text-xs font-mono font-bold text-white bg-[#291B64] hover:bg-[#382586] rounded-none transition-colors cursor-pointer whitespace-nowrap"
-              >
-                Cargar Stream
-              </button>
-            </div>
-          </form>
+          <div className="w-full px-4 sm:px-8 lg:px-12 py-3.5 bg-[#12121A] border-b border-white/10 space-y-2.5">
+            <form
+              onSubmit={handleApplyCustomVideo}
+              className="w-full flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3"
+            >
+              <div className="text-xs font-mono text-neutral-300">
+                Pegá una URL pública <strong className="text-emerald-400">Cloudflare R2 (pub-xxx.r2.dev/archivo.mp4)</strong> o el ID/URL de <strong className="text-white">YouTube</strong>:
+              </div>
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                <input
+                  type="text"
+                  value={customYoutubeInput}
+                  onChange={(e) => {
+                    setCustomYoutubeInput(e.target.value);
+                    if (directVideoError) setDirectVideoError('');
+                  }}
+                  placeholder="https://pub-xxx.r2.dev/video.mp4 o https://youtu.be/XVYUP8Pz-hE"
+                  className="px-3.5 py-2 text-xs font-mono bg-black/60 text-white rounded-none border border-white/15 focus:outline-none focus:border-white sm:min-w-[340px]"
+                />
+                <button
+                  type="submit"
+                  className="px-4 py-2 text-xs font-mono font-bold text-white bg-[#291B64] hover:bg-[#382586] rounded-none transition-colors cursor-pointer whitespace-nowrap"
+                >
+                  Cargar Stream
+                </button>
+              </div>
+            </form>
+            {directVideoError && (
+              <div className="p-2.5 bg-amber-500/15 border border-amber-400/40 text-amber-200 text-xs font-mono leading-relaxed">
+                ⚠️ {directVideoError}
+              </div>
+            )}
+          </div>
         )}
 
         {/* Main Full-Bleed Cinema Split (Zero Overlap on Mobile & Desktop) */}
@@ -324,6 +379,12 @@ export const Hero: React.FC<HeroProps> = ({
                   playsInline
                   controls
                   preload="metadata"
+                  onError={() => {
+                    setDirectVideoLoadFailed(true);
+                    setDirectVideoError(
+                      'No se pudo cargar el archivo de video directo desde esa URL (verificá que el bucket tenga acceso público r2.dev o dominio propio y que el nombre del archivo .mp4 sea exacto). Se activó el respaldo de YouTube automáticamente.'
+                    );
+                  }}
                   className={`w-full h-full ${
                     videoFitMode === 'cover' ? 'object-cover' : 'object-contain'
                   }`}

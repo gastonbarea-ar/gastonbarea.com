@@ -114,7 +114,9 @@ export const SITE_CONFIG: SiteConfig = {
 
   presentationVideo: {
     youtubeId: 'XVYUP8Pz-hE',
-    directVideoUrl: getEnvVar('VITE_DIRECT_VIDEO_URL') || '',
+    directVideoUrl:
+      getEnvVar('VITE_DIRECT_VIDEO_URL') ||
+      'https://pub-eae6e588df744c44ab3e62f36cc7875d.r2.dev/gemini_generated_video_05630b9d.mp4',
     videoFitMode: 'cover',
     title: 'Proyectos de Base Tecnológica y Bioeconomía: De la Estrategia a la Ejecución Productiva',
     subtitle: '30 años en el sector tecnológico-productivo y 14 años dirigiendo proyectos estratégicos con clientes.',

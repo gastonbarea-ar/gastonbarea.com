@@ -1128,3 +1128,20 @@ export function buildCustomSolutionBlueprint(rawQuery: string): CustomAiSolution
   };
 }
 
+/**
+ * Validates whether a URL is a playable public direct video URL (e.g., Cloudflare R2 pub-*.r2.dev or CDN .mp4/.webm),
+ * rejecting private S3 API endpoints (*.r2.cloudflarestorage.com) or bucket paths without a video file extension.
+ */
+export function isValidPublicDirectVideoUrl(rawUrl: string): boolean {
+  const trimmed = (rawUrl || '').trim();
+  if (!trimmed) return false;
+  if (trimmed.toLowerCase().includes('r2.cloudflarestorage.com')) return false;
+  try {
+    const parsed = new URL(trimmed);
+    return parsed.pathname.length > 1 && /\.(mp4|webm|m3u8|mov)(\?.*)?$/i.test(parsed.pathname);
+  } catch {
+    return /\.(mp4|webm|m3u8|mov)(\?.*)?$/i.test(trimmed);
+  }
+}
+
+
