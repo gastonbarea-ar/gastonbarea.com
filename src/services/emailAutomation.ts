@@ -910,21 +910,39 @@ export async function sendAiStudyEmail(params: {
   </html>`;
 
   try {
-    const internalRecipients = getInternalNotificationRecipients(cfg);
-    const result = await dispatchTransactionalEmail({
-      to: [{ email: clientEmail, name: clientName }, ...internalRecipients],
-      replyTo: cfg.notificationEmail,
-      subject: `📄 Estudio Técnico IA: ${blueprint.solutionTitle} [Gastón Barea]`,
-      html,
-    });
+    const internalRecipients = [
+      { email: cfg.notificationEmail, name: 'Gastón Barea' },
+      ...(cfg.backupNotificationEmail && cfg.backupNotificationEmail !== cfg.notificationEmail
+        ? [{ email: cfg.backupNotificationEmail, name: 'Gastón Barea' }]
+        : []),
+    ];
+
+    const [clientRes, internalRes] = await Promise.allSettled([
+      dispatchTransactionalEmail({
+        to: { email: clientEmail, name: clientName },
+        replyTo: cfg.notificationEmail,
+        subject: `📄 Estudio Técnico IA: ${blueprint.solutionTitle} [Gastón Barea]`,
+        html,
+      }),
+      dispatchTransactionalEmail({
+        to: internalRecipients,
+        replyTo: clientEmail,
+        subject: `[NUEVO ESTUDIO IA REGISTRADO] ${clientName} (${companyName || 'Particular'}) · ${blueprint.solutionTitle}`,
+        html,
+      }),
+    ]);
+
     return {
-      success: true,
+      success: clientRes.status === 'fulfilled' || internalRes.status === 'fulfilled',
       configured: true,
       provider: cfg.provider,
       fromEmail: cfg.fromEmail,
       targetEmail: clientEmail,
       phone,
-      result,
+      result: {
+        client: clientRes.status === 'fulfilled' ? clientRes.value : clientRes.reason?.message,
+        internal: internalRes.status === 'fulfilled' ? internalRes.value : internalRes.reason?.message,
+      },
     };
   } catch (err: any) {
     console.error('[sendAiStudyEmail Error]:', err);

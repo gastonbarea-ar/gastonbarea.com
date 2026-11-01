@@ -1135,26 +1135,29 @@ app.post('/api/send-ai-study', async (req, res) => {
     .join(' | ');
 
   // 1. Auto-provision Company, Contact (with Portal access) and Kanban Opportunity
-  let provisioned: any = null;
+  let provisionedOpp: any = null;
+  let matchedContact: any = null;
   try {
-    provisioned = await autoProvisionCrmFromWebLead({
-      name: cleanName,
-      email: cleanEmail,
-      company: cleanCompany,
-      phone: cleanPhone,
-      title: `Estudio IA: ${resolvedBlueprint.solutionTitle}`,
-      serviceText: `${resolvedBlueprint.primaryVertical || ''} ${resolvedBlueprint.solutionTitle || ''}`,
-      notes: `[ESTUDIO TÉCNICO IA ENVIADO POR EMAIL]\nConsulta: ${resolvedBlueprint.query}\nDiagnóstico: ${resolvedBlueprint.executiveDiagnosis}\nMódulos: ${servicesSummary}\nPlazo estimado: ${resolvedBlueprint.estimatedTimeline}`,
+    provisionedOpp = await autoProvisionCrmFromWebLead({
       source: 'web_diagnostic',
-      estimatedValue: 4800,
+      clientName: cleanName,
+      clientEmail: cleanEmail,
+      clientPhone: cleanPhone,
+      companyName: cleanCompany,
+      title: `Estudio IA: ${resolvedBlueprint.solutionTitle}`,
+      rawTextForCategory: `${resolvedBlueprint.primaryVertical || ''} ${resolvedBlueprint.solutionTitle || ''} ${resolvedBlueprint.query || ''}`,
+      notes: `[ESTUDIO TÉCNICO IA ENVIADO POR EMAIL]\nConsulta: ${resolvedBlueprint.query}\nDiagnóstico: ${resolvedBlueprint.executiveDiagnosis}\nMódulos: ${servicesSummary}\nPlazo estimado: ${resolvedBlueprint.estimatedTimeline}`,
     });
+    if (provisionedOpp?.contactId) {
+      matchedContact = cachedCrmContacts.find((c) => c.id === provisionedOpp.contactId);
+    }
   } catch (err) {
     console.error('[send-ai-study] Error provisioning CRM lead:', err);
   }
 
   const portalCredentials = {
-    username: provisioned?.contact?.username || cleanEmail,
-    password: provisioned?.contact?.password || 'cliente2026',
+    username: matchedContact?.username || cleanEmail,
+    password: matchedContact?.password || 'cliente2026',
   };
 
   // 2. Dispatch complete AI Technical Study HTML email via Resend
@@ -1180,7 +1183,7 @@ app.post('/api/send-ai-study', async (req, res) => {
     emailSent: emailResult.success,
     emailProvider: emailResult.provider,
     portalAccount: portalCredentials,
-    opportunity: provisioned?.opportunity || null,
+    opportunity: provisionedOpp || null,
     waMeUrl,
     message:
       '¡Estudio técnico enviado a tu correo electrónico y vinculado a tu Portal de Clientes!',
@@ -2235,21 +2238,81 @@ app.get('/api/crm/opportunities', requireAdminAuth, (_req, res) => {
   return res.json({ success: true, opportunities: cachedOpportunities });
 });
 
-app.post('/api/crm/opportunities', requireAdminAuth, async (req, res) => {
-  const syncedLinks = syncContactAndCompanyFromOpportunity(req.body || {});
+app.post('/api/crm/opportunities', async (req, res) => {
+  const body = req.body || {};
+  const normalizedClientName = (body.clientName || body.name || 'Cliente Ejecutivo').trim();
+  const normalizedClientEmail = (body.clientEmail || body.contactEmail || body.email || '').trim().toLowerCase();
+  const normalizedClientPhone = (body.clientPhone || body.phone || '').trim();
+  const normalizedCompany = (body.company || body.companyName || '').trim();
+  const normalizedTitle = (body.title || body.projectTitle || 'Oportunidad de Arquitectura').trim();
+  const normalizedValue = Number(body.value ?? body.estimatedBudget ?? 4800) || 4800;
+  const normalizedStage =
+    body.stage === 'diagnostico' || !body.stage ? 'lead' : body.stage;
+
+  const normalizedPayload = {
+    ...body,
+    title: normalizedTitle,
+    clientName: normalizedClientName,
+    clientEmail: normalizedClientEmail,
+    clientPhone: normalizedClientPhone,
+    company: normalizedCompany,
+    value: normalizedValue,
+    stage: normalizedStage,
+  };
+
+  const syncedLinks = syncContactAndCompanyFromOpportunity(normalizedPayload);
   const newOpp = {
-    ...req.body,
-    id: req.body.id || `opp-${Date.now()}`,
-    companyId: req.body.companyId || syncedLinks.companyId,
-    contactId: req.body.contactId || syncedLinks.contactId,
-    createdAt: req.body.createdAt || new Date().toISOString(),
+    ...normalizedPayload,
+    id: body.id || `opp-${Date.now()}`,
+    companyId: body.companyId || syncedLinks.companyId,
+    contactId: body.contactId || syncedLinks.contactId,
+    createdAt: body.createdAt || new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
 
   cachedOpportunities.unshift(newOpp);
 
+  const matchedContact = syncedLinks.contactId
+    ? cachedCrmContacts.find((c) => c.id === syncedLinks.contactId)
+    : null;
+  const matchedCompany = syncedLinks.companyId
+    ? cachedCrmCompanies.find((c) => c.id === syncedLinks.companyId)
+    : null;
+
   if (supabase) {
     try {
+      if (matchedCompany) {
+        await supabase.from('crm_companies').upsert({
+          id: matchedCompany.id,
+          name: matchedCompany.name,
+          industry: matchedCompany.industry,
+          phone: matchedCompany.phone || null,
+          email: matchedCompany.email || null,
+          tier: matchedCompany.tier || 'pyme',
+          notes: matchedCompany.notes || null,
+          created_at: matchedCompany.createdAt,
+          updated_at: matchedCompany.updatedAt,
+        });
+      }
+      if (matchedContact) {
+        await supabase.from('crm_contacts').upsert({
+          id: matchedContact.id,
+          full_name: matchedContact.fullName,
+          email: matchedContact.email,
+          username: matchedContact.username,
+          password: matchedContact.password || 'cliente2026',
+          phone: matchedContact.phone || null,
+          role_title: matchedContact.roleTitle,
+          contact_type: matchedContact.contactType,
+          company_id: matchedContact.companyId || null,
+          company_name: matchedContact.companyName || null,
+          portal_access_status: 'active',
+          has_active_service: Boolean(matchedContact.hasActiveService),
+          notes: matchedContact.notes || null,
+          created_at: matchedContact.createdAt,
+          updated_at: matchedContact.updatedAt,
+        });
+      }
       await supabase.from('crm_opportunities').upsert({
         id: newOpp.id,
         title: newOpp.title,
@@ -2257,14 +2320,14 @@ app.post('/api/crm/opportunities', requireAdminAuth, async (req, res) => {
         client_email: newOpp.clientEmail,
         client_phone: newOpp.clientPhone || null,
         company: newOpp.company || null,
-        service_category: newOpp.serviceCategory,
+        service_category: newOpp.serviceCategory || 'software_architecture',
         stage: newOpp.stage || 'lead',
         value: newOpp.value || 0,
         currency: newOpp.currency || 'USD',
-        probability: newOpp.probability || 30,
+        probability: newOpp.probability || 45,
         expected_close_date: newOpp.expectedCloseDate || null,
         notes: newOpp.notes || null,
-        source: newOpp.source || 'manual',
+        source: newOpp.source || 'web_diagnostic',
         created_at: newOpp.createdAt,
         updated_at: newOpp.updatedAt,
         linked_quote_id: newOpp.linkedQuoteId || null,
@@ -2274,9 +2337,28 @@ app.post('/api/crm/opportunities', requireAdminAuth, async (req, res) => {
     }
   }
 
+  const portalAccount = {
+    username: matchedContact?.username || normalizedClientEmail,
+    password: matchedContact?.password || 'cliente2026',
+  };
+
+  // If submitted from #solucion-ia public page, also dispatch the study/confirmation email in background
+  if (normalizedClientEmail && (body.contactEmail || body.projectTitle)) {
+    const synthesizedBp = buildCustomSolutionBlueprint(normalizedTitle);
+    sendAiStudyEmail({
+      clientName: normalizedClientName,
+      clientEmail: normalizedClientEmail,
+      companyName: normalizedCompany,
+      phone: normalizedClientPhone,
+      blueprint: synthesizedBp,
+      portalCredentials: portalAccount,
+    }).catch((err) => console.error('Background study email error:', err));
+  }
+
   return res.json({
     success: true,
     opportunity: newOpp,
+    portalAccount,
     companies: cachedCrmCompanies,
     contacts: cachedCrmContacts,
   });
