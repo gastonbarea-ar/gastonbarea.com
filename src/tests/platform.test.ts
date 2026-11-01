@@ -29,6 +29,10 @@ import {
   setRuntimeWhatsAppConfig,
   dispatchWhatsAppMessage,
 } from '../services/whatsappAutomation.ts';
+import {
+  buildGoogleCalendarInviteUrl,
+  getBookingTypeLabel,
+} from '../services/emailAutomation.ts';
 
 describe('1. Enrutamiento y Navegación de Secciones (resolvePageFromHash & resolveServiceCodeFromHash)', () => {
   it('debe resolver correctamente las páginas principales del menú superior y los workspaces dedicados', () => {
@@ -328,7 +332,24 @@ describe('8. Integración WhatsApp Business API & Automatizaciones CRM (whatsapp
     assert.equal(dispatchRes.toPhone, '5492995137574');
     assert.ok(dispatchRes.waMeFallbackUrl.startsWith('https://wa.me/5492995137574?text='));
   });
+
+  it('debe generar enlaces automáticos de Google Calendar con horarios GMT-3 convertidos a UTC y enlace Google Meet Pro', () => {
+    assert.equal(getBookingTypeLabel('discovery_ia'), 'Diagnóstico & Propuesta IA (30 min)');
+    const calUrl = buildGoogleCalendarInviteUrl({
+      clientName: 'Gastón Prueba',
+      company: 'XGaston',
+      type: 'discovery_ia',
+      date: '2026-11-12',
+      timeSlot: '15:00 - 15:45 (GMT-3)',
+      meetingUrl: 'https://meet.google.com/gastonbarea-consultoria',
+      agendaTopic: 'Evaluar estudio preliminar IA',
+    });
+    assert.ok(calUrl.startsWith('https://calendar.google.com/calendar/render?action=TEMPLATE'));
+    assert.ok(calUrl.includes('dates=20261112T180000Z/20261112T184500Z'));
+    assert.ok(calUrl.includes(encodeURIComponent('https://meet.google.com/gastonbarea-consultoria')));
+  });
 });
+
 
 
 

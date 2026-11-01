@@ -11,6 +11,9 @@ import {
   sendOfficialQuoteEmail,
   sendProjectKickoffEmail,
   sendAiStudyEmail,
+  sendBookingConfirmationEmail,
+  buildGoogleCalendarInviteUrl,
+  getBookingTypeLabel,
   getEmailConfigStatus,
 } from './src/services/emailAutomation.ts';
 import {
@@ -3894,27 +3897,157 @@ app.post('/api/client/tickets', (req, res) => {
   return res.json({ success: true, ticket: newTicket });
 });
 
-// 8. Client: Book Consulting Advisory Call
-app.post('/api/client/bookings', (req, res) => {
+// 8. Client & Public: Book Consulting Advisory Call (Automated Meet Link + Google Calendar + Resend Email + CRM Sync)
+app.post('/api/client/bookings', async (req, res) => {
   const client = getClientFromRequest(req);
-  const { type, date, timeSlot, agendaTopic } = req.body || {};
+  const { type, date, timeSlot, agendaTopic, clientEmail, clientName, company, phone } =
+    req.body || {};
+
+  const resolvedEmail = (
+    client?.email ||
+    clientEmail ||
+    'cliente@empresa.com'
+  )
+    .trim()
+    .toLowerCase();
+  const resolvedName = (
+    client?.name ||
+    clientName ||
+    resolvedEmail.split('@')[0] ||
+    'Cliente'
+  ).trim();
+  const resolvedCompany = (
+    client?.company ||
+    company ||
+    'Contacto Individual'
+  ).trim();
+  const resolvedPhone = (phone || '').trim();
+  const resolvedType = type || 'discovery_ia';
+  const resolvedDate = date || new Date().toISOString().split('T')[0];
+  const resolvedSlot = timeSlot || '15:00 - 15:45 (GMT-3)';
+  const resolvedTopic = (
+    agendaTopic || 'Reunión de diagnóstico técnico y seguimiento de arquitectura'
+  ).trim();
+
+  const baseMeetUrl =
+    cachedSiteConfig?.booking?.googleMeetUrl ||
+    SITE_CONFIG.booking.googleMeetUrl ||
+    'https://meet.google.com/gastonbarea-consultoria';
+
+  const googleCalendarUrl = buildGoogleCalendarInviteUrl({
+    clientName: resolvedName,
+    company: resolvedCompany,
+    type: resolvedType,
+    date: resolvedDate,
+    timeSlot: resolvedSlot,
+    meetingUrl: baseMeetUrl,
+    agendaTopic: resolvedTopic,
+  });
+
+  const bookingId = `book-${Date.now()}`;
+
+  // Ensure contact exists in CRM directory & update nextAction on any related Opportunity
+  if (resolvedEmail && resolvedEmail !== 'cliente@empresa.com') {
+    const existingContact = cachedCrmContacts.find(
+      (c) => c.email.toLowerCase() === resolvedEmail
+    );
+    if (!existingContact) {
+      cachedCrmContacts.unshift({
+        id: `cnt-book-${Date.now()}`,
+        fullName: resolvedName,
+        email: resolvedEmail,
+        username: resolvedEmail.split('@')[0],
+        phone: resolvedPhone || undefined,
+        roleTitle: 'Ejecutivo / Solicitante Meet',
+        contactType:
+          resolvedCompany && resolvedCompany !== 'Contacto Individual'
+            ? 'corporate_member'
+            : 'individual',
+        companyName: resolvedCompany,
+        portalAccessStatus: 'active',
+        hasActiveService: false,
+        isPrimaryContact: true,
+        notes: `Agendó sesión ${getBookingTypeLabel(resolvedType)} para el ${resolvedDate} (${resolvedSlot}).`,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+    }
+
+    cachedOpportunities.forEach((opp) => {
+      if (opp.clientEmail.toLowerCase() === resolvedEmail) {
+        opp.nextAction = `Videollamada Meet (${resolvedDate} · ${resolvedSlot}): ${resolvedTopic}`;
+        opp.nextActionDate = resolvedDate;
+        opp.updatedAt = new Date().toISOString();
+      }
+    });
+  }
+
+  let emailSent = false;
+  if (resolvedEmail && resolvedEmail.includes('@') && resolvedEmail !== 'cliente@empresa.com') {
+    try {
+      const emailResult = await sendBookingConfirmationEmail({
+        bookingId,
+        clientName: resolvedName,
+        clientEmail: resolvedEmail,
+        company: resolvedCompany,
+        phone: resolvedPhone,
+        type: resolvedType,
+        date: resolvedDate,
+        timeSlot: resolvedSlot,
+        meetingUrl: baseMeetUrl,
+        googleCalendarUrl,
+        agendaTopic: resolvedTopic,
+      });
+      emailSent = Boolean(emailResult?.success);
+    } catch (err) {
+      console.warn('[Booking Email Dispatch Warning]:', err);
+    }
+  }
+
+  if (resolvedPhone) {
+    dispatchWhatsAppMessage({
+      toPhone: resolvedPhone,
+      clientName: resolvedName,
+      category: 'booking_reminder',
+      customMessage: `Hola ${resolvedName}, confirmamos tu videollamada Google Meet con Gastón Barea (${getBookingTypeLabel(
+        resolvedType
+      )}) para el día ${resolvedDate} a las ${resolvedSlot}.\n\n🎥 Sala Google Meet: ${baseMeetUrl}\n📅 Agregar a Google Calendar: ${googleCalendarUrl}`,
+    }).catch(() => {});
+  }
 
   const newBooking = {
-    id: `book-${Date.now()}`,
-    clientEmail: client?.email || req.body.clientEmail || 'cliente@empresa.com',
-    clientName: client?.name || req.body.clientName || 'Cliente',
-    company: client?.company || 'Empresa',
-    type: type || 'sprint_review',
-    date: date || new Date().toISOString().split('T')[0],
-    timeSlot: timeSlot || '15:00 - 15:45 (GMT-3)',
-    meetingUrl: 'https://meet.google.com/gastonbarea-consultoria',
-    agendaTopic: agendaTopic || 'Reunión de seguimiento técnico de proyecto',
+    id: bookingId,
+    clientEmail: resolvedEmail,
+    clientName: resolvedName,
+    company: resolvedCompany,
+    phone: resolvedPhone || undefined,
+    type: resolvedType,
+    date: resolvedDate,
+    timeSlot: resolvedSlot,
+    meetingUrl: baseMeetUrl,
+    googleCalendarUrl,
+    emailSent,
+    agendaTopic: resolvedTopic,
     status: 'confirmed' as const,
     createdAt: new Date().toISOString(),
   };
 
   cachedClientBookings.unshift(newBooking);
-  return res.json({ success: true, booking: newBooking });
+
+  const whatsappText = `Hola Gastón, acabo de agendar nuestra videollamada "${getBookingTypeLabel(
+    resolvedType
+  )}" para el día ${resolvedDate} en el horario ${resolvedSlot}. Tema: ${resolvedTopic}`;
+  const whatsappConfirmUrl = `https://wa.me/${
+    SITE_CONFIG.whatsapp.phoneNumber || '5492804697193'
+  }?text=${encodeURIComponent(whatsappText)}`;
+
+  return res.json({
+    success: true,
+    booking: newBooking,
+    emailSent,
+    googleCalendarUrl,
+    whatsappConfirmUrl,
+  });
 });
 
 // 9. Admin Side: View all client inquiries & tickets

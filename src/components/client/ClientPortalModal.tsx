@@ -140,16 +140,33 @@ export const ClientPortalModal: React.FC<ClientPortalModalProps> = ({ isOpen = t
   const [isSubmittingTicket, setIsSubmittingTicket] = useState<boolean>(false);
 
   // New booking modal
-  const [isNewBookingOpen, setIsNewBookingOpen] = useState<boolean>(false);
-  const [bookingType, setBookingType] = useState<'sprint_review' | 'architecture_advisory' | 'incident_postmortem' | 'emergency_audit'>('sprint_review');
+  const [isNewBookingOpen, setIsNewBookingOpen] = useState<boolean>(true);
+  const [bookingType, setBookingType] = useState<
+    | 'discovery_ia'
+    | 'sprint_review'
+    | 'architecture_advisory'
+    | 'incident_postmortem'
+    | 'emergency_audit'
+  >('discovery_ia');
   const [bookingDate, setBookingDate] = useState<string>(() => {
     const d = new Date();
-    d.setDate(d.getDate() + 2);
+    d.setDate(d.getDate() + 1);
+    if (d.getDay() === 6) d.setDate(d.getDate() + 2);
+    if (d.getDay() === 0) d.setDate(d.getDate() + 1);
     return d.toISOString().split('T')[0];
   });
   const [bookingSlot, setBookingSlot] = useState<string>('15:00 - 15:45 (GMT-3)');
-  const [bookingTopic, setBookingTopic] = useState<string>('');
+  const [bookingTopic, setBookingTopic] = useState<string>(
+    'Evaluación de propuesta técnica, alcance y hoja de ruta 40/40/20'
+  );
+  const [bookingPhone, setBookingPhone] = useState<string>('');
   const [isSubmittingBooking, setIsSubmittingBooking] = useState<boolean>(false);
+  const [lastBookingConfirmation, setLastBookingConfirmation] = useState<{
+    booking: ConsultingBooking;
+    emailSent: boolean;
+    googleCalendarUrl: string;
+    whatsappConfirmUrl: string;
+  } | null>(null);
 
   // Milestone payment detail modal
   const [selectedMilestoneForPayment, setSelectedMilestoneForPayment] = useState<ProjectMilestoneItem | null>(null);
@@ -770,24 +787,112 @@ export const ClientPortalModal: React.FC<ClientPortalModalProps> = ({ isOpen = t
     setTicketDescription('');
   };
 
+  const getUpcomingBusinessDays = () => {
+    const days: { iso: string; shortLabel: string; dayName: string }[] = [];
+    const weekdayNames = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+    const monthNames = [
+      'Ene',
+      'Feb',
+      'Mar',
+      'Abr',
+      'May',
+      'Jun',
+      'Jul',
+      'Ago',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dic',
+    ];
+    const cursor = new Date();
+    let added = 0;
+    let offset = 0;
+    while (added < 5 && offset < 14) {
+      offset++;
+      const d = new Date(cursor);
+      d.setDate(cursor.getDate() + offset);
+      const dow = d.getDay();
+      if (dow !== 0 && dow !== 6) {
+        const iso = d.toISOString().split('T')[0];
+        const dayName = offset === 1 ? 'Mañana' : weekdayNames[dow];
+        const shortLabel = `${d.getDate()} ${monthNames[d.getMonth()]}`;
+        days.push({ iso, shortLabel, dayName });
+        added++;
+      }
+    }
+    return days;
+  };
+
+  const getFriendlyBookingTypeTitle = (type?: string) => {
+    switch (type) {
+      case 'discovery_ia':
+        return 'Diagnóstico & Propuesta IA (30 min)';
+      case 'sprint_review':
+        return 'Sprint Review & Demo en Staging (45 min)';
+      case 'architecture_advisory':
+        return 'Asesoría de Arquitectura, Odoo & Bioeconomía (45 min)';
+      case 'emergency_audit':
+        return 'Soporte Prioritario & Auditoría (30 min)';
+      case 'incident_postmortem':
+        return 'Revisión Operativa & Postmortem (30 min)';
+      default:
+        return 'Sesión 1-on-1 de Consultoría';
+    }
+  };
+
+  const buildLocalCalendarUrl = (b: {
+    type?: string;
+    date: string;
+    timeSlot: string;
+    meetingUrl: string;
+    agendaTopic?: string;
+  }) => {
+    const title = encodeURIComponent(
+      `Google Meet Pro · Gastón Barea (${getFriendlyBookingTypeTitle(b.type)})`
+    );
+    const details = encodeURIComponent(
+      `Videollamada 1-on-1 con Gastón Barea.\nSala Google Meet: ${b.meetingUrl}\nHorario: ${b.date} · ${b.timeSlot}\nTema: ${
+        b.agendaTopic || 'Diagnóstico y seguimiento'
+      }`
+    );
+    return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&details=${details}&location=${encodeURIComponent(
+      b.meetingUrl
+    )}`;
+  };
+
   // Submit new booking
   const handleCreateBooking = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmittingBooking(true);
 
-    const newBooking: ConsultingBooking = {
+    const activeClientEmail = clientSession?.email || emailInput || 'cliente@empresa.com';
+    const activeClientName = clientSession?.name || 'Cliente';
+    const activeCompany = clientSession?.company || 'Contacto Individual';
+    const resolvedTopic =
+      bookingTopic.trim() || 'Revisión de arquitectura, propuesta y próximos pasos';
+
+    let newBooking: ConsultingBooking = {
       id: 'book-' + Date.now(),
-      clientEmail: clientSession?.email || emailInput,
-      clientName: clientSession?.name || 'Cliente',
-      company: clientSession?.company || 'Empresa',
+      clientEmail: activeClientEmail,
+      clientName: activeClientName,
+      company: activeCompany,
+      phone: bookingPhone.trim() || undefined,
       type: bookingType,
       date: bookingDate,
       timeSlot: bookingSlot,
       meetingUrl: 'https://meet.google.com/gastonbarea-consultoria',
-      agendaTopic: bookingTopic || 'Revisión y consultoría 1-on-1',
+      agendaTopic: resolvedTopic,
       status: 'confirmed',
       createdAt: new Date().toISOString(),
     };
+
+    let emailSent = false;
+    let googleCalendarUrl = buildLocalCalendarUrl(newBooking);
+    let whatsappConfirmUrl = `https://wa.me/5492804697193?text=${encodeURIComponent(
+      `Hola Gastón, acabo de agendar en el Portal nuestra sesión "${getFriendlyBookingTypeTitle(
+        bookingType
+      )}" para el día ${bookingDate} (${bookingSlot}). Tema: ${resolvedTopic}`
+    )}`;
 
     try {
       const res = await fetch('/api/client/bookings', {
@@ -795,21 +900,26 @@ export const ClientPortalModal: React.FC<ClientPortalModalProps> = ({ isOpen = t
         headers: {
           'Content-Type': 'application/json',
           'x-client-token': token,
-          'x-client-email': clientSession?.email || '',
+          'x-client-email': activeClientEmail,
         },
         body: JSON.stringify({
           type: bookingType,
           date: bookingDate,
           timeSlot: bookingSlot,
-          agendaTopic: bookingTopic,
-          clientName: clientSession?.name || '',
-          company: clientSession?.company || '',
+          agendaTopic: resolvedTopic,
+          clientEmail: activeClientEmail,
+          clientName: activeClientName,
+          company: activeCompany,
+          phone: bookingPhone.trim() || undefined,
         }),
       });
       if (res.ok) {
         const data = await res.json();
         if (data.success && data.booking) {
-          newBooking.id = data.booking.id;
+          newBooking = data.booking;
+          emailSent = Boolean(data.emailSent);
+          if (data.googleCalendarUrl) googleCalendarUrl = data.googleCalendarUrl;
+          if (data.whatsappConfirmUrl) whatsappConfirmUrl = data.whatsappConfirmUrl;
         }
       }
     } catch (err) {
@@ -818,9 +928,17 @@ export const ClientPortalModal: React.FC<ClientPortalModalProps> = ({ isOpen = t
       setIsSubmittingBooking(false);
     }
 
+    newBooking.googleCalendarUrl = googleCalendarUrl;
+    newBooking.emailSent = emailSent;
+
     setBookings((prev) => [newBooking, ...prev]);
+    setLastBookingConfirmation({
+      booking: newBooking,
+      emailSent,
+      googleCalendarUrl,
+      whatsappConfirmUrl,
+    });
     setIsNewBookingOpen(false);
-    setBookingTopic('');
   };
 
   if (!isOpen) return null;
@@ -2459,190 +2577,470 @@ export const ClientPortalModal: React.FC<ClientPortalModalProps> = ({ isOpen = t
               {/* TAB 3: AGENDA PARA CONSULTORÍA */}
               {activeTab === 'bookings' && (
                 <div className="space-y-6">
-                  <div className="bg-white p-6 border border-black/[0.08] space-y-5">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                      <div>
-                        <h3 className="font-display text-base font-bold text-[#1D1D1F]">
+                  <div className="bg-white p-6 sm:p-8 border border-black/[0.08] space-y-6">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-black/[0.08] pb-4">
+                      <div className="space-y-1">
+                        <div className="inline-flex items-center gap-2 text-[11px] font-mono font-bold uppercase text-[#291B64]">
+                          <Video className="w-3.5 h-3.5 text-emerald-600" />
+                          <span>Enlace Google Meet Automatizado + Invitación por Email</span>
+                        </div>
+                        <h3 className="font-display text-lg sm:text-xl font-bold text-[#1D1D1F]">
                           Agenda para Consultoría & Sprint Reviews
                         </h3>
-                        <p className="text-xs text-[#515154]">
-                          Reserva sesiones de revisión de avances, auditorías de arquitectura o soporte en vivo con Gastón Barea
+                        <p className="text-xs sm:text-sm text-[#515154]">
+                          Elegí el motivo, día y horario en 3 clics. Te enviamos automáticamente el enlace de Google Meet Pro a tu correo ({clientSession?.email}) y la invitación para tu Google Calendar.
                         </p>
                       </div>
                       <button
                         type="button"
                         onClick={() => setIsNewBookingOpen(!isNewBookingOpen)}
-                        className="px-4 py-2.5 bg-[#291B64] hover:bg-[#382586] text-white font-bold text-xs transition-colors flex items-center gap-1.5 cursor-pointer shrink-0"
+                        className="px-4 py-2.5 bg-[#291B64] hover:bg-[#382586] text-white font-bold text-xs transition-colors flex items-center gap-2 cursor-pointer shrink-0"
                       >
-                        <Plus className="w-3.5 h-3.5" />
+                        <Video className="w-3.5 h-3.5 text-emerald-300" />
                         <span>
-                          {isNewBookingOpen ? 'Cerrar Formulario' : 'Agendar Nueva Reunión'}
+                          {isNewBookingOpen
+                            ? 'Ocultar Agenda Rápida'
+                            : '¡Hablemos! Agendar Meet'}
                         </span>
                       </button>
                     </div>
 
-                    {/* INLINE FORM: NUEVA REUNIÓN */}
+                    {/* BANNER DE CONFIRMACIÓN AUTOMÁTICA RECIÉN AGENDADA */}
+                    {lastBookingConfirmation && (
+                      <div className="p-5 sm:p-6 bg-[#0E0F17] text-white border-l-4 border-emerald-400 space-y-4">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                          <div className="flex items-center gap-2 text-xs font-mono text-emerald-400 font-bold uppercase">
+                            <CheckCircle2 className="w-4 h-4 shrink-0" />
+                            <span>
+                              ¡Reunión Confirmada! Enlace Google Meet Generado Automáticamente
+                            </span>
+                          </div>
+                          <span className="text-[11px] font-mono text-neutral-400">
+                            {lastBookingConfirmation.emailSent
+                              ? `✓ Invitación enviada a ${lastBookingConfirmation.booking.clientEmail}`
+                              : `Sincronizado en tu agenda del Portal`}
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 p-3.5 bg-white/[0.05] border border-white/10 text-xs">
+                          <div>
+                            <span className="text-neutral-400 block text-[11px] font-mono">
+                              SESIÓN:
+                            </span>
+                            <strong className="text-white">
+                              {getFriendlyBookingTypeTitle(
+                                lastBookingConfirmation.booking.type
+                              )}
+                            </strong>
+                          </div>
+                          <div>
+                            <span className="text-neutral-400 block text-[11px] font-mono">
+                              FECHA Y HORARIO:
+                            </span>
+                            <strong className="text-emerald-300 font-mono">
+                              {lastBookingConfirmation.booking.date} ·{' '}
+                              {lastBookingConfirmation.booking.timeSlot}
+                            </strong>
+                          </div>
+                          <div>
+                            <span className="text-neutral-400 block text-[11px] font-mono">
+                              SALA GOOGLE MEET PRO:
+                            </span>
+                            <a
+                              href={lastBookingConfirmation.booking.meetingUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-sky-300 underline font-mono break-all"
+                            >
+                              {lastBookingConfirmation.booking.meetingUrl}
+                            </a>
+                          </div>
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-2.5 pt-1">
+                          <a
+                            href={lastBookingConfirmation.googleCalendarUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="px-4 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-emerald-950 font-bold text-xs inline-flex items-center gap-2 transition-colors"
+                          >
+                            <Calendar className="w-4 h-4" />
+                            <span>1. Agregar a mi Google Calendar (1 Clic)</span>
+                            <ExternalLink className="w-3.5 h-3.5" />
+                          </a>
+
+                          <a
+                            href={lastBookingConfirmation.booking.meetingUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="px-4 py-2.5 bg-[#291B64] hover:bg-[#382586] text-white font-bold text-xs inline-flex items-center gap-2 transition-colors"
+                          >
+                            <Video className="w-4 h-4 text-emerald-300" />
+                            <span>2. Abrir Sala Google Meet Pro</span>
+                            <ExternalLink className="w-3.5 h-3.5" />
+                          </a>
+
+                          <a
+                            href={lastBookingConfirmation.whatsappConfirmUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="px-4 py-2.5 bg-white/10 hover:bg-white/20 text-white font-semibold text-xs inline-flex items-center gap-2 transition-colors"
+                          >
+                            <MessageSquare className="w-4 h-4 text-emerald-400" />
+                            <span>3. Avisar por WhatsApp Directo</span>
+                          </a>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* INLINE FORM: NUEVA REUNIÓN GUIADA Y AMIGABLE EN 3 PASOS */}
                     {isNewBookingOpen && (
                       <form
                         onSubmit={handleCreateBooking}
-                        className="p-5 bg-[#F5F5F7] border border-black/15 space-y-4"
+                        className="p-5 sm:p-7 bg-[#F5F5F7] border border-black/15 space-y-6"
                       >
-                        <div className="flex items-center justify-between border-b border-black/10 pb-2.5">
-                          <h4 className="font-display text-sm font-bold text-[#1D1D1F]">
-                            Agendar Sesión 1-on-1 de Consultoría
-                          </h4>
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-black/10 pb-3.5">
+                          <div>
+                            <span className="text-[11px] font-mono font-bold uppercase text-[#291B64]">
+                              RESERVA RÁPIDA EN 3 PASOS · SIN INTERMEDIARIOS
+                            </span>
+                            <h4 className="font-display text-base font-bold text-[#1D1D1F]">
+                              ¡Hablemos! Agendar Sesión 1-on-1 con Gastón Barea
+                            </h4>
+                          </div>
                           <button
                             type="button"
                             onClick={() => setIsNewBookingOpen(false)}
-                            className="text-xs text-slate-500 hover:text-slate-900 cursor-pointer"
+                            className="text-xs font-semibold text-slate-500 hover:text-slate-900 cursor-pointer self-start sm:self-auto"
                           >
-                            Cancelar ×
+                            Cerrar ×
                           </button>
                         </div>
 
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                          <div>
-                            <label className="block text-xs font-bold text-slate-700 mb-1">
-                              Tipo de Sesión
-                            </label>
-                            <select
-                              value={bookingType}
-                              onChange={(e) => setBookingType(e.target.value as any)}
-                              className="w-full px-3 py-2.5 bg-white border border-black/15 text-xs text-slate-900 focus:outline-none focus:border-[#291B64]"
-                            >
-                              <option value="sprint_review">
-                                Sprint Review & Demo de Avance (45 min)
-                              </option>
-                              <option value="architecture_advisory">
-                                Asesoría de Arquitectura & Base de Datos (45 min)
-                              </option>
-                              <option value="emergency_audit">
-                                Auditoría de Emergencia & Contingencia (30 min)
-                              </option>
-                              <option value="incident_postmortem">
-                                Revisión Operativa & Postmortem (30 min)
-                              </option>
-                            </select>
-                          </div>
-
-                          <div>
-                            <label className="block text-xs font-bold text-slate-700 mb-1">
-                              Fecha
-                            </label>
-                            <input
-                              type="date"
-                              required
-                              value={bookingDate}
-                              onChange={(e) => setBookingDate(e.target.value)}
-                              className="w-full px-3 py-2.5 bg-white border border-black/15 text-xs text-slate-900 focus:outline-none focus:border-[#291B64]"
-                            />
-                          </div>
-
-                          <div>
-                            <label className="block text-xs font-bold text-slate-700 mb-1">
-                              Horario Disponible
-                            </label>
-                            <select
-                              value={bookingSlot}
-                              onChange={(e) => setBookingSlot(e.target.value)}
-                              className="w-full px-3 py-2.5 bg-white border border-black/15 text-xs text-slate-900 focus:outline-none focus:border-[#291B64]"
-                            >
-                              <option value="10:00 - 10:45 (GMT-3)">10:00 - 10:45 (GMT-3)</option>
-                              <option value="11:30 - 12:15 (GMT-3)">11:30 - 12:15 (GMT-3)</option>
-                              <option value="15:00 - 15:45 (GMT-3)">15:00 - 15:45 (GMT-3)</option>
-                              <option value="17:00 - 17:45 (GMT-3)">17:00 - 17:45 (GMT-3)</option>
-                            </select>
-                          </div>
-                        </div>
-
-                        <div>
-                          <label className="block text-xs font-bold text-slate-700 mb-1">
-                            Tema Principal de la Agenda
+                        {/* PASO 1: ELEGÍ EL MOTIVO DE LA REUNIÓN */}
+                        <div className="space-y-2.5">
+                          <label className="block text-xs font-bold text-[#1D1D1F]">
+                            1. ¿Sobre qué querés conversar? (Elegí una opción)
                           </label>
-                          <input
-                            type="text"
-                            required
-                            value={bookingTopic}
-                            onChange={(e) => setBookingTopic(e.target.value)}
-                            placeholder="Ej: Demostración de flujos de venta y cierre de Hito 2 en Staging"
-                            className="w-full px-3 py-2.5 bg-white border border-black/15 text-xs text-slate-900 focus:outline-none focus:border-[#291B64]"
-                          />
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                            {[
+                              {
+                                id: 'discovery_ia' as const,
+                                title: 'Diagnóstico & Propuesta IA',
+                                duration: '30 min',
+                                desc: 'Evaluar requerimiento, estudio preliminar IA y presupuesto 40/40/20.',
+                              },
+                              {
+                                id: 'architecture_advisory' as const,
+                                title: 'Arquitectura, Odoo v18 o Bioeconomía',
+                                duration: '45 min',
+                                desc: 'Consultoría sobre sistemas a medida, ERP sin licencias, IoT o Linux.',
+                              },
+                              {
+                                id: 'sprint_review' as const,
+                                title: 'Sprint Review & Demo en Staging',
+                                duration: '45 min',
+                                desc: 'Revisión de avances del proyecto en vivo y validación de entregables.',
+                              },
+                              {
+                                id: 'emergency_audit' as const,
+                                title: 'Soporte Prioritario & Auditoría',
+                                duration: '30 min',
+                                desc: 'Resolución rápida de cuellos de botella, bases de datos o servidores.',
+                              },
+                            ].map((opt) => {
+                              const active = bookingType === opt.id;
+                              return (
+                                <button
+                                  key={opt.id}
+                                  type="button"
+                                  onClick={() => setBookingType(opt.id)}
+                                  className={`p-3.5 text-left border transition-all cursor-pointer flex flex-col justify-between gap-1.5 ${
+                                    active
+                                      ? 'bg-[#291B64] text-white border-[#291B64] shadow-xs'
+                                      : 'bg-white text-[#1D1D1F] border-black/15 hover:border-[#291B64]'
+                                  }`}
+                                >
+                                  <div className="flex items-center justify-between gap-2">
+                                    <span className="text-xs font-bold">{opt.title}</span>
+                                    <span
+                                      className={`text-[10px] font-mono px-2 py-0.5 font-semibold ${
+                                        active
+                                          ? 'bg-emerald-400 text-emerald-950'
+                                          : 'bg-slate-100 text-slate-700'
+                                      }`}
+                                    >
+                                      {opt.duration}
+                                    </span>
+                                  </div>
+                                  <p
+                                    className={`text-[11px] leading-snug ${
+                                      active ? 'text-white/85' : 'text-slate-500'
+                                    }`}
+                                  >
+                                    {opt.desc}
+                                  </p>
+                                </button>
+                              );
+                            })}
+                          </div>
                         </div>
 
-                        <div className="flex items-center justify-end gap-2">
+                        {/* PASO 2: ELEGÍ DÍA Y HORARIO CON BOTONES VISUALES */}
+                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 pt-1">
+                          <div className="lg:col-span-7 space-y-2.5">
+                            <label className="block text-xs font-bold text-[#1D1D1F]">
+                              2. Elegí el Día (Próximos días hábiles o seleccioná en calendario)
+                            </label>
+                            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                              {getUpcomingBusinessDays().map((d) => {
+                                const isSelected = bookingDate === d.iso;
+                                return (
+                                  <button
+                                    key={d.iso}
+                                    type="button"
+                                    onClick={() => setBookingDate(d.iso)}
+                                    className={`p-2.5 text-center border transition-all cursor-pointer ${
+                                      isSelected
+                                        ? 'bg-[#291B64] text-white border-[#291B64] font-bold'
+                                        : 'bg-white text-[#1D1D1F] border-black/15 hover:border-[#291B64]'
+                                    }`}
+                                  >
+                                    <div
+                                      className={`text-[10px] font-mono uppercase ${
+                                        isSelected ? 'text-emerald-300' : 'text-slate-500'
+                                      }`}
+                                    >
+                                      {d.dayName}
+                                    </div>
+                                    <div className="text-xs font-bold mt-0.5">{d.shortLabel}</div>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                            <div className="flex items-center gap-2 pt-1">
+                              <span className="text-[11px] text-slate-600 font-medium">
+                                ¿Otra fecha?:
+                              </span>
+                              <input
+                                type="date"
+                                required
+                                value={bookingDate}
+                                onChange={(e) => setBookingDate(e.target.value)}
+                                className="px-3 py-1.5 bg-white border border-black/15 text-xs font-mono text-slate-900 focus:outline-none focus:border-[#291B64]"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="lg:col-span-5 space-y-2.5">
+                            <label className="block text-xs font-bold text-[#1D1D1F]">
+                              Horario (Hora Argentina GMT-3)
+                            </label>
+                            <div className="grid grid-cols-2 gap-2">
+                              {[
+                                { label: '10:00 hs', value: '10:00 - 10:45 (GMT-3)', tag: 'Mañana' },
+                                { label: '11:30 hs', value: '11:30 - 12:15 (GMT-3)', tag: 'Mediodía' },
+                                { label: '15:00 hs', value: '15:00 - 15:45 (GMT-3)', tag: 'Tarde' },
+                                { label: '17:00 hs', value: '17:00 - 17:45 (GMT-3)', tag: 'Tarde' },
+                              ].map((slot) => {
+                                const active = bookingSlot === slot.value;
+                                return (
+                                  <button
+                                    key={slot.value}
+                                    type="button"
+                                    onClick={() => setBookingSlot(slot.value)}
+                                    className={`p-2.5 border text-left transition-all cursor-pointer flex items-center justify-between ${
+                                      active
+                                        ? 'bg-[#291B64] text-white border-[#291B64] font-bold'
+                                        : 'bg-white text-[#1D1D1F] border-black/15 hover:border-[#291B64]'
+                                    }`}
+                                  >
+                                    <span className="text-xs font-mono font-bold">{slot.label}</span>
+                                    <span
+                                      className={`text-[10px] font-mono ${
+                                        active ? 'text-emerald-300' : 'text-slate-400'
+                                      }`}
+                                    >
+                                      {slot.tag}
+                                    </span>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* PASO 3: TEMA O CONSULTA CON CHIPS RÁPIDOS + WHATSAPP OPCIONAL */}
+                        <div className="space-y-2.5 pt-1">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <label className="block text-xs font-bold text-[#1D1D1F]">
+                              3. ¿Qué tema querés que prioricemos en la sesión?
+                            </label>
+                            <span className="text-[11px] text-slate-500">
+                              Tocá una sugerencia rápida o escribí debajo:
+                            </span>
+                          </div>
+
+                          <div className="flex flex-wrap gap-1.5">
+                            {[
+                              'Revisar estudio técnico generado con IA y cotización',
+                              'Evaluar implementación de Odoo ERP v18 / B2B2C',
+                              'Proyecto de Bioeconomía / Trazabilidad IoT',
+                              'Revisión de avances y entregables en Staging',
+                            ].map((chip) => (
+                              <button
+                                key={chip}
+                                type="button"
+                                onClick={() => setBookingTopic(chip)}
+                                className={`px-2.5 py-1 text-[11px] border transition-colors cursor-pointer ${
+                                  bookingTopic === chip
+                                    ? 'bg-[#291B64]/10 border-[#291B64] text-[#291B64] font-semibold'
+                                    : 'bg-white border-black/10 text-slate-600 hover:border-black/30'
+                                }`}
+                              >
+                                + {chip}
+                              </button>
+                            ))}
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 pt-1">
+                            <div className="sm:col-span-8">
+                              <input
+                                type="text"
+                                required
+                                value={bookingTopic}
+                                onChange={(e) => setBookingTopic(e.target.value)}
+                                placeholder="Contanos brevemente qué querés revisar en la videollamada..."
+                                className="w-full px-3.5 py-2.5 bg-white border border-black/15 text-xs text-slate-900 focus:outline-none focus:border-[#291B64]"
+                              />
+                            </div>
+                            <div className="sm:col-span-4">
+                              <input
+                                type="text"
+                                value={bookingPhone}
+                                onChange={(e) => setBookingPhone(e.target.value)}
+                                placeholder="Tu WhatsApp (Opcional p/ aviso)"
+                                className="w-full px-3.5 py-2.5 bg-white border border-black/15 text-xs text-slate-900 focus:outline-none focus:border-[#291B64]"
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="pt-2 border-t border-black/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                          <div className="text-[11px] text-slate-600 flex items-center gap-2">
+                            <Mail className="w-4 h-4 text-[#291B64] shrink-0" />
+                            <span>
+                              Te enviaremos al instante el enlace de <strong>Google Meet Pro</strong> a{' '}
+                              <strong>{clientSession?.email}</strong>.
+                            </span>
+                          </div>
+
                           <button
                             type="submit"
                             disabled={isSubmittingBooking}
-                            className="px-5 py-2.5 bg-[#291B64] hover:bg-[#382586] text-white font-bold text-xs transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                            className="px-6 py-3 bg-[#291B64] hover:bg-[#382586] text-white font-bold text-xs transition-colors flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 shrink-0"
                           >
                             {isSubmittingBooking ? (
-                              <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                              <>
+                                <RefreshCw className="w-4 h-4 animate-spin" />
+                                <span>Generando Enlace Meet y Enviando Email...</span>
+                              </>
                             ) : (
-                              <Calendar className="w-3.5 h-3.5" />
+                              <>
+                                <Video className="w-4 h-4 text-emerald-300" />
+                                <span>¡Hablemos! Confirmar y Recibir Enlace Meet</span>
+                              </>
                             )}
-                            <span>Confirmar Reunión</span>
                           </button>
                         </div>
                       </form>
                     )}
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {bookings.length === 0 ? (
-                        <div className="col-span-full p-8 text-center bg-[#F5F5F7] border border-dashed border-slate-300 space-y-2">
-                          <Calendar className="w-8 h-8 mx-auto text-slate-400" />
-                          <div className="text-sm font-bold text-slate-700">
-                            No tienes reuniones agendadas
-                          </div>
-                          <p className="text-xs text-slate-500 max-w-sm mx-auto">
-                            Coordina un Sprint Review para revisar los entregables en Staging o consultar decisiones de arquitectura técnica.
-                          </p>
-                        </div>
-                      ) : (
-                        bookings.map((book) => (
-                          <div
-                            key={book.id}
-                            className="p-4 bg-[#F5F5F7] border border-black/[0.08] space-y-3"
-                          >
-                            <div className="flex items-center justify-between">
-                              <span className="text-[10px] font-mono font-bold px-2 py-0.5 bg-emerald-100 text-emerald-800">
-                                Confirmada
-                              </span>
-                              <span className="text-[11px] font-mono text-slate-500">
-                                {book.date}
-                              </span>
-                            </div>
+                    {/* LISTADO DE REUNIONES AGENDADAS */}
+                    <div className="space-y-3">
+                      <div className="text-xs font-mono font-bold uppercase text-slate-500">
+                        Tus Sesiones Confirmadas ({bookings.length})
+                      </div>
 
-                            <div>
-                              <div className="text-xs font-mono font-bold text-[#291B64] uppercase">
-                                {book.type.replace('_', ' ')}
-                              </div>
-                              <h4 className="text-sm font-bold text-[#1D1D1F] mt-0.5">
-                                {book.agendaTopic || 'Sesión de Seguimiento Técnico'}
-                              </h4>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {bookings.length === 0 ? (
+                          <div className="col-span-full p-8 text-center bg-[#F5F5F7] border border-dashed border-slate-300 space-y-3">
+                            <Calendar className="w-8 h-8 mx-auto text-[#291B64]" />
+                            <div className="text-sm font-bold text-slate-800">
+                              Todavía no tenés reuniones agendadas
                             </div>
-
-                            <div className="p-2.5 bg-white border border-black/10 text-xs flex items-center justify-between">
-                              <div className="flex items-center gap-2">
-                                <Clock className="w-3.5 h-3.5 text-slate-400" />
-                                <span className="font-semibold text-slate-700">
-                                  {book.timeSlot}
-                                </span>
-                              </div>
-                              {book.meetingUrl && (
-                                <a
-                                  href={book.meetingUrl}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="px-2.5 py-1 bg-[#291B64]/10 text-[#291B64] hover:bg-[#291B64] hover:text-white font-bold text-[11px] flex items-center gap-1 transition-colors"
-                                >
-                                  <Video className="w-3 h-3" />
-                                  <span>Google Meet</span>
-                                </a>
-                              )}
-                            </div>
+                            <p className="text-xs text-slate-500 max-w-md mx-auto">
+                              Usá el formulario de arriba para elegir día y horario. El sistema generará tu sala Google Meet Pro automáticamente y te enviará los datos por correo electrónico.
+                            </p>
                           </div>
-                        ))
-                      )}
+                        ) : (
+                          bookings.map((book) => {
+                            const calUrl =
+                              book.googleCalendarUrl || buildLocalCalendarUrl(book);
+                            return (
+                              <div
+                                key={book.id}
+                                className="p-4 sm:p-5 bg-[#F5F5F7] border border-black/[0.08] flex flex-col justify-between space-y-3.5"
+                              >
+                                <div className="space-y-2">
+                                  <div className="flex items-center justify-between gap-2">
+                                    <span className="text-[10px] font-mono font-bold px-2 py-0.5 bg-emerald-100 text-emerald-800">
+                                      ✓ Confirmada · Google Meet Pro
+                                    </span>
+                                    <span className="text-xs font-mono font-bold text-[#1D1D1F]">
+                                      {book.date}
+                                    </span>
+                                  </div>
+
+                                  <div>
+                                    <div className="text-xs font-mono font-bold text-[#291B64]">
+                                      {getFriendlyBookingTypeTitle(book.type)}
+                                    </div>
+                                    <h4 className="text-sm font-bold text-[#1D1D1F] mt-0.5">
+                                      {book.agendaTopic || 'Sesión de Seguimiento Técnico'}
+                                    </h4>
+                                  </div>
+                                </div>
+
+                                <div className="p-3 bg-white border border-black/10 space-y-2.5">
+                                  <div className="flex items-center justify-between text-xs">
+                                    <span className="flex items-center gap-1.5 font-semibold text-slate-700">
+                                      <Clock className="w-3.5 h-3.5 text-[#291B64]" />
+                                      <span>{book.timeSlot}</span>
+                                    </span>
+                                    <span className="text-[11px] font-mono text-emerald-700">
+                                      Enlace Activo
+                                    </span>
+                                  </div>
+
+                                  <div className="flex flex-wrap items-center gap-2 pt-1">
+                                    {book.meetingUrl && (
+                                      <a
+                                        href={book.meetingUrl}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="flex-1 py-2 px-3 bg-[#291B64] hover:bg-[#382586] text-white font-bold text-[11px] flex items-center justify-center gap-1.5 transition-colors"
+                                      >
+                                        <Video className="w-3.5 h-3.5 text-emerald-300" />
+                                        <span>Abrir Google Meet</span>
+                                      </a>
+                                    )}
+                                    <a
+                                      href={calUrl}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="flex-1 py-2 px-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] flex items-center justify-center gap-1.5 transition-colors"
+                                    >
+                                      <Calendar className="w-3.5 h-3.5" />
+                                      <span>Google Calendar</span>
+                                    </a>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>

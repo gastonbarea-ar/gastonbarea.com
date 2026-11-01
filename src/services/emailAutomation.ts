@@ -955,4 +955,231 @@ export async function sendAiStudyEmail(params: {
   }
 }
 
+export function getBookingTypeLabel(type?: string): string {
+  switch (type) {
+    case 'discovery_ia':
+      return 'Diagnóstico & Propuesta IA (30 min)';
+    case 'sprint_review':
+      return 'Sprint Review & Demo de Avance (45 min)';
+    case 'architecture_advisory':
+      return 'Asesoría de Arquitectura, Odoo & Bioeconomía (45 min)';
+    case 'emergency_audit':
+      return 'Auditoría Prioritaria & Contingencia (30 min)';
+    case 'incident_postmortem':
+      return 'Revisión Operativa & Postmortem (30 min)';
+    default:
+      return 'Sesión 1-on-1 de Consultoría Técnica';
+  }
+}
+
+export function buildGoogleCalendarInviteUrl(params: {
+  clientName: string;
+  company?: string;
+  type?: string;
+  date: string;
+  timeSlot: string;
+  meetingUrl: string;
+  agendaTopic?: string;
+}): string {
+  const { clientName, company, type, date, timeSlot, meetingUrl, agendaTopic } = params;
+  const sessionLabel = getBookingTypeLabel(type);
+  const title = `Google Meet Pro · Gastón Barea + ${clientName}${company && company !== 'Empresa' ? ` (${company})` : ''}`;
+
+  // Parse start & end time from timeSlot e.g. "15:00 - 15:45 (GMT-3)" or "10:00 - 10:45 (GMT-3)"
+  const cleanDate = (date || new Date().toISOString().split('T')[0]).replace(/-/g, '');
+  const timeMatches = (timeSlot || '15:00 - 15:45').match(/(\d{1,2}):(\d{2})/g);
+  let datesParam = '';
+
+  if (cleanDate.length === 8 && timeMatches && timeMatches.length >= 1) {
+    const parseToUtcStr = (hhmm: string, addMinutesFallback = 0) => {
+      const [hh, mm] = hhmm.split(':').map(Number);
+      const y = Number(cleanDate.slice(0, 4));
+      const m = Number(cleanDate.slice(4, 6)) - 1;
+      const d = Number(cleanDate.slice(6, 8));
+      // GMT-3 -> UTC is +3 hours
+      const utcDate = new Date(Date.UTC(y, m, d, hh + 3, mm + addMinutesFallback, 0));
+      return utcDate.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
+    };
+    const startUtc = parseToUtcStr(timeMatches[0], 0);
+    const endUtc =
+      timeMatches.length >= 2
+        ? parseToUtcStr(timeMatches[1], 0)
+        : parseToUtcStr(timeMatches[0], 45);
+    datesParam = `&dates=${startUtc}/${endUtc}`;
+  }
+
+  const details = [
+    `Sesión 1-on-1 confirmada con Gastón Barea (${sessionLabel}).`,
+    `Sala Google Meet Pro: ${meetingUrl}`,
+    agendaTopic ? `Tema de Agenda: ${agendaTopic}` : '',
+    `Portal de Clientes: https://www.gastonbarea.com/#portal`,
+  ]
+    .filter(Boolean)
+    .join('\n\n');
+
+  return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(
+    title
+  )}${datesParam}&details=${encodeURIComponent(details)}&location=${encodeURIComponent(
+    meetingUrl
+  )}`;
+}
+
+export async function sendBookingConfirmationEmail(params: {
+  bookingId: string;
+  clientName: string;
+  clientEmail: string;
+  company?: string;
+  phone?: string;
+  type: string;
+  date: string;
+  timeSlot: string;
+  meetingUrl: string;
+  googleCalendarUrl: string;
+  agendaTopic?: string;
+}) {
+  const cfg = getEmailConfig();
+  const {
+    bookingId,
+    clientName,
+    clientEmail,
+    company,
+    phone,
+    type,
+    date,
+    timeSlot,
+    meetingUrl,
+    googleCalendarUrl,
+    agendaTopic,
+  } = params;
+
+  const sessionLabel = getBookingTypeLabel(type);
+  const whatsappConfirmText = `Hola Gastón, acabo de agendar nuestra sesión "${sessionLabel}" para el día ${date} en el horario ${timeSlot}. Tema: ${agendaTopic || 'Diagnóstico y seguimiento'}.`;
+  const whatsappUrl = `https://wa.me/5492804697193?text=${encodeURIComponent(whatsappConfirmText)}`;
+
+  if (!cfg.isConfigured) {
+    console.log(
+      '[Email Automation - Booking Confirmation Dry Run]:',
+      clientEmail,
+      date,
+      timeSlot,
+      meetingUrl
+    );
+    return {
+      success: true,
+      configured: false,
+      provider: cfg.provider,
+      message: 'Modo simulación activo.',
+    };
+  }
+
+  const html = `
+  <!DOCTYPE html>
+  <html>
+  <body style="margin:0;padding:24px 12px;background:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#0f172a;">
+    <table width="100%" cellpadding="0" cellspacing="0" style="max-width:620px;margin:0 auto;background:#ffffff;border:1px solid #cbd5e1;border-radius:14px;overflow:hidden;">
+      <tr>
+        <td style="padding:26px 28px;background:#0B0B10;color:#ffffff;">
+          <div style="font-family:monospace;font-size:11px;color:#34d399;font-weight:700;text-transform:uppercase;letter-spacing:1px;">
+            ¡HABLEMOS! SESIÓN GOOGLE MEET CONFIRMADA · GASTONBAREA.COM
+          </div>
+          <h1 style="margin:8px 0 4px 0;font-size:20px;line-height:1.3;color:#ffffff;">
+            ${sessionLabel}
+          </h1>
+          <div style="font-family:monospace;font-size:12px;color:#94a3b8;">
+            ID Reserva: <strong style="color:#ffffff;">${bookingId}</strong> · Estado: <strong style="color:#34d399;">Confirmada</strong>
+          </div>
+        </td>
+      </tr>
+      <tr>
+        <td style="padding:28px;">
+          <p style="font-size:14px;line-height:1.6;color:#334155;margin-top:0;">
+            Hola <strong>${clientName}</strong>${company && company !== 'Empresa' ? ` (${company})` : ''}, tu videollamada 1-on-1 con <strong>Gastón Barea</strong> quedó agendada y sincronizada en tu Portal de Clientes.
+          </p>
+
+          <div style="background:#f8fafc;border:1px solid #e2e8f0;border-left:4px solid #291B64;padding:16px;border-radius:8px;margin:18px 0;">
+            <div style="font-size:13px;color:#0f172a;margin-bottom:6px;">
+              <strong>📅 Fecha:</strong> ${date}
+            </div>
+            <div style="font-size:13px;color:#0f172a;margin-bottom:6px;">
+              <strong>⏰ Horario:</strong> ${timeSlot}
+            </div>
+            <div style="font-size:13px;color:#0f172a;margin-bottom:6px;">
+              <strong>🎯 Tema Principal:</strong> ${agendaTopic || 'Revisión de requerimientos y arquitectura técnica'}
+            </div>
+            <div style="font-size:13px;color:#0f172a;">
+              <strong>🎥 Enlace Google Meet Pro:</strong> <a href="${meetingUrl}" style="color:#291B64;font-weight:700;">${meetingUrl}</a>
+            </div>
+          </div>
+
+          <div style="margin:22px 0;">
+            <a href="${meetingUrl}" target="_blank" style="display:inline-block;padding:12px 20px;background:#291B64;color:#ffffff;text-decoration:none;font-weight:700;font-size:13px;border-radius:8px;margin-right:8px;margin-bottom:8px;">
+              🎥 Abrir Sala Google Meet Pro
+            </a>
+            <a href="${googleCalendarUrl}" target="_blank" style="display:inline-block;padding:12px 20px;background:#059669;color:#ffffff;text-decoration:none;font-weight:700;font-size:13px;border-radius:8px;margin-right:8px;margin-bottom:8px;">
+              📅 Agregar a mi Google Calendar
+            </a>
+            <a href="${whatsappUrl}" target="_blank" style="display:inline-block;padding:12px 18px;background:#f1f5f9;color:#0f172a;border:1px solid #cbd5e1;text-decoration:none;font-weight:600;font-size:12px;border-radius:8px;margin-bottom:8px;">
+              💬 Confirmar / Coordinar por WhatsApp
+            </a>
+          </div>
+
+          <div style="background:#0f172a;color:#ffffff;border-radius:10px;padding:16px 18px;margin-top:20px;">
+            <div style="font-family:monospace;font-size:11px;color:#34d399;font-weight:700;text-transform:uppercase;">
+              SINCRONIZADO EN TU PORTAL DE CLIENTES
+            </div>
+            <p style="font-size:12px;color:#cbd5e1;line-height:1.5;margin:6px 0 0 0;">
+              Podés consultar tus reuniones, subir consultas previas o descargar propuestas desde <a href="https://www.gastonbarea.com/#portal" style="color:#34d399;">https://www.gastonbarea.com/#portal</a>.
+            </p>
+          </div>
+
+          <p style="font-size:12px;color:#64748b;margin-top:22px;margin-bottom:0;">
+            ¡Nos vemos en la sesión!<br/>
+            <strong>Gastón Barea</strong> · Consultor y Desarrollador de Proyectos de Base Tecnológica & Bioeconomía
+          </p>
+        </td>
+      </tr>
+    </table>
+  </body>
+  </html>`;
+
+  try {
+    const internalRecipients = [
+      { email: cfg.notificationEmail, name: 'Gastón Barea' },
+      ...(cfg.backupNotificationEmail && cfg.backupNotificationEmail !== cfg.notificationEmail
+        ? [{ email: cfg.backupNotificationEmail, name: 'Gastón Barea' }]
+        : []),
+    ];
+
+    const [clientRes, internalRes] = await Promise.allSettled([
+      dispatchTransactionalEmail({
+        to: { email: clientEmail, name: clientName },
+        replyTo: cfg.notificationEmail,
+        subject: `📅 Confirmación Google Meet: ${sessionLabel} (${date} · ${timeSlot})`,
+        html,
+      }),
+      dispatchTransactionalEmail({
+        to: internalRecipients,
+        replyTo: clientEmail,
+        subject: `[NUEVA REUNIÓN AGENDADA] ${clientName} (${company || 'Particular'}) · ${date} ${timeSlot}${phone ? ` · Tel: ${phone}` : ''}`,
+        html,
+      }),
+    ]);
+
+    return {
+      success: clientRes.status === 'fulfilled' || internalRes.status === 'fulfilled',
+      configured: true,
+      provider: cfg.provider,
+    };
+  } catch (err: any) {
+    console.error('[sendBookingConfirmationEmail Error]:', err);
+    return {
+      success: false,
+      configured: true,
+      provider: cfg.provider,
+      error: err?.message || 'Error al enviar confirmación de reunión por email',
+    };
+  }
+}
+
+
 

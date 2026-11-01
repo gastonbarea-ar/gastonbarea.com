@@ -329,7 +329,7 @@ export const CustomSolutionPage: React.FC<CustomSolutionPageProps> = ({
                   className="px-4 py-2.5 text-xs font-mono font-bold text-emerald-300 bg-[#291B64]/60 hover:bg-[#291B64] border border-emerald-400/30 inline-flex items-center gap-2 cursor-pointer transition-colors"
                 >
                   <Video className="w-4 h-4" />
-                  <span>Agendar Videollamada Google Meet Pro (30m)</span>
+                  <span>¡Hablemos! Agendar Meet</span>
                 </button>
               </div>
             </div>
@@ -481,7 +481,7 @@ export const CustomSolutionPage: React.FC<CustomSolutionPageProps> = ({
                   className="px-4 py-2.5 text-xs font-mono font-semibold text-white bg-white/[0.08] hover:bg-white/[0.15] transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
                 >
                   <Video className="w-3.5 h-3.5 text-emerald-300" />
-                  <span>Agendar Meet (30m)</span>
+                  <span>¡Hablemos! Agendar Meet</span>
                 </button>
               </div>
             </div>

@@ -94,11 +94,20 @@ export interface ConsultingBooking {
   clientEmail: string;
   clientName: string;
   company: string;
-  type: 'sprint_review' | 'architecture_advisory' | 'incident_postmortem' | 'emergency_audit';
+  phone?: string;
+  type:
+    | 'discovery_ia'
+    | 'sprint_review'
+    | 'architecture_advisory'
+    | 'incident_postmortem'
+    | 'emergency_audit';
   date: string;
   timeSlot: string;
   meetingUrl: string;
+  googleCalendarUrl?: string;
+  emailSent?: boolean;
   agendaTopic?: string;
   status: 'confirmed' | 'rescheduled' | 'completed';
   createdAt: string;
 }
+

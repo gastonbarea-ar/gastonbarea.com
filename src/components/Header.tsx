@@ -559,8 +559,8 @@ export const Header: React.FC<HeaderProps> = ({
               className="px-3.5 sm:px-4 py-2 text-[12.5px] sm:text-[13px] font-sans font-semibold tracking-[-0.01em] text-white bg-[#291B64] hover:bg-[#382586] transition-colors inline-flex items-center gap-2 whitespace-nowrap shrink-0 cursor-pointer border border-[#291B64]"
             >
               <Video className="w-3.5 h-3.5 hidden sm:inline shrink-0" />
-              <span className="hidden sm:inline">Agendar Meet Pro</span>
-              <span className="sm:hidden">Meet Pro</span>
+              <span className="hidden sm:inline">¡Hablemos! Agendar Meet</span>
+              <span className="sm:hidden">¡Hablemos! Meet</span>
             </button>
           </div>
         </div>
@@ -769,7 +769,7 @@ export const Header: React.FC<HeaderProps> = ({
                   >
                     <span className="inline-flex items-center gap-2">
                       <Video className="w-4 h-4 text-emerald-300" />
-                      <span>Google Meet Pro</span>
+                      <span>¡Hablemos! Agendar Meet</span>
                     </span>
                     <ArrowUpRight className="w-3.5 h-3.5" />
                   </button>
