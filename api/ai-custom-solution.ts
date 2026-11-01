@@ -41,7 +41,7 @@ Ids válidos de proyectos en catálogo para reordenar según relevancia (recomme
 - "infraestructura-critica-linux-cluster"`;
 
       const response = await ai.models.generateContent({
-        model: 'gemini-3.8-flash',
+        model: 'gemini-3-flash-preview',
         contents: prompt,
         config: {
           systemInstruction:

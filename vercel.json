@@ -4,8 +4,28 @@
   "outputDirectory": "dist",
   "rewrites": [
     {
+      "source": "/api/ai-custom-solution",
+      "destination": "/api/ai-custom-solution"
+    },
+    {
+      "source": "/api/architecture-proposal",
+      "destination": "/api/architecture-proposal"
+    },
+    {
+      "source": "/api/architecture-qa",
+      "destination": "/api/architecture-qa"
+    },
+    {
+      "source": "/api/save-contact",
+      "destination": "/api/save-contact"
+    },
+    {
+      "source": "/api/save-proposal",
+      "destination": "/api/save-proposal"
+    },
+    {
       "source": "/api/(.*)",
-      "destination": "/api/$1"
+      "destination": "/api/index"
     },
     {
       "source": "/(.*)",
@@ -19,10 +39,6 @@
         {
           "key": "X-Content-Type-Options",
           "value": "nosniff"
-        },
-        {
-          "key": "X-Frame-Options",
-          "value": "DENY"
         },
         {
           "key": "X-XSS-Protection",

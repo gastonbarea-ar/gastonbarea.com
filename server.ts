@@ -359,7 +359,7 @@ Solución detectada dentro de la web: "${matchedSolution.serviceTitle}" (${match
 Responde en 2 párrafos ágiles y ejecutivos como la inteligencia viva de gastonbarea.com (con la voz y experiencia de 30 años en el sector tecnológico-productivo y 14 años dirigiendo proyectos con clientes de Gastón Barea). Orienta al usuario exactamente a cómo resolvemos su problema y por qué la solución "${matchedSolution.serviceTitle}" dentro de la web es el camino indicado.`;
 
       const response = await ai.models.generateContent({
-        model: 'gemini-3.8-flash',
+        model: 'gemini-3-flash-preview',
         contents: fullPrompt,
         config: {
           systemInstruction: GASTON_DIGITAL_TWIN_SYSTEM_INSTRUCTION,
@@ -424,7 +424,7 @@ Ids válidos de proyectos en catálogo para reordenar según relevancia (recomme
 - "infraestructura-critica-linux-cluster"`;
 
       const response = await ai.models.generateContent({
-        model: 'gemini-3.8-flash',
+        model: 'gemini-3-flash-preview',
         contents: prompt,
         config: {
           systemInstruction: GASTON_DIGITAL_TWIN_SYSTEM_INSTRUCTION,
@@ -2608,7 +2608,8 @@ async function startServer() {
 
   if (!isProduction) {
     let viteMiddleware: any = null;
-    const viteReady = import('vite')
+    const vitePkg = 'vite';
+    const viteReady = import(vitePkg)
       .then(({ createServer: createViteServer }) =>
         createViteServer({
           server: { middlewareMode: true },
@@ -2659,5 +2660,11 @@ async function startServer() {
   });
 }
 
-startServer();
+if (!process.env.VERCEL) {
+  startServer();
+}
+
+export { app };
+export default app;
+
 
