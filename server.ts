@@ -106,11 +106,19 @@ app.get(['/api/health', '/health', '/api/infrastructure/status'], async (_req, r
       if (!settingsErr) {
         supabaseConnected = true;
         schemaTablesReady = true;
-      } else if (settingsErr.code === '42P01' || settingsErr.message?.includes('does not exist')) {
+      } else if (
+        settingsErr.code === '42P01' ||
+        settingsErr.code === 'PGRST205' ||
+        settingsErr.message?.includes('does not exist') ||
+        settingsErr.message?.includes('schema cache')
+      ) {
         // Connected to Supabase instance, but schema.sql hasn't been executed yet
         supabaseConnected = true;
         schemaTablesReady = false;
-        supabaseError = 'Conectado a Supabase, pero falta ejecutar supabase/schema.sql en el SQL Editor.';
+        supabaseError =
+          'Conectado exitosamente a Supabase (' +
+          (projectHost || 'activo') +
+          '), pero las tablas aún no fueron creadas. Ejecutá supabase/schema.sql en el SQL Editor de Supabase.';
       } else {
         supabaseError = settingsErr.message;
       }
