@@ -12,10 +12,13 @@ import {
   Layers,
   ShieldCheck,
   MessageSquare,
+  Download,
+  Mail,
 } from 'lucide-react';
 import {
   CustomAiSolutionBlueprint,
   buildCustomSolutionBlueprint,
+  downloadAiStudyDossier,
 } from '../lib/domainLogic';
 import { PROJECTS_CATALOG, ProductionProject } from '../data/projectsData';
 
@@ -143,40 +146,33 @@ export const CustomSolutionPage: React.FC<CustomSolutionPageProps> = ({
 
   const handleSaveToCrmAndPortal = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!contactName.trim() || !contactEmail.trim() || isSavingToPortal) return;
+    if (!contactEmail.trim() || isSavingToPortal) return;
+
+    const resolvedName =
+      contactName.trim() || contactEmail.trim().split('@')[0] || 'Ejecutivo';
 
     setIsSavingToPortal(true);
     setPortalSaveFeedback({ status: 'idle', message: '' });
 
-    const servicesSummary = blueprint.tailoredServices
-      .map((s) => `${s.code}. ${s.title} (${s.deliverable})`)
-      .join(' | ');
-
     try {
-      const response = await fetch('/api/crm/opportunities', {
+      const response = await fetch('/api/send-ai-study', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          clientName: contactName.trim(),
-          contactEmail: contactEmail.trim(),
+          clientName: resolvedName,
+          clientEmail: contactEmail.trim(),
           companyName: contactCompany.trim() || 'Cuenta Individual / En Evaluación',
           phone: contactPhone.trim() || '',
-          serviceCategory: blueprint.primaryVertical,
-          projectTitle: blueprint.solutionTitle,
-          estimatedBudget: 4800,
-          currency: 'USD',
-          stage: 'diagnostico',
-          probability: 45,
-          notes: `[SOLUCIÓN DISEÑADA CON IA A MEDIDA]\nConsulta: ${blueprint.query}\nDiagnóstico: ${blueprint.executiveDiagnosis}\nServicios creados: ${servicesSummary}\nPlazo estimado: ${blueprint.estimatedTimeline}`,
+          blueprint,
         }),
       });
 
       const data = await response.json();
-      if (response.ok) {
+      if (response.ok && data.success) {
         setPortalSaveFeedback({
           status: 'success',
           message:
-            'Tu solución personalizada fue registrada en el Pipeline CRM y vinculada al Portal de Clientes. Ya podés ingresar al Portal para dar seguimiento a los hitos o agendar la revisión técnica.',
+            '¡Listo! Enviamos el Estudio Técnico completo a tu correo electrónico (vía notificaciones@gastonbarea.com) y vinculamos la arquitectura a tu cuenta del Portal de Clientes.',
           credentials: data.portalAccount
             ? {
                 username: data.portalAccount.username,
@@ -185,13 +181,13 @@ export const CustomSolutionPage: React.FC<CustomSolutionPageProps> = ({
             : undefined,
         });
       } else {
-        throw new Error(data?.error || 'Error al registrar');
+        throw new Error(data?.error || 'Error al enviar el estudio por email');
       }
     } catch {
       setPortalSaveFeedback({
         status: 'error',
         message:
-          'No se pudo sincronizar automáticamente en este instante. Podés agendar directamente en Google Meet Pro con el contexto completo.',
+          'No se pudo enviar automáticamente en este instante. Podés descargar el estudio directamente con el botón de descarga o continuar por WhatsApp Directo.',
       });
     } finally {
       setIsSavingToPortal(false);
@@ -211,7 +207,7 @@ export const CustomSolutionPage: React.FC<CustomSolutionPageProps> = ({
           <div className="p-4 sm:p-6 bg-[#13141C] border border-white/10 space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-2 text-xs font-mono text-neutral-400">
               <span className="text-emerald-400 font-semibold">
-                ARQUITECTURA REORGANIZADA A MEDIDA · GEMELO DIGITAL EN VIVO
+                ESTUDIO TÉCNICO PERSONALIZADO CON IA · GEMELO DIGITAL EN VIVO
               </span>
               <span>30 AÑOS TECH · 14 AÑOS DIRECCIÓN PMO</span>
             </div>
@@ -229,7 +225,7 @@ export const CustomSolutionPage: React.FC<CustomSolutionPageProps> = ({
                   type="text"
                   value={refineQuery}
                   onChange={(e) => setRefineQuery(e.target.value)}
-                  placeholder="Refiná tu requerimiento o describí otro desafío empresarial para reorganizar servicios en tiempo real..."
+                  placeholder="Refiná tu requerimiento o describí otro desafío empresarial para recalcular el estudio en tiempo real..."
                   className="w-full text-sm bg-transparent text-white placeholder:text-neutral-500 focus:outline-none"
                 />
               </div>
@@ -241,11 +237,11 @@ export const CustomSolutionPage: React.FC<CustomSolutionPageProps> = ({
                 {isGenerating ? (
                   <>
                     <RefreshCw className="w-4 h-4 animate-spin" />
-                    <span>Reorganizando Arquitectura...</span>
+                    <span>Recalculando Estudio...</span>
                   </>
                 ) : (
                   <>
-                    <span>Rediseñar Solución con IA</span>
+                    <span>Actualizar Estudio con IA</span>
                     <Send className="w-3.5 h-3.5" />
                   </>
                 )}
@@ -278,7 +274,7 @@ export const CustomSolutionPage: React.FC<CustomSolutionPageProps> = ({
 
           {/* Main Strategic Diagnosis Grid */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-start">
-            <div className="lg:col-span-8 space-y-5 text-left">
+            <div className="lg:col-span-7 space-y-5 text-left">
               <div className="flex flex-wrap items-center gap-3 text-xs font-mono text-emerald-400">
                 <span>CONSULTA ANALIZADA: &ldquo;{blueprint.query}&rdquo;</span>
                 <span aria-hidden="true">·</span>
@@ -309,64 +305,183 @@ export const CustomSolutionPage: React.FC<CustomSolutionPageProps> = ({
                   ))}
                 </div>
               </div>
-            </div>
 
-            {/* Right Executive KPI & Fast Action Box */}
-            <div className="lg:col-span-4 p-6 sm:p-8 bg-[#13141C] border border-white/10 space-y-6 text-left">
-              <div className="space-y-2">
-                <div className="text-xs font-mono text-emerald-400">
-                  PARÁMETROS DE EJECUCIÓN PMO
-                </div>
-                <div className="text-2xl font-display font-bold text-white">
-                  {blueprint.estimatedTimeline}
-                </div>
-                <p className="text-xs text-neutral-400 leading-relaxed">
-                  Gobernanza por hitos verificables en servidor Staging (40% Inicio · 40% UAT Funcional · 20% Puesta en Producción).
-                </p>
-              </div>
-
-              <div className="space-y-3 pt-4 border-t border-white/10">
-                <button
-                  type="button"
-                  onClick={() => onScheduleClick(scheduleSummaryContext)}
-                  className="w-full px-5 py-3.5 text-xs sm:text-sm font-semibold text-white bg-[#291B64] hover:bg-[#382586] rounded-none transition-colors flex items-center justify-between gap-2 cursor-pointer"
-                >
-                  <span className="inline-flex items-center gap-2">
-                    <Video className="w-4 h-4 text-emerald-300" />
-                    <span>Validar Solución en Google Meet Pro</span>
-                  </span>
-                  <ArrowRight className="w-4 h-4" />
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    const el = document.getElementById('guardar-solucion-portal');
-                    if (el) el.scrollIntoView({ behavior: 'smooth' });
-                  }}
-                  className="w-full px-5 py-3.5 text-xs sm:text-sm font-semibold text-white bg-white/[0.08] hover:bg-white/[0.14] rounded-none transition-colors flex items-center justify-between gap-2 cursor-pointer"
-                >
-                  <span className="inline-flex items-center gap-2">
-                    <UserCheck className="w-4 h-4 text-emerald-400" />
-                    <span>Guardar en Portal Clientes & CRM</span>
-                  </span>
-                  <ArrowRight className="w-4 h-4" />
-                </button>
-
+              {/* Quick Study Download + Direct Channels Bar below diagnosis */}
+              <div className="pt-4 flex flex-wrap items-center gap-3">
                 <button
                   type="button"
                   onClick={() =>
-                    onWhatsAppClick(
-                      `Hola Gastón, generé en gastonbarea.com la solución a medida "${blueprint.solutionTitle}" para nuestra consulta: "${blueprint.query}". Me gustaría coordinar una revisión.`
+                    downloadAiStudyDossier(
+                      blueprint,
+                      contactName.trim() || undefined,
+                      contactCompany.trim() || undefined
                     )
                   }
-                  className="w-full px-5 py-3 text-xs font-mono text-neutral-300 hover:text-white transition-colors flex items-center justify-between gap-2 cursor-pointer"
+                  className="px-4 py-2.5 text-xs font-mono font-bold text-white bg-white/10 hover:bg-white/20 border border-white/15 inline-flex items-center gap-2 cursor-pointer transition-colors"
                 >
-                  <span className="inline-flex items-center gap-2">
-                    <MessageSquare className="w-3.5 h-3.5 text-emerald-400" />
-                    <span>Enviar Síntesis por WhatsApp Directo</span>
+                  <Download className="w-4 h-4 text-emerald-400" />
+                  <span>Descargar Estudio como Documento (.HTML / PDF)</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => onScheduleClick(scheduleSummaryContext)}
+                  className="px-4 py-2.5 text-xs font-mono font-bold text-emerald-300 bg-[#291B64]/60 hover:bg-[#291B64] border border-emerald-400/30 inline-flex items-center gap-2 cursor-pointer transition-colors"
+                >
+                  <Video className="w-4 h-4" />
+                  <span>Agendar Videollamada Google Meet Pro (30m)</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Right Executive Box: PRIORITIZED EMAIL DISPATCH, WHATSAPP DIRECT & DOWNLOAD */}
+            <div className="lg:col-span-5 p-6 sm:p-7 bg-[#13141C] border border-emerald-400/30 space-y-5 text-left">
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between gap-2 text-xs font-mono text-emerald-400 font-bold">
+                  <span>ACCIONES PRIORITARIAS DEL ESTUDIO</span>
+                  <span>{blueprint.estimatedTimeline}</span>
+                </div>
+                <h2 className="font-display text-lg sm:text-xl font-bold text-white">
+                  Recibí este Estudio en tu Email o continuá por WhatsApp
+                </h2>
+                <p className="text-xs text-neutral-300 leading-relaxed">
+                  Enviate ahora mismo el dossier técnico completo a tu correo (incluye acceso automático al Portal de Clientes) o conversemos directo por WhatsApp.
+                </p>
+              </div>
+
+              {/* Priority #1: WhatsApp Directo */}
+              <button
+                type="button"
+                onClick={() =>
+                  onWhatsAppClick(
+                    `Hola Gastón, acabo de generar en gastonbarea.com/#solucion-ia el estudio técnico "${blueprint.solutionTitle}" para nuestra consulta: "${blueprint.query}". Me gustaría avanzar con vos.`
+                  )
+                }
+                className="w-full px-5 py-3.5 text-xs sm:text-sm font-semibold text-emerald-950 bg-emerald-400 hover:bg-emerald-300 rounded-none transition-colors flex items-center justify-between gap-2 cursor-pointer shadow-md"
+              >
+                <span className="inline-flex items-center gap-2">
+                  <MessageSquare className="w-4 h-4 shrink-0" />
+                  <span>1. Enviar Consulta por WhatsApp Directo</span>
+                </span>
+                <ArrowRight className="w-4 h-4 shrink-0" />
+              </button>
+
+              {/* Priority #2: Instant Email Study Dispatch Form */}
+              <form
+                onSubmit={handleSaveToCrmAndPortal}
+                className="p-4 bg-[#0B0B10] border border-white/10 space-y-3"
+              >
+                <div className="flex items-center justify-between gap-2 text-xs font-mono text-emerald-300 font-semibold">
+                  <span className="inline-flex items-center gap-1.5">
+                    <Mail className="w-3.5 h-3.5" />
+                    <span>2. ENVIAR ESTUDIO COMPLETO A MI EMAIL</span>
                   </span>
-                  <ArrowRight className="w-3.5 h-3.5" />
+                  <span className="text-[10px] text-neutral-400">Vía Resend</span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  <input
+                    type="text"
+                    value={contactName}
+                    onChange={(e) => setContactName(e.target.value)}
+                    placeholder="Tu Nombre y Apellido"
+                    className="w-full px-3 py-2 text-xs bg-[#141622] border border-white/15 text-white placeholder:text-neutral-500 focus:outline-none focus:border-emerald-400"
+                  />
+                  <input
+                    type="email"
+                    required
+                    value={contactEmail}
+                    onChange={(e) => setContactEmail(e.target.value)}
+                    placeholder="tu-correo@empresa.com *"
+                    className="w-full px-3 py-2 text-xs bg-[#141622] border border-white/15 text-white placeholder:text-neutral-500 focus:outline-none focus:border-emerald-400"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  <input
+                    type="text"
+                    value={contactCompany}
+                    onChange={(e) => setContactCompany(e.target.value)}
+                    placeholder="Empresa (Opcional)"
+                    className="w-full px-3 py-2 text-xs bg-[#141622] border border-white/15 text-white placeholder:text-neutral-500 focus:outline-none focus:border-emerald-400"
+                  />
+                  <input
+                    type="text"
+                    value={contactPhone}
+                    onChange={(e) => setContactPhone(e.target.value)}
+                    placeholder="WhatsApp (Opcional)"
+                    className="w-full px-3 py-2 text-xs bg-[#141622] border border-white/15 text-white placeholder:text-neutral-500 focus:outline-none focus:border-emerald-400"
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={isSavingToPortal || !contactEmail.trim()}
+                  className="w-full px-4 py-3 text-xs font-semibold text-white bg-[#291B64] hover:bg-[#382586] transition-colors flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                >
+                  <Mail className="w-4 h-4 text-emerald-300" />
+                  <span>
+                    {isSavingToPortal
+                      ? 'Enviando Estudio a tu Correo...'
+                      : 'Recibir Estudio en mi Email + Activar Portal'}
+                  </span>
+                </button>
+
+                {portalSaveFeedback.status !== 'idle' && (
+                  <div
+                    className={`p-3 border text-xs space-y-1.5 ${
+                      portalSaveFeedback.status === 'success'
+                        ? 'bg-emerald-950/60 border-emerald-500/40 text-emerald-200'
+                        : 'bg-amber-950/60 border-amber-500/40 text-amber-200'
+                    }`}
+                  >
+                    <div className="flex items-start gap-1.5">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
+                      <span>{portalSaveFeedback.message}</span>
+                    </div>
+                    {portalSaveFeedback.credentials && (
+                      <div className="pt-1.5 border-t border-white/10 font-mono text-[11px] text-white flex flex-wrap items-center justify-between gap-2">
+                        <span>
+                          Usuario: <strong>{portalSaveFeedback.credentials.username}</strong> · Clave:{' '}
+                          <strong>{portalSaveFeedback.credentials.password || 'cliente2026'}</strong>
+                        </span>
+                        <button
+                          type="button"
+                          onClick={onClientPortalClick}
+                          className="underline text-emerald-300 cursor-pointer"
+                        >
+                          Abrir Portal →
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </form>
+
+              {/* Priority #3: Download Dossier + Schedule Call */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+                <button
+                  type="button"
+                  onClick={() =>
+                    downloadAiStudyDossier(
+                      blueprint,
+                      contactName.trim() || undefined,
+                      contactCompany.trim() || undefined
+                    )
+                  }
+                  className="px-4 py-2.5 text-xs font-mono font-semibold text-white bg-white/[0.08] hover:bg-white/[0.15] transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <Download className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Descargar Estudio</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => onScheduleClick(scheduleSummaryContext)}
+                  className="px-4 py-2.5 text-xs font-mono font-semibold text-white bg-white/[0.08] hover:bg-white/[0.15] transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <Video className="w-3.5 h-3.5 text-emerald-300" />
+                  <span>Agendar Meet (30m)</span>
                 </button>
               </div>
             </div>
@@ -630,7 +745,7 @@ export const CustomSolutionPage: React.FC<CustomSolutionPageProps> = ({
         </div>
       </section>
 
-      {/* 5. BLOQUE 04: VINCULAR SOLUCIÓN AL PORTAL CLIENTES & PIPELINE CRM */}
+      {/* 5. BLOQUE 04: ENVIAR ESTUDIO POR EMAIL, DESCARGAR DOSSIER & VINCULAR AL PORTAL CLIENTES */}
       <section
         id="guardar-solucion-portal"
         className="w-full px-4 sm:px-8 lg:px-12 xl:px-16 py-16 lg:py-20 bg-[#12131A] text-white"
@@ -638,54 +753,75 @@ export const CustomSolutionPage: React.FC<CustomSolutionPageProps> = ({
         <div className="w-full grid grid-cols-1 lg:grid-cols-12 gap-10 items-start text-left">
           <div className="lg:col-span-6 space-y-5">
             <div className="text-xs font-mono text-emerald-400 font-semibold uppercase tracking-wider">
-              04. VINCULACIÓN DIRECTA CON PORTAL DE CLIENTES & AGENDA CRM
+              04. ENVÍO POR EMAIL, DESCARGA DE ESTUDIO & PORTAL CLIENTES
             </div>
             <h2 className="font-display text-2xl sm:text-4xl font-bold text-white leading-tight">
-              Guardá esta arquitectura personalizada en tu cuenta del Portal Clientes.
+              Recibí este estudio en tu correo, descargalo como dossier o avanzá por WhatsApp.
             </h2>
             <p className="text-sm text-neutral-300 leading-relaxed">
-              Al registrar esta solución, el sistema crea automáticamente tu ficha en la Agenda Corporativa/Individual del CRM y habilita tu usuario en el{' '}
-              <strong className="text-white">Portal de Clientes (#portal)</strong> sin necesidad de tener un servicio previo contratado.
+              Al enviarte este estudio por correo electrónico, el sistema despacha el documento completo desde{' '}
+              <strong className="text-white">notificaciones@gastonbarea.com</strong>, crea tu ficha en el CRM y habilita tu usuario en el{' '}
+              <strong className="text-white">Portal de Clientes (#portal)</strong>.
             </p>
 
             <div className="space-y-3 pt-2 text-xs sm:text-sm text-neutral-300">
               <div className="flex items-start gap-2.5">
                 <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
                 <span>
-                  Acceso inmediato a la hoja de ruta 40/40/20 y seguimiento de la propuesta.
+                  Dossier completo en tu bandeja de entrada con diagnóstico, stack y hoja de ruta 40/40/20.
                 </span>
               </div>
               <div className="flex items-start gap-2.5">
                 <FolderKanban className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
                 <span>
-                  Agrupación de contactos por empresa o cuenta individual en el Pipeline CRM.
+                  Credenciales inmediatas para seguimiento en el Portal de Clientes y canal directo de WhatsApp.
                 </span>
               </div>
             </div>
 
-            <div className="pt-4 flex flex-wrap items-center gap-4">
+            <div className="pt-4 flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                onClick={() =>
+                  onWhatsAppClick(
+                    `Hola Gastón, estuve analizando el estudio "${blueprint.solutionTitle}" en gastonbarea.com/#solucion-ia y quiero avanzar.`
+                  )
+                }
+                className="px-5 py-3 text-xs font-semibold text-emerald-950 bg-emerald-400 hover:bg-emerald-300 transition-colors inline-flex items-center gap-2 cursor-pointer"
+              >
+                <MessageSquare className="w-4 h-4" />
+                <span>Continuar por WhatsApp Directo</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() =>
+                  downloadAiStudyDossier(
+                    blueprint,
+                    contactName.trim() || undefined,
+                    contactCompany.trim() || undefined
+                  )
+                }
+                className="px-5 py-3 text-xs font-semibold text-white bg-white/10 hover:bg-white/20 transition-colors inline-flex items-center gap-2 cursor-pointer"
+              >
+                <Download className="w-4 h-4 text-emerald-400" />
+                <span>Descargar Estudio (.HTML / PDF)</span>
+              </button>
+
               <button
                 type="button"
                 onClick={onClientPortalClick}
-                className="px-5 py-3 text-xs font-semibold text-white bg-white/10 hover:bg-white/20 transition-colors inline-flex items-center gap-2 cursor-pointer"
+                className="px-4 py-3 text-xs font-semibold text-white bg-white/5 hover:bg-white/15 transition-colors inline-flex items-center gap-2 cursor-pointer"
               >
                 <UserCheck className="w-4 h-4 text-emerald-400" />
-                <span>Abrir Portal Clientes Ahora</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => onScheduleClick(scheduleSummaryContext)}
-                className="px-5 py-3 text-xs font-semibold text-emerald-300 hover:underline inline-flex items-center gap-2 cursor-pointer"
-              >
-                <Video className="w-4 h-4" />
-                <span>Agendar Google Meet Pro (30m)</span>
+                <span>Portal Clientes</span>
               </button>
             </div>
           </div>
 
           <div className="lg:col-span-6 p-6 sm:p-8 bg-[#191B24] border border-white/10 space-y-5">
-            <div className="text-xs font-mono text-neutral-300 font-semibold">
-              REGISTRAR PROPUESTA EN PORTAL CLIENTES & PIPELINE CRM
+            <div className="text-xs font-mono text-emerald-400 font-semibold">
+              ENVIAR ESTUDIO TÉCNICO A MI CORREO & HABILITAR PORTAL CLIENTES
             </div>
 
             <form onSubmit={handleSaveToCrmAndPortal} className="space-y-4">
@@ -750,10 +886,11 @@ export const CustomSolutionPage: React.FC<CustomSolutionPageProps> = ({
                 disabled={isSavingToPortal}
                 className="w-full px-6 py-3.5 text-xs sm:text-sm font-semibold text-white bg-[#291B64] hover:bg-[#382586] transition-colors flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
               >
+                <Mail className="w-4 h-4 text-emerald-300" />
                 <span>
                   {isSavingToPortal
-                    ? 'Vinculando con Portal Clientes y CRM...'
-                    : 'Guardar Arquitectura en Mi Portal Clientes'}
+                    ? 'Enviando Estudio por Email y Vinculando al Portal...'
+                    : 'Recibir Estudio Técnico en mi Email + Guardar en Portal'}
                 </span>
                 <ArrowRight className="w-4 h-4" />
               </button>

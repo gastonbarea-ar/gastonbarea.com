@@ -10,6 +10,7 @@ import {
   sendTestTransactionalEmail,
   sendOfficialQuoteEmail,
   sendProjectKickoffEmail,
+  sendAiStudyEmail,
   getEmailConfigStatus,
 } from './src/services/emailAutomation.ts';
 import {
@@ -1100,6 +1101,90 @@ app.post('/api/save-contact', async (req, res) => {
     console.error('Exception saving contact to Supabase:', err);
     return res.json({ success: true, mocked: true, data: record, opportunity: autoOpportunity });
   }
+});
+
+// Public Endpoint: Dispatch AI Consultation Study by Email + Auto-Provision CRM & Client Portal
+app.post('/api/send-ai-study', async (req, res) => {
+  const {
+    clientName,
+    clientEmail,
+    companyName,
+    phone,
+    blueprint,
+  } = req.body || {};
+
+  const cleanEmail = (clientEmail || '').trim().toLowerCase();
+  const cleanName = (clientName || '').trim() || (cleanEmail ? cleanEmail.split('@')[0] : 'Ejecutivo');
+  const cleanCompany = (companyName || '').trim() || 'Cuenta Individual / Evaluación Técnica';
+  const cleanPhone = (phone || '').trim();
+
+  if (!cleanEmail || !/\S+@\S+\.\S+/.test(cleanEmail)) {
+    return res.status(400).json({
+      success: false,
+      error: 'Por favor ingresá un correo electrónico válido para enviarte el estudio técnico.',
+    });
+  }
+
+  const resolvedBlueprint =
+    blueprint && blueprint.solutionTitle
+      ? blueprint
+      : buildCustomSolutionBlueprint(blueprint?.query || 'Arquitectura de Base Tecnológica & IA Services');
+
+  const servicesSummary = (resolvedBlueprint.tailoredServices || [])
+    .map((s: any) => `${s.code}. ${s.title} (${s.deliverable})`)
+    .join(' | ');
+
+  // 1. Auto-provision Company, Contact (with Portal access) and Kanban Opportunity
+  let provisioned: any = null;
+  try {
+    provisioned = await autoProvisionCrmFromWebLead({
+      name: cleanName,
+      email: cleanEmail,
+      company: cleanCompany,
+      phone: cleanPhone,
+      title: `Estudio IA: ${resolvedBlueprint.solutionTitle}`,
+      serviceText: `${resolvedBlueprint.primaryVertical || ''} ${resolvedBlueprint.solutionTitle || ''}`,
+      notes: `[ESTUDIO TÉCNICO IA ENVIADO POR EMAIL]\nConsulta: ${resolvedBlueprint.query}\nDiagnóstico: ${resolvedBlueprint.executiveDiagnosis}\nMódulos: ${servicesSummary}\nPlazo estimado: ${resolvedBlueprint.estimatedTimeline}`,
+      source: 'web_diagnostic',
+      estimatedValue: 4800,
+    });
+  } catch (err) {
+    console.error('[send-ai-study] Error provisioning CRM lead:', err);
+  }
+
+  const portalCredentials = {
+    username: provisioned?.contact?.username || cleanEmail,
+    password: provisioned?.contact?.password || 'cliente2026',
+  };
+
+  // 2. Dispatch complete AI Technical Study HTML email via Resend
+  const emailResult = await sendAiStudyEmail({
+    clientName: cleanName,
+    clientEmail: cleanEmail,
+    companyName: cleanCompany,
+    phone: cleanPhone,
+    blueprint: resolvedBlueprint,
+    portalCredentials,
+  });
+
+  // 3. Prepare direct WhatsApp link to Gastón with the study reference
+  const waCfg = getWhatsAppConfig();
+  const targetWaPhone = normalizePhoneE164(waCfg.businessPhone || '5492995137574');
+  const waText = encodeURIComponent(
+    `Hola Gastón, acabo de generar y descargar en gastonbarea.com el Estudio Técnico IA: "${resolvedBlueprint.solutionTitle}" (Consulta: "${resolvedBlueprint.query}"). Mi correo es ${cleanEmail}. Me gustaría avanzar con una revisión.`
+  );
+  const waMeUrl = `https://wa.me/${targetWaPhone}?text=${waText}`;
+
+  return res.json({
+    success: true,
+    emailSent: emailResult.success,
+    emailProvider: emailResult.provider,
+    portalAccount: portalCredentials,
+    opportunity: provisioned?.opportunity || null,
+    waMeUrl,
+    message:
+      '¡Estudio técnico enviado a tu correo electrónico y vinculado a tu Portal de Clientes!',
+  });
 });
 
 // Supabase Webhook Endpoint for external database event triggers

@@ -14,12 +14,16 @@ import {
   SlidersHorizontal,
   Maximize2,
   Minimize2,
+  Download,
+  Mail,
+  CheckCircle2,
 } from 'lucide-react';
 import { SITE_CONFIG, SiteConfig } from '../data/siteConfig';
 import {
   extractYoutubeId,
   CustomAiSolutionBlueprint,
   buildCustomSolutionBlueprint,
+  downloadAiStudyDossier,
 } from '../lib/domainLogic';
 
 interface MatchedSolution {
@@ -367,7 +371,7 @@ export const Hero: React.FC<HeroProps> = ({
                 videoFitMode === 'cover' && !isCinemaExpanded
                   ? 'lg:aspect-auto lg:flex-1 lg:min-h-[480px]'
                   : 'lg:aspect-video'
-              } bg-black overflow-hidden`}
+              } bg-black overflow-hidden group`}
             >
               {activeDirectVideoUrl ? (
                 <video
@@ -411,9 +415,38 @@ export const Hero: React.FC<HeroProps> = ({
                   />
                 </div>
               )}
+
+              {/* Floating Action Overlay Inside Video Frame: Schedule Video Call + Direct Audio/WhatsApp */}
+              <div className="absolute top-3.5 right-3.5 z-20 flex flex-wrap items-center justify-end gap-2 pointer-events-auto">
+                <button
+                  type="button"
+                  onClick={() =>
+                    onScheduleClick('Videollamada Google Meet Pro agendada desde el Frame de Video Principal')
+                  }
+                  className="px-3.5 sm:px-4 py-2.5 text-xs font-mono font-bold text-white bg-[#291B64]/95 hover:bg-[#382586] backdrop-blur-md border border-emerald-400/50 shadow-lg transition-all inline-flex items-center gap-2 cursor-pointer"
+                >
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+                  <Video className="w-3.5 h-3.5 text-emerald-300 shrink-0" />
+                  <span>Agendar Videollamada (30m)</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    onWhatsAppClick(
+                      'Hola Gastón, estoy viendo tu video de presentación en gastonbarea.com y me gustaría hacerte una consulta directa.'
+                    )
+                  }
+                  className="px-3 py-2.5 text-xs font-mono font-bold text-emerald-950 bg-emerald-400 hover:bg-emerald-300 shadow-lg transition-all inline-flex items-center gap-1.5 cursor-pointer"
+                  title="Escribir por WhatsApp Directo"
+                >
+                  <MessageSquare className="w-3.5 h-3.5 shrink-0" />
+                  <span className="hidden sm:inline">WhatsApp</span>
+                </button>
+              </div>
             </div>
 
-            {/* Clean Non-Overlapping Video Control & Episode Bar Below Player (Selector 1) */}
+            {/* Clean Non-Overlapping Video Control & Episode Bar Below Player */}
             <div className="relative z-10 w-full bg-[#0B0B10] px-4 sm:px-6 lg:px-8 py-4 border-t border-white/10 flex flex-col gap-3.5 text-left">
               {/* Row 1: Active Episode Title + Sound & Stage Controls */}
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -536,74 +569,143 @@ export const Hero: React.FC<HeroProps> = ({
             </div>
           </div>
 
-          {/* RIGHT EXECUTIVE BIO & DIRECT ACCESS COLUMN (Selector 2: Clean responsive stack) */}
+          {/* RIGHT EXECUTIVE BIO & DIRECT ACCESS COLUMN (Reorganized to fill vertical height cleanly without empty gaps) */}
           {!isCinemaExpanded && (
-            <div className="lg:col-span-4 p-5 sm:p-8 lg:p-10 flex flex-col justify-between space-y-6 text-left bg-[#0E0E14] border-t lg:border-t-0 lg:border-l border-white/10">
-              <div className="space-y-4">
-                <div className="flex flex-wrap items-center gap-2 text-xs font-mono text-neutral-400">
+            <div className="lg:col-span-4 p-5 sm:p-7 lg:p-8 flex flex-col justify-between gap-5 text-left bg-[#0E0E14] border-t lg:border-t-0 lg:border-l border-white/10">
+              {/* Top: Identity Badge + Executive Title */}
+              <div className="space-y-3">
+                <div className="inline-flex flex-wrap items-center gap-2 px-2.5 py-1 bg-white/[0.05] border border-white/10 text-[11px] font-mono text-neutral-300">
                   <span className="text-white font-bold tracking-wider">GASTONBAREA.COM</span>
                   <span aria-hidden="true">·</span>
                   <span>30 AÑOS TECH</span>
                   <span aria-hidden="true">·</span>
-                  <span className="text-emerald-400">14 AÑOS PMO</span>
+                  <span className="text-emerald-400 font-bold">14 AÑOS PMO</span>
                 </div>
 
                 <h1
-                  className="font-display text-2xl sm:text-3xl lg:text-[2rem] font-bold tracking-tight text-white leading-[1.15]"
+                  className="font-display text-xl sm:text-2xl lg:text-[1.65rem] font-bold tracking-tight text-white leading-[1.18]"
                   style={{ textWrap: 'balance' }}
                 >
                   Consultor y desarrollador de proyectos de base tecnológica, IA Services y bioeconomía.
                 </h1>
 
-                <p className="text-xs sm:text-sm text-neutral-300 leading-relaxed">
-                  Toda esta web funciona como mi{' '}
-                  <strong className="text-white font-semibold">Gemelo Digital</strong>. Explorá los bloques temáticos del inicio o navegá a cada página dedicada para estructurar tu proyecto e interactuar con mi experiencia.
+                <p className="text-xs sm:text-[13px] text-neutral-300 leading-relaxed">
+                  Esta plataforma opera como mi{' '}
+                  <strong className="text-white font-semibold">Gemelo Digital</strong>. Consultá tu desafío para recibir un estudio técnico a medida con hoja de ruta <strong className="text-emerald-400">40% · 40% · 20%</strong>.
                 </p>
               </div>
 
-              {/* Clean Executive Actions */}
-              <div className="space-y-2.5 pt-4 border-t border-white/10">
-                <button
-                  type="button"
-                  onClick={() => onScheduleClick('Sesión Ejecutiva Google Meet Pro desde Portada')}
-                  className="w-full px-4 sm:px-5 py-3.5 text-xs sm:text-sm font-semibold text-white bg-[#291B64] hover:bg-[#382586] rounded-none transition-colors flex items-center justify-between gap-2 cursor-pointer"
-                >
-                  <span className="inline-flex items-center gap-2">
-                    <Video className="w-4 h-4 text-emerald-300 shrink-0" />
-                    <span>Agendar Google Meet Pro (30m)</span>
-                  </span>
-                  <ArrowRight className="w-4 h-4 shrink-0" />
-                </button>
+              {/* Middle: Vertical Pillars (Fills the space next to the video frame with actionable executive value) */}
+              <div className="space-y-2 py-3 border-y border-white/10">
+                <div className="text-[10px] font-mono text-emerald-400 uppercase tracking-wider font-semibold">
+                  EJES ESTRATÉGICOS DE EJECUCIÓN DIRECTA:
+                </div>
 
-                <button
-                  type="button"
-                  onClick={onDiagnosticoClick}
-                  className="w-full px-4 sm:px-5 py-3.5 text-xs sm:text-sm font-semibold text-white bg-white/[0.07] hover:bg-[#291B64] rounded-none transition-colors flex items-center justify-between gap-2 cursor-pointer"
-                >
-                  <span className="inline-flex items-center gap-2">
-                    <Play className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                    <span>Ir a IA Services & Estructurador</span>
-                  </span>
-                  <ArrowRight className="w-4 h-4 shrink-0" />
-                </button>
-
-                <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-neutral-400 pt-2">
+                <div className="grid grid-cols-1 gap-1.5">
                   <button
                     type="button"
-                    onClick={() => onWhatsAppClick()}
-                    className="hover:text-white underline underline-offset-4 inline-flex items-center gap-1.5 cursor-pointer"
+                    onClick={() => handleAskWebAi(quickIntents[1].query, true)}
+                    className="w-full p-2.5 bg-white/[0.03] hover:bg-white/[0.08] border-l-2 border-emerald-400 text-left transition-colors flex items-center justify-between gap-2 cursor-pointer"
                   >
-                    <MessageSquare className="w-3.5 h-3.5 text-emerald-400" />
+                    <div>
+                      <div className="text-xs font-semibold text-white">
+                        01. IA Services, Gemelos Digitales & RAG
+                      </div>
+                      <div className="text-[11px] text-neutral-400">
+                        Agentes conectados a datos propios y BI predictivo
+                      </div>
+                    </div>
+                    <ArrowRight className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleAskWebAi(quickIntents[2].query, true)}
+                    className="w-full p-2.5 bg-white/[0.03] hover:bg-white/[0.08] border-l-2 border-[#6344F5] text-left transition-colors flex items-center justify-between gap-2 cursor-pointer"
+                  >
+                    <div>
+                      <div className="text-xs font-semibold text-white">
+                        02. Bioeconomía, Agroindustria & IoT
+                      </div>
+                      <div className="text-[11px] text-neutral-400">
+                        Trazabilidad de lotes, telemetría y pasaporte ESG
+                      </div>
+                    </div>
+                    <ArrowRight className="w-3.5 h-3.5 text-neutral-400 shrink-0" />
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleAskWebAi(quickIntents[4].query, true)}
+                    className="w-full p-2.5 bg-white/[0.03] hover:bg-white/[0.08] border-l-2 border-sky-400 text-left transition-colors flex items-center justify-between gap-2 cursor-pointer"
+                  >
+                    <div>
+                      <div className="text-xs font-semibold text-white">
+                        03. Odoo ERP v18, B2B2C & Dirección PMO
+                      </div>
+                      <div className="text-[11px] text-neutral-400">
+                        Sin costo de licencias · Entregas en Servidor Staging
+                      </div>
+                    </div>
+                    <ArrowRight className="w-3.5 h-3.5 text-neutral-400 shrink-0" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Bottom: Direct Contact & Action Priorities (WhatsApp + Email + Video Call + Portal) */}
+              <div className="space-y-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      onWhatsAppClick(
+                        'Hola Gastón, estuve viendo tu presentación en gastonbarea.com y quiero consultarte por un proyecto.'
+                      )
+                    }
+                    className="w-full px-3.5 py-3 text-xs font-semibold text-emerald-950 bg-emerald-400 hover:bg-emerald-300 rounded-none transition-colors flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    <MessageSquare className="w-4 h-4 shrink-0" />
                     <span>WhatsApp Directo</span>
                   </button>
+
+                  <button
+                    type="button"
+                    onClick={() => onScheduleClick('Sesión Ejecutiva Google Meet Pro desde Portada')}
+                    className="w-full px-3.5 py-3 text-xs font-semibold text-white bg-[#291B64] hover:bg-[#382586] rounded-none transition-colors flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    <Video className="w-4 h-4 text-emerald-300 shrink-0" />
+                    <span>Agendar Meet (30m)</span>
+                  </button>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (onOpenCustomSolution) {
+                      onOpenCustomSolution(lastBlueprint);
+                    } else {
+                      onDiagnosticoClick();
+                    }
+                  }}
+                  className="w-full px-4 py-2.5 text-xs font-semibold text-white bg-white/[0.07] hover:bg-white/[0.14] rounded-none transition-colors flex items-center justify-between gap-2 cursor-pointer"
+                >
+                  <span className="inline-flex items-center gap-2">
+                    <Mail className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                    <span>Consultar con IA & Recibir Estudio por Email</span>
+                  </span>
+                  <ArrowRight className="w-3.5 h-3.5 shrink-0" />
+                </button>
+
+                <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] font-mono text-neutral-400 pt-1">
+                  <span>notificaciones@gastonbarea.com</span>
 
                   {onClientPortalClick && (
                     <button
                       type="button"
                       onClick={onClientPortalClick}
-                      className="hover:text-white underline underline-offset-4 inline-flex items-center gap-1.5 cursor-pointer"
+                      className="text-emerald-400 hover:text-white underline underline-offset-4 inline-flex items-center gap-1 cursor-pointer"
                     >
-                      <UserCheck className="w-3.5 h-3.5 text-neutral-300" />
+                      <UserCheck className="w-3.5 h-3.5" />
                       <span>Portal Clientes</span>
                     </button>
                   )}
@@ -615,7 +717,7 @@ export const Hero: React.FC<HeroProps> = ({
       </div>
 
       {/* BLOQUE 2: BUSCADOR Y ESTRUCTURADOR DE SOLUCIONES CON IA */}
-      <div className="w-full px-4 sm:px-8 lg:px-12 xl:px-16 py-16 md:py-20 bg-[#F7F7FA]">
+      <div className="w-full px-4 sm:px-8 lg:px-12 xl:px-12 py-16 md:py-20 bg-[#F7F7FA]">
         <div className="w-full space-y-10 text-left">
           <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6">
             <div className="space-y-2 max-w-2xl">
@@ -630,7 +732,7 @@ export const Hero: React.FC<HeroProps> = ({
               </h2>
             </div>
             <p className="text-xs sm:text-sm text-[#515154] max-w-md leading-relaxed">
-              Escribí tu consulta en la barra o elegí un eje estratégico. La IA reorganizará todo el contenido creando una página de solución con servicios a medida, hoja de ruta 40·40·20 y proyectos en producción afines.
+              Escribí tu consulta en la barra o elegí un eje estratégico. La IA generará un estudio técnico descargable, te lo enviará por Email y podrás continuar por WhatsApp Directo.
             </p>
           </div>
 
@@ -682,11 +784,11 @@ export const Hero: React.FC<HeroProps> = ({
                 {isAiThinking ? (
                   <>
                     <RefreshCw className="w-4 h-4 animate-spin" />
-                    <span>Diseñando Solución a Medida...</span>
+                    <span>Diseñando Estudio Técnico...</span>
                   </>
                 ) : (
                   <>
-                    <span>Generar Solución a Medida con IA</span>
+                    <span>Generar Estudio Técnico con IA</span>
                     <Send className="w-3.5 h-3.5" />
                   </>
                 )}
@@ -694,14 +796,14 @@ export const Hero: React.FC<HeroProps> = ({
             </form>
           </div>
 
-          {/* Open Two-Column AI Result (Tonal surfaces, zero heavy borders) */}
+          {/* Open Two-Column AI Result (Prioritizing Email, WhatsApp & Downloadable Dossier) */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch pt-2">
             {/* Left (7 cols): Gastón's AI Synthesis + Preview of Tailored Services */}
             <div className="lg:col-span-7 p-6 sm:p-8 bg-white flex flex-col justify-between space-y-6">
               <div className="space-y-4">
                 <div className="flex flex-wrap items-center justify-between gap-2 text-xs font-mono text-slate-500">
                   <span className="text-[#291B64] font-semibold">
-                    ARQUITECTURA SINTETIZADA · {lastBlueprint.query.toUpperCase()}
+                    ESTUDIO PRELIMINAR IA · {lastBlueprint.query.toUpperCase()}
                   </span>
                   <span>30 Años Tech · 14 Años PMO</span>
                 </div>
@@ -733,7 +835,14 @@ export const Hero: React.FC<HeroProps> = ({
               </div>
 
               <div className="pt-4 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-500">
-                <span>Ejecución auditada: 40% Arquitectura · 40% Staging · 20% Producción</span>
+                <button
+                  type="button"
+                  onClick={() => downloadAiStudyDossier(lastBlueprint)}
+                  className="font-mono font-semibold text-emerald-700 hover:underline inline-flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Descargar Estudio Técnico (.HTML / PDF)</span>
+                </button>
                 <button
                   type="button"
                   onClick={() => {
@@ -743,28 +852,44 @@ export const Hero: React.FC<HeroProps> = ({
                   }}
                   className="font-semibold text-[#291B64] hover:underline inline-flex items-center gap-1 cursor-pointer"
                 >
-                  <span>Abrir Página Completa de esta Solución (#solucion-ia)</span>
+                  <span>Abrir Estudio Completo y Recibir por Email (#solucion-ia)</span>
                   <ArrowRight className="w-3.5 h-3.5" />
                 </button>
               </div>
             </div>
 
-            {/* Right (5 cols): Dedicated Personalized Solution Action Card */}
+            {/* Right (5 cols): Prioritized WhatsApp, Email Study & Download CTAs */}
             <div className="lg:col-span-5 p-6 sm:p-8 bg-[#18103C] text-white flex flex-col justify-between space-y-6">
               <div className="space-y-3">
                 <div className="flex flex-wrap items-center justify-between gap-2 text-xs font-mono text-emerald-400">
-                  <span>PÁGINA DE SOLUCIÓN A MEDIDA</span>
+                  <span>CANALES PRIORITARIOS DE EJECUCIÓN</span>
                   <span>Plazo: {lastBlueprint.estimatedTimeline}</span>
                 </div>
                 <h3 className="font-display text-xl sm:text-2xl font-bold text-white leading-snug">
-                  {matchedSolution.serviceTitle}
+                  Recibí este estudio en tu correo o conversemos por WhatsApp
                 </h3>
                 <p className="text-xs sm:text-sm text-neutral-300 leading-relaxed">
-                  {matchedSolution.summary}
+                  Podés enviarte el dossier técnico completo a tu Email (con acceso automático al Portal de Clientes), descargarlo como documento de estudio o iniciar contacto directo por WhatsApp.
                 </p>
               </div>
 
-              <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-3 pt-2">
+              <div className="space-y-2.5 pt-2">
+                <button
+                  type="button"
+                  onClick={() =>
+                    onWhatsAppClick(
+                      `Hola Gastón, acabo de analizar con tu IA en gastonbarea.com la solución "${lastBlueprint.solutionTitle}" (Consulta: "${lastBlueprint.query}"). Quiero avanzar con este estudio.`
+                    )
+                  }
+                  className="w-full px-5 py-3.5 text-xs sm:text-sm font-semibold text-emerald-950 bg-emerald-400 hover:bg-emerald-300 rounded-none transition-colors inline-flex items-center justify-between gap-2 cursor-pointer"
+                >
+                  <span className="inline-flex items-center gap-2">
+                    <MessageSquare className="w-4 h-4 shrink-0" />
+                    <span>1. Continuar Consulta por WhatsApp Directo</span>
+                  </span>
+                  <ArrowRight className="w-4 h-4 shrink-0" />
+                </button>
+
                 <button
                   type="button"
                   onClick={() => {
@@ -772,27 +897,38 @@ export const Hero: React.FC<HeroProps> = ({
                       onOpenCustomSolution(lastBlueprint);
                     }
                   }}
-                  className="px-5 py-3.5 text-xs font-semibold text-white bg-[#291B64] hover:bg-[#382586] rounded-none transition-colors inline-flex items-center justify-center gap-2 cursor-pointer whitespace-nowrap"
+                  className="w-full px-5 py-3.5 text-xs sm:text-sm font-semibold text-white bg-[#291B64] hover:bg-[#382586] rounded-none transition-colors inline-flex items-center justify-between gap-2 cursor-pointer"
                 >
-                  <span>Ver Solución Diseñada a Medida</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
+                  <span className="inline-flex items-center gap-2">
+                    <Mail className="w-4 h-4 text-emerald-300 shrink-0" />
+                    <span>2. Recibir Estudio Completo por Email & Abrir #solucion-ia</span>
+                  </span>
+                  <ArrowRight className="w-4 h-4 shrink-0" />
                 </button>
 
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (onNavigateToSolution) {
-                      onNavigateToSolution(
-                        matchedSolution.sectionId,
-                        matchedSolution.serviceCode,
-                        aiResponseText
-                      );
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => downloadAiStudyDossier(lastBlueprint)}
+                    className="px-4 py-2.5 text-xs font-mono font-semibold text-white bg-white/10 hover:bg-white/20 rounded-none transition-colors inline-flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    <Download className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>Descargar Estudio</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      onScheduleClick(
+                        `Revisión de Estudio IA: ${lastBlueprint.solutionTitle} (${lastBlueprint.query})`
+                      )
                     }
-                  }}
-                  className="px-4 py-3.5 text-xs font-semibold text-white bg-white/10 hover:bg-white/20 rounded-none transition-colors cursor-pointer whitespace-nowrap text-center"
-                >
-                  {matchedSolution.ctaLabel}
-                </button>
+                    className="px-4 py-2.5 text-xs font-mono font-semibold text-white bg-white/10 hover:bg-white/20 rounded-none transition-colors inline-flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    <Video className="w-3.5 h-3.5 text-emerald-300" />
+                    <span>Agendar Videollamada</span>
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -801,3 +937,4 @@ export const Hero: React.FC<HeroProps> = ({
     </section>
   );
 };
+

@@ -727,3 +727,214 @@ export async function sendTestTransactionalEmail(recipientOverride?: string) {
   }
 }
 
+/**
+ * Dispatches the Executive AI Consultation Study (Dossier de Viabilidad & Arquitectura 40/40/20)
+ * to the client via Resend (notificaciones@gastonbarea.com) + copy to Gastón.
+ */
+export async function sendAiStudyEmail(params: {
+  clientName: string;
+  clientEmail: string;
+  companyName?: string;
+  phone?: string;
+  blueprint: {
+    query: string;
+    solutionTitle: string;
+    primaryVertical: string;
+    estimatedTimeline: string;
+    executiveDiagnosis: string;
+    recommendedStack: string[];
+    tailoredServices: Array<{
+      code: string;
+      title: string;
+      problemSolved: string;
+      technicalApproach: string;
+      deliverable: string;
+      impactMetric: string;
+    }>;
+    roadmapPhases: Array<{
+      phaseCode: string;
+      percentage: string;
+      title: string;
+      duration: string;
+      deliverable: string;
+      verificationCriteria: string;
+    }>;
+  };
+  portalCredentials?: {
+    username: string;
+    password?: string;
+  };
+}) {
+  const cfg = resolveEmailConfig();
+  const { clientName, clientEmail, companyName, phone, blueprint, portalCredentials } = params;
+
+  if (!clientEmail || !/\S+@\S+\.\S+/.test(clientEmail)) {
+    return {
+      success: false,
+      configured: cfg.configured,
+      error: 'Ingresá un correo electrónico válido para recibir el estudio técnico.',
+    };
+  }
+
+  if (!cfg.configured) {
+    return {
+      success: true,
+      mocked: true,
+      configured: false,
+      provider: cfg.provider,
+      targetEmail: clientEmail,
+      message: 'Modo simulación local activo. En producción se despacha vía Resend.',
+    };
+  }
+
+  const stackBadges = (blueprint.recommendedStack || [])
+    .map(
+      (tech, idx) =>
+        `<span style="display:inline-block;background:#f1f5f9;border:1px solid #cbd5e1;color:#0f172a;padding:4px 10px;border-radius:6px;font-family:monospace;font-size:11px;margin:0 6px 6px 0;">0${idx + 1}. ${tech}</span>`
+    )
+    .join('');
+
+  const modulesHtml = (blueprint.tailoredServices || [])
+    .map(
+      (srv) => `
+      <div style="background:#f8fafc;border:1px solid #e2e8f0;border-left:4px solid #291B64;border-radius:8px;padding:14px 16px;margin-bottom:12px;">
+        <div style="font-family:monospace;font-size:11px;font-weight:700;color:#291B64;text-transform:uppercase;">
+          MÓDULO ${srv.code} · ${srv.impactMetric}
+        </div>
+        <div style="font-size:15px;font-weight:700;color:#0f172a;margin:4px 0 8px 0;">${srv.title}</div>
+        <div style="font-size:12px;color:#334155;line-height:1.5;margin-bottom:6px;">
+          <strong>Desafío que resuelve:</strong> ${srv.problemSolved}
+        </div>
+        <div style="font-size:12px;color:#334155;line-height:1.5;margin-bottom:6px;">
+          <strong>Ingeniería & Arquitectura:</strong> ${srv.technicalApproach}
+        </div>
+        <div style="font-family:monospace;font-size:11px;color:#047857;font-weight:700;">
+          Entregable auditable: ${srv.deliverable}
+        </div>
+      </div>`
+    )
+    .join('');
+
+  const roadmapHtml = (blueprint.roadmapPhases || [])
+    .map(
+      (ph) => `
+      <div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:8px;padding:12px 14px;margin-bottom:8px;">
+        <div style="font-family:monospace;font-size:11px;font-weight:700;color:#059669;">
+          ${ph.phaseCode} · HITO ${ph.percentage} (${ph.duration})
+        </div>
+        <div style="font-size:14px;font-weight:700;color:#0f172a;margin:3px 0;">${ph.title}</div>
+        <div style="font-size:12px;color:#475569;line-height:1.5;">${ph.deliverable}</div>
+        <div style="font-size:11px;color:#64748b;margin-top:4px;font-family:monospace;">
+          Validación PMO: ${ph.verificationCriteria}
+        </div>
+      </div>`
+    )
+    .join('');
+
+  const html = `
+  <!DOCTYPE html>
+  <html>
+  <body style="margin:0;padding:24px 12px;background:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#0f172a;">
+    <table width="100%" cellpadding="0" cellspacing="0" style="max-width:660px;margin:0 auto;background:#ffffff;border:1px solid #cbd5e1;border-radius:14px;overflow:hidden;">
+      <tr>
+        <td style="padding:28px;background:#0B0B10;color:#ffffff;">
+          <div style="font-family:monospace;font-size:11px;color:#34d399;font-weight:700;text-transform:uppercase;letter-spacing:1px;">
+            ESTUDIO TÉCNICO PRELIMINAR DE VIABILIDAD & ARQUITECTURA · GASTONBAREA.COM
+          </div>
+          <h1 style="margin:10px 0 6px 0;font-size:21px;line-height:1.25;color:#ffffff;">
+            ${blueprint.solutionTitle}
+          </h1>
+          <div style="font-family:monospace;font-size:12px;color:#94a3b8;">
+            Preparado para: <strong style="color:#ffffff;">${clientName}</strong> ${companyName ? `· ${companyName}` : ''} | Plazo Estimado: <strong style="color:#34d399;">${blueprint.estimatedTimeline}</strong>
+          </div>
+        </td>
+      </tr>
+      <tr>
+        <td style="padding:28px;">
+          <p style="font-size:14px;line-height:1.6;color:#334155;margin-top:0;">
+            Hola <strong>${clientName}</strong>, adjuntamos el estudio preliminar generado por el Gemelo Digital de <strong>Gastón Barea</strong> (30 años en el sector tecnológico-productivo y 14 años en dirección ejecutiva PMO) en base a tu consulta:
+          </p>
+
+          <div style="background:#f8fafc;border:1px solid #e2e8f0;padding:12px 16px;border-radius:8px;font-family:monospace;font-size:12px;color:#1e293b;margin-bottom:18px;">
+            <strong>Consulta Analizada:</strong> "${blueprint.query}"<br/>
+            <strong>Vertical Estratégica:</strong> ${blueprint.primaryVertical}
+          </div>
+
+          <h3 style="font-family:monospace;font-size:12px;text-transform:uppercase;color:#291B64;margin:20px 0 8px 0;">
+            1. Diagnóstico Ejecutivo de Arquitectura
+          </h3>
+          <p style="font-size:13px;line-height:1.65;color:#1e293b;white-space:pre-line;background:#f8fafc;padding:14px 16px;border-radius:8px;border:1px solid #e2e8f0;">
+            ${blueprint.executiveDiagnosis}
+          </p>
+
+          <h3 style="font-family:monospace;font-size:12px;text-transform:uppercase;color:#291B64;margin:20px 0 8px 0;">
+            2. Stack Tecnológico Seleccionado
+          </h3>
+          <div style="margin-bottom:18px;">${stackBadges}</div>
+
+          <h3 style="font-family:monospace;font-size:12px;text-transform:uppercase;color:#291B64;margin:20px 0 10px 0;">
+            3. Módulos y Servicios Creados a Medida
+          </h3>
+          ${modulesHtml}
+
+          <h3 style="font-family:monospace;font-size:12px;text-transform:uppercase;color:#291B64;margin:22px 0 10px 0;">
+            4. Hoja de Ruta PMO Auditable (Esquema 40% · 40% · 20%)
+          </h3>
+          ${roadmapHtml}
+
+          <div style="background:#0f172a;color:#ffffff;border-radius:10px;padding:18px 20px;margin:24px 0;">
+            <div style="font-family:monospace;font-size:11px;color:#34d399;font-weight:700;text-transform:uppercase;">
+              ACCESO A TU PORTAL DE CLIENTES & CANALES DIRECTOS
+            </div>
+            <p style="font-size:12px;color:#cbd5e1;line-height:1.5;margin:6px 0 12px 0;">
+              Este estudio ya quedó vinculado a tu cuenta en el Portal de Clientes para seguimiento de hitos, cotización formal y soporte SLA:
+            </p>
+            <div style="font-family:monospace;font-size:12px;background:rgba(255,255,255,0.08);padding:10px 12px;border-radius:6px;margin-bottom:14px;">
+              <div>Portal: <a href="https://www.gastonbarea.com/#portal" style="color:#34d399;">https://www.gastonbarea.com/#portal</a></div>
+              <div>Usuario: <strong>${portalCredentials?.username || clientEmail}</strong> · Clave inicial: <strong>${portalCredentials?.password || 'cliente2026'}</strong></div>
+            </div>
+            <div style="font-size:12px;color:#e2e8f0;">
+              Podés responder directamente a este correo (<strong>${cfg.notificationEmail}</strong>) o continuar por WhatsApp Directo para ajustar el alcance.
+            </div>
+          </div>
+
+          <p style="font-size:12px;color:#64748b;margin-bottom:0;">
+            Atentamente,<br/>
+            <strong>Gastón Barea</strong> · Consultor y Desarrollador de Proyectos de Base Tecnológica & Bioeconomía<br/>
+            <a href="https://www.gastonbarea.com" style="color:#291B64;">https://www.gastonbarea.com</a>
+          </p>
+        </td>
+      </tr>
+    </table>
+  </body>
+  </html>`;
+
+  try {
+    const internalRecipients = getInternalNotificationRecipients(cfg);
+    const result = await dispatchTransactionalEmail({
+      to: [{ email: clientEmail, name: clientName }, ...internalRecipients],
+      replyTo: cfg.notificationEmail,
+      subject: `📄 Estudio Técnico IA: ${blueprint.solutionTitle} [Gastón Barea]`,
+      html,
+    });
+    return {
+      success: true,
+      configured: true,
+      provider: cfg.provider,
+      fromEmail: cfg.fromEmail,
+      targetEmail: clientEmail,
+      phone,
+      result,
+    };
+  } catch (err: any) {
+    console.error('[sendAiStudyEmail Error]:', err);
+    return {
+      success: false,
+      configured: true,
+      provider: cfg.provider,
+      error: err?.message || 'No se pudo enviar el estudio técnico por correo.',
+    };
+  }
+}
+
+

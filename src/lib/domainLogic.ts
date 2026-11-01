@@ -1144,4 +1144,174 @@ export function isValidPublicDirectVideoUrl(rawUrl: string): boolean {
   }
 }
 
+/**
+ * Generates a complete, self-contained, print-ready HTML Dossier for an AI Consultation Study
+ */
+export function buildAiStudyDossierHtml(
+  blueprint: CustomAiSolutionBlueprint,
+  clientName = 'Dirección Ejecutiva / Evaluación Técnica',
+  companyName = 'Organización Solicitante'
+): string {
+  const dateStr = new Date().toLocaleDateString('es-AR', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  });
+
+  const stackBadges = (blueprint.recommendedStack || [])
+    .map(
+      (tech, idx) =>
+        `<span style="display:inline-block;background:#f1f5f9;border:1px solid #cbd5e1;color:#0f172a;padding:6px 12px;font-family:monospace;font-size:12px;margin:0 8px 8px 0;">0${idx + 1}. ${tech}</span>`
+    )
+    .join('');
+
+  const servicesHtml = (blueprint.tailoredServices || [])
+    .map(
+      (srv) => `
+      <div style="background:#f8fafc;border:1px solid #e2e8f0;border-left:4px solid #291B64;padding:18px 20px;margin-bottom:14px;page-break-inside:avoid;">
+        <div style="display:flex;justify-content:space-between;align-items:center;font-family:monospace;font-size:12px;font-weight:700;color:#291B64;margin-bottom:6px;">
+          <span>MÓDULO ${srv.code}</span>
+          <span style="color:#047857;">${srv.impactMetric}</span>
+        </div>
+        <h3 style="margin:0 0 10px 0;font-size:16px;color:#0f172a;">${srv.title}</h3>
+        <p style="margin:0 0 8px 0;font-size:13px;color:#334155;line-height:1.55;">
+          <strong>Problema que resuelve:</strong> ${srv.problemSolved}
+        </p>
+        <p style="margin:0 0 8px 0;font-size:13px;color:#334155;line-height:1.55;">
+          <strong>Enfoque de Ingeniería:</strong> ${srv.technicalApproach}
+        </p>
+        <div style="font-family:monospace;font-size:12px;color:#0f172a;padding-top:8px;border-top:1px solid #e2e8f0;">
+          <strong style="color:#291B64;">ENTREGABLE AUDITABLE:</strong> ${srv.deliverable}
+        </div>
+      </div>`
+    )
+    .join('');
+
+  const roadmapHtml = (blueprint.roadmapPhases || [])
+    .map(
+      (ph) => `
+      <div style="background:#ffffff;border:1px solid #cbd5e1;padding:16px 18px;margin-bottom:12px;page-break-inside:avoid;">
+        <div style="font-family:monospace;font-size:12px;font-weight:700;color:#059669;margin-bottom:4px;">
+          ${ph.phaseCode} · HITO ${ph.percentage} (${ph.duration})
+        </div>
+        <h4 style="margin:0 0 6px 0;font-size:15px;color:#0f172a;">${ph.title}</h4>
+        <p style="margin:0 0 6px 0;font-size:13px;color:#334155;line-height:1.5;">${ph.deliverable}</p>
+        <div style="font-family:monospace;font-size:11px;color:#64748b;">
+          <strong>Criterio de Validación PMO:</strong> ${ph.verificationCriteria}
+        </div>
+      </div>`
+    )
+    .join('');
+
+  return `<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>Estudio Técnico IA — ${blueprint.solutionTitle} | Gastón Barea</title>
+  <style>
+    @media print {
+      .no-print { display: none !important; }
+      body { background: #ffffff !important; padding: 0 !important; }
+    }
+    body {
+      margin: 0;
+      padding: 32px 16px;
+      background: #f1f5f9;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      color: #0f172a;
+    }
+    .container {
+      max-width: 820px;
+      margin: 0 auto;
+      background: #ffffff;
+      border: 1px solid #cbd5e1;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="no-print" style="background:#18103C;color:#ffffff;padding:12px 24px;display:flex;justify-content:space-between;align-items:center;font-family:monospace;font-size:12px;">
+      <span>DOSSIER TÉCNICO DESCARGABLE · GASTONBAREA.COM</span>
+      <button onclick="window.print()" style="background:#10b981;color:#064e3b;border:none;padding:8px 16px;font-family:monospace;font-weight:700;font-size:12px;cursor:pointer;">
+        Imprimir / Guardar como PDF
+      </button>
+    </div>
+
+    <div style="padding:36px 40px;background:#0B0B10;color:#ffffff;">
+      <div style="font-family:monospace;font-size:11px;color:#34d399;font-weight:700;text-transform:uppercase;letter-spacing:1px;">
+        ESTUDIO TÉCNICO PRELIMINAR DE VIABILIDAD & ARQUITECTURA · ${dateStr.toUpperCase()}
+      </div>
+      <h1 style="margin:12px 0 10px 0;font-size:26px;line-height:1.2;color:#ffffff;">
+        ${blueprint.solutionTitle}
+      </h1>
+      <div style="font-family:monospace;font-size:12px;color:#94a3b8;">
+        Solicitante: <strong style="color:#ffffff;">${clientName}</strong> (${companyName}) · Plazo Estimado: <strong style="color:#34d399;">${blueprint.estimatedTimeline}</strong>
+      </div>
+    </div>
+
+    <div style="padding:36px 40px;">
+      <div style="background:#f8fafc;border:1px solid #cbd5e1;padding:14px 18px;font-family:monospace;font-size:12px;margin-bottom:24px;">
+        <div><strong>CONSULTA ANALIZADA:</strong> "${blueprint.query}"</div>
+        <div style="margin-top:4px;"><strong>VERTICAL ESTRATÉGICA:</strong> ${blueprint.primaryVertical}</div>
+        <div style="margin-top:4px;"><strong>DIRECCIÓN EJECUTIVA:</strong> Gastón Barea · 30 Años Tech · 14 Años PMO</div>
+      </div>
+
+      <h2 style="font-family:monospace;font-size:13px;text-transform:uppercase;color:#291B64;border-bottom:2px solid #291B64;padding-bottom:6px;margin:24px 0 12px 0;">
+        01. Diagnóstico Ejecutivo de Ingeniería
+      </h2>
+      <p style="font-size:14px;line-height:1.7;color:#1e293b;white-space:pre-line;margin-bottom:24px;">
+        ${blueprint.executiveDiagnosis}
+      </p>
+
+      <h2 style="font-family:monospace;font-size:13px;text-transform:uppercase;color:#291B64;border-bottom:2px solid #291B64;padding-bottom:6px;margin:24px 0 12px 0;">
+        02. Stack Tecnológico Seleccionado
+      </h2>
+      <div style="margin-bottom:24px;">${stackBadges}</div>
+
+      <h2 style="font-family:monospace;font-size:13px;text-transform:uppercase;color:#291B64;border-bottom:2px solid #291B64;padding-bottom:6px;margin:24px 0 14px 0;">
+        03. Módulos y Servicios Creados a Medida
+      </h2>
+      ${servicesHtml}
+
+      <h2 style="font-family:monospace;font-size:13px;text-transform:uppercase;color:#291B64;border-bottom:2px solid #291B64;padding-bottom:6px;margin:28px 0 14px 0;">
+        04. Plan de Ejecución PMO (Esquema Auditable 40% · 40% · 20%)
+      </h2>
+      ${roadmapHtml}
+
+      <div style="margin-top:32px;padding:22px 24px;background:#0f172a;color:#ffffff;font-family:monospace;font-size:12px;line-height:1.6;">
+        <div style="color:#34d399;font-weight:700;margin-bottom:6px;">PRÓXIMOS PASOS & CANALES DE CONTACTO DIRECTO</div>
+        <div>• Correo Oficial: <strong>notificaciones@gastonbarea.com</strong> / <strong>gastonbarea.com@gmail.com</strong></div>
+        <div>• Portal de Clientes: <strong>https://www.gastonbarea.com/#portal</strong></div>
+        <div>• Web & Estructurador IA: <strong>https://www.gastonbarea.com/#solucion-ia</strong></div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>`;
+}
+
+export function downloadAiStudyDossier(
+  blueprint: CustomAiSolutionBlueprint,
+  clientName?: string,
+  companyName?: string
+): void {
+  if (typeof document === 'undefined') return;
+  const htmlContent = buildAiStudyDossierHtml(blueprint, clientName, companyName);
+  const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const slug = (blueprint.query || 'estudio-ia')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '')
+    .slice(0, 42);
+  a.href = url;
+  a.download = `Estudio-Tecnico-IA-${slug || 'gastonbarea'}.html`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+}
+
+
 

@@ -11,6 +11,7 @@ import {
   filterProjectsCatalog,
   validateContactForm,
   buildCustomSolutionBlueprint,
+  buildAiStudyDossierHtml,
 } from '../lib/domainLogic.ts';
 import { PROJECTS_CATALOG } from '../data/projectsData.ts';
 import { SITE_CONFIG } from '../data/siteConfig.ts';
@@ -285,6 +286,17 @@ describe('7. Motor de Reorganización Estratégica y Soluciones a Medida con IA 
     assert.equal(bp.tailoredServices.length, 3);
     assert.equal(bp.recommendedProjectIds[0], 'odoo-v18-b2b2c-multideposito');
     assert.ok(bp.solutionTitle.includes('Odoo'));
+  });
+
+  it('debe generar un dossier HTML descargable e imprimible del estudio técnico con IA', () => {
+    const bp = buildCustomSolutionBlueprint('Trazabilidad en bioeconomía e IA');
+    const html = buildAiStudyDossierHtml(bp, 'Ing. Martín Rodríguez', 'BioSur S.A.');
+    assert.ok(html.includes('<!DOCTYPE html>'));
+    assert.ok(html.includes(bp.solutionTitle));
+    assert.ok(html.includes('Ing. Martín Rodríguez'));
+    assert.ok(html.includes('BioSur S.A.'));
+    assert.ok(html.includes('window.print()'));
+    assert.ok(html.includes('notificaciones@gastonbarea.com'));
   });
 });
 
