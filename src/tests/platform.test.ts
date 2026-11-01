@@ -22,6 +22,12 @@ import {
   INITIAL_CRM_QUOTES,
 } from '../data/crmTemplates.ts';
 import { INITIAL_CLIENT_PROJECTS, CLIENT_ACCOUNTS } from '../data/clientPortalData.ts';
+import {
+  normalizePhoneE164,
+  getWhatsAppPublicStatus,
+  setRuntimeWhatsAppConfig,
+  dispatchWhatsAppMessage,
+} from '../services/whatsappAutomation.ts';
 
 describe('1. Enrutamiento y Navegación de Secciones (resolvePageFromHash & resolveServiceCodeFromHash)', () => {
   it('debe resolver correctamente las páginas principales del menú superior y los workspaces dedicados', () => {
@@ -281,5 +287,36 @@ describe('7. Motor de Reorganización Estratégica y Soluciones a Medida con IA 
     assert.ok(bp.solutionTitle.includes('Odoo'));
   });
 });
+
+describe('8. Integración WhatsApp Business API & Automatizaciones CRM (whatsappAutomation)', () => {
+  it('debe normalizar números telefónicos argentinos e internacionales a formato E.164 limpio', () => {
+    assert.equal(normalizePhoneE164('2995137574'), '5492995137574');
+    assert.equal(normalizePhoneE164('0299 15-5137574'), '5492995137574');
+    assert.equal(normalizePhoneE164('+54 9 299 513-7574'), '5492995137574');
+    assert.equal(normalizePhoneE164('542995137574'), '5492995137574');
+    assert.equal(normalizePhoneE164(''), '');
+  });
+
+  it('debe exponer el estado público del conector WhatsApp Business y generar waMeFallbackUrl seguro', async () => {
+    setRuntimeWhatsAppConfig({
+      businessPhone: '0299 15-5137574',
+      adminNotifyPhone: '+54 9 299 513-7574',
+      provider: 'evolution_api',
+    });
+    const status = getWhatsAppPublicStatus();
+    assert.equal(status.businessPhone, '5492995137574');
+    assert.equal(status.adminNotifyPhone, '5492995137574');
+    assert.equal(status.provider, 'evolution_api');
+    assert.equal(status.inboundWebhookPath, '/api/webhooks/whatsapp');
+
+    const dispatchRes = await dispatchWhatsAppMessage({
+      toPhone: '2995137574',
+      message: 'Prueba unitaria de automatización CRM Gastón Barea',
+    });
+    assert.equal(dispatchRes.toPhone, '5492995137574');
+    assert.ok(dispatchRes.waMeFallbackUrl.startsWith('https://wa.me/5492995137574?text='));
+  });
+});
+
 
 

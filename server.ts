@@ -8,8 +8,17 @@ import {
   sendProposalAutomation,
   sendContactAutomation,
   sendTestTransactionalEmail,
+  sendOfficialQuoteEmail,
+  sendProjectKickoffEmail,
   getEmailConfigStatus,
 } from './src/services/emailAutomation.ts';
+import {
+  getWhatsAppConfig,
+  getWhatsAppPublicStatus,
+  setRuntimeWhatsAppConfig,
+  dispatchWhatsAppMessage,
+  normalizePhoneE164,
+} from './src/services/whatsappAutomation.ts';
 import { SITE_CONFIG } from './src/data/siteConfig.ts';
 import { INITIAL_BLOG_POSTS } from './src/data/blogData.ts';
 import {
@@ -165,6 +174,7 @@ app.get(['/api/health', '/health', '/api/infrastructure/status'], async (_req, r
         cyberpanelServerIp: getEmailConfigStatus().cyberpanelServerIp,
         domain: getEmailConfigStatus().domain,
       },
+      whatsappBusiness: getWhatsAppPublicStatus(),
     },
     timestamp: new Date().toISOString(),
   });
@@ -839,6 +849,152 @@ Ids válidos de proyectos en catálogo para reordenar según relevancia (recomme
   return res.json({ blueprint: baseBlueprint });
 });
 
+// AUTOMATION 1: Auto-provision CRM Company, Contact (with Portal Access) & Kanban Opportunity on Web Lead capture
+async function autoProvisionCrmFromWebLead(params: {
+  source: 'web_diagnostic' | 'contact_form' | 'whatsapp_inbound';
+  clientName: string;
+  clientEmail: string;
+  clientPhone?: string;
+  companyName?: string;
+  title: string;
+  notes: string;
+  rawTextForCategory: string;
+}) {
+  const text = (params.rawTextForCategory || '').toLowerCase();
+  let serviceCategory: any = 'software_architecture';
+  let estimatedValue = 3800;
+
+  if (text.includes('odoo') || text.includes('erp')) {
+    serviceCategory = 'odoo_erp';
+    estimatedValue = 4500;
+  } else if (text.includes('commerce') || text.includes('b2b') || text.includes('mayorista')) {
+    serviceCategory = 'ecommerce_b2b2c';
+    estimatedValue = 4200;
+  } else if (text.includes('linux') || text.includes('docker') || text.includes('servidor')) {
+    serviceCategory = 'linux_docker';
+    estimatedValue = 2400;
+  } else if (text.includes('ia') || text.includes('gemelo') || text.includes('bi') || text.includes('analytics')) {
+    serviceCategory = 'bi_analytics';
+    estimatedValue = 3600;
+  } else if (text.includes('pmo') || text.includes('cto') || text.includes('dirección')) {
+    serviceCategory = 'fractional_cto';
+    estimatedValue = 3200;
+  }
+
+  const synced = syncContactAndCompanyFromOpportunity({
+    clientName: params.clientName,
+    clientEmail: params.clientEmail,
+    clientPhone: params.clientPhone,
+    company: params.companyName,
+    stage: 'lead',
+  });
+
+  const newOpp = {
+    id: `opp-${Date.now()}`,
+    title: params.title,
+    clientName: params.clientName || 'Prospecto Web',
+    clientEmail: params.clientEmail || '',
+    clientPhone: params.clientPhone || '',
+    company: params.companyName || '',
+    companyId: synced.companyId,
+    contactId: synced.contactId,
+    serviceCategory,
+    stage: 'lead' as const,
+    value: estimatedValue,
+    currency: 'USD' as const,
+    probability: 40,
+    expectedCloseDate: new Date(Date.now() + 21 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+    notes: params.notes,
+    source: params.source === 'whatsapp_inbound' ? ('whatsapp' as const) : params.source,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+
+  cachedOpportunities.unshift(newOpp);
+
+  if (supabase) {
+    try {
+      // Persist Company if newly created
+      if (synced.companyId) {
+        const comp = cachedCrmCompanies.find((c) => c.id === synced.companyId);
+        if (comp) {
+          await supabase.from('crm_companies').upsert({
+            id: comp.id,
+            name: comp.name,
+            industry: comp.industry,
+            phone: comp.phone || null,
+            email: comp.email || null,
+            tier: comp.tier || 'pyme',
+            notes: comp.notes || null,
+            created_at: comp.createdAt,
+            updated_at: comp.updatedAt,
+          });
+        }
+      }
+      // Persist Contact (with Portal Access) if newly created
+      if (synced.contactId) {
+        const cnt = cachedCrmContacts.find((c) => c.id === synced.contactId);
+        if (cnt) {
+          await supabase.from('crm_contacts').upsert({
+            id: cnt.id,
+            full_name: cnt.fullName,
+            email: cnt.email,
+            username: cnt.username,
+            password: cnt.password || 'cliente2026',
+            phone: cnt.phone || null,
+            role_title: cnt.roleTitle,
+            contact_type: cnt.contactType,
+            company_id: cnt.companyId || null,
+            company_name: cnt.companyName || null,
+            portal_access_status: 'active',
+            has_active_service: Boolean(cnt.hasActiveService),
+            notes: cnt.notes || null,
+            created_at: cnt.createdAt,
+            updated_at: cnt.updatedAt,
+          });
+        }
+      }
+      // Persist Opportunity in Kanban
+      await supabase.from('crm_opportunities').upsert({
+        id: newOpp.id,
+        title: newOpp.title,
+        client_name: newOpp.clientName,
+        client_email: newOpp.clientEmail,
+        client_phone: newOpp.clientPhone || null,
+        company: newOpp.company || null,
+        service_category: newOpp.serviceCategory,
+        stage: newOpp.stage,
+        value: newOpp.value,
+        currency: newOpp.currency,
+        probability: newOpp.probability,
+        expected_close_date: newOpp.expectedCloseDate,
+        notes: newOpp.notes,
+        source: newOpp.source,
+        created_at: newOpp.createdAt,
+        updated_at: newOpp.updatedAt,
+      });
+    } catch (err) {
+      console.warn('[Auto-Provision CRM] Error syncing to Supabase:', err);
+    }
+  }
+
+  // Trigger WhatsApp Business Alert if configured
+  const waCfg = getWhatsAppConfig();
+  if (waCfg.enabled && waCfg.autoNotifyOnLead && (waCfg.adminNotifyPhone || params.clientPhone)) {
+    const targetPhone = waCfg.adminNotifyPhone || params.clientPhone || '';
+    if (targetPhone) {
+      dispatchWhatsAppMessage({
+        toPhone: targetPhone,
+        contextType: 'lead_alert',
+        message: `🚀 *Nuevo Prospecto Automático en CRM (gastonbarea.com)*\n\n👤 *Cliente:* ${newOpp.clientName} (${newOpp.company || 'Particular'})\n📧 *Email:* ${newOpp.clientEmail || 'N/A'}\n📌 *Oportunidad:* ${newOpp.title}\n💰 *Valor Estimado:* USD $${newOpp.value.toLocaleString()}\n🔑 *Portal Clientes:* Habilitado automáticamente`,
+        metadata: { opportunityId: newOpp.id },
+      }).catch(() => {});
+    }
+  }
+
+  return newOpp;
+}
+
 // Private server-side endpoint for saving diagnosis proposals
 app.post('/api/save-proposal', async (req, res) => {
   const proposalData = req.body || {};
@@ -854,7 +1010,7 @@ app.post('/api/save-proposal', async (req, res) => {
     estimated_timeline: proposalData.estimatedTimeline,
     recommended_stack: proposalData.recommendedStack || [],
     executive_message: proposalData.executiveMessage,
-    status: 'new',
+    status: 'converted',
     created_at: new Date().toISOString(),
   };
 
@@ -864,8 +1020,20 @@ app.post('/api/save-proposal', async (req, res) => {
     console.error('[Worker Automation] Error in background email task:', err);
   });
 
+  // AUTOMATION 1: Automatically create Opportunity + Company + Contact in CRM & Portal
+  const autoOpportunity = await autoProvisionCrmFromWebLead({
+    source: 'web_diagnostic',
+    clientName: proposalData.clientName || proposalData.companyName || 'Prospecto Diagnóstico IA',
+    clientEmail: proposalData.clientEmail || '',
+    clientPhone: proposalData.clientPhone || '',
+    companyName: proposalData.companyName || proposalData.organizationType || '',
+    title: proposalData.architectureTitle || 'Diagnóstico de Arquitectura Tecnológica',
+    notes: `Diagnóstico IA: ${proposalData.diagnosticSummary || ''}\nUrgencia: ${proposalData.urgency || 'Media'}\nStack: ${(proposalData.currentStack || []).join(', ')}`,
+    rawTextForCategory: `${proposalData.primaryChallenge || ''} ${proposalData.architectureTitle || ''}`,
+  });
+
   if (!supabase) {
-    return res.json({ success: true, mocked: true, data: record });
+    return res.json({ success: true, mocked: true, data: record, opportunity: autoOpportunity });
   }
 
   try {
@@ -873,13 +1041,13 @@ app.post('/api/save-proposal', async (req, res) => {
 
     if (error) {
       console.error('Error saving proposal to Supabase:', error);
-      return res.json({ success: true, mocked: true, data: record });
+      return res.json({ success: true, mocked: true, data: record, opportunity: autoOpportunity });
     }
 
-    return res.json({ success: true, data: data || record });
+    return res.json({ success: true, data: data || record, opportunity: autoOpportunity });
   } catch (err: any) {
     console.error('Exception saving proposal to Supabase:', err);
-    return res.json({ success: true, mocked: true, data: record });
+    return res.json({ success: true, mocked: true, data: record, opportunity: autoOpportunity });
   }
 });
 
@@ -893,7 +1061,7 @@ app.post('/api/save-contact', async (req, res) => {
     company: inquiryData.company || null,
     service_area: inquiryData.serviceArea,
     requirements: inquiryData.requirements,
-    status: 'new',
+    status: 'converted',
     created_at: inquiryData.createdAt || new Date().toISOString(),
   };
 
@@ -903,8 +1071,20 @@ app.post('/api/save-contact', async (req, res) => {
     console.error('[Worker Automation] Error in background email task:', err);
   });
 
+  // AUTOMATION 1: Automatically create Opportunity + Company + Contact in CRM & Portal
+  const autoOpportunity = await autoProvisionCrmFromWebLead({
+    source: 'contact_form',
+    clientName: inquiryData.name || 'Prospecto Web',
+    clientEmail: inquiryData.email || '',
+    clientPhone: inquiryData.phone || '',
+    companyName: inquiryData.company || '',
+    title: `Consulta: ${inquiryData.serviceArea || 'Arquitectura & Consultoría'}`,
+    notes: inquiryData.requirements || '',
+    rawTextForCategory: `${inquiryData.serviceArea || ''} ${inquiryData.requirements || ''}`,
+  });
+
   if (!supabase) {
-    return res.json({ success: true, mocked: true, data: record });
+    return res.json({ success: true, mocked: true, data: record, opportunity: autoOpportunity });
   }
 
   try {
@@ -912,13 +1092,13 @@ app.post('/api/save-contact', async (req, res) => {
 
     if (error) {
       console.error('Error saving contact to Supabase:', error);
-      return res.json({ success: true, mocked: true, data: record });
+      return res.json({ success: true, mocked: true, data: record, opportunity: autoOpportunity });
     }
 
-    return res.json({ success: true, data: data || record });
+    return res.json({ success: true, data: data || record, opportunity: autoOpportunity });
   } catch (err: any) {
     console.error('Exception saving contact to Supabase:', err);
-    return res.json({ success: true, mocked: true, data: record });
+    return res.json({ success: true, mocked: true, data: record, opportunity: autoOpportunity });
   }
 });
 
@@ -2056,7 +2236,20 @@ app.put('/api/crm/opportunities/:id', requireAdminAuth, async (req, res) => {
     }
   }
 
-  return res.json({ success: true, opportunity: updated });
+  // AUTOMATION 3: If opportunity stage moved to 'won', auto-provision Kick-off Project in Client Portal
+  let kickoffProject = null;
+  if (updated.stage === 'won') {
+    kickoffProject = await autoProvisionKickoffProject({
+      clientName: updated.clientName,
+      clientEmail: updated.clientEmail,
+      clientPhone: updated.clientPhone,
+      companyName: updated.company,
+      projectTitle: updated.title,
+      serviceCategory: updated.serviceCategory,
+    });
+  }
+
+  return res.json({ success: true, opportunity: updated, kickoffProject });
 });
 
 app.delete('/api/crm/opportunities/:id', requireAdminAuth, async (req, res) => {
@@ -2321,12 +2514,17 @@ app.post('/api/crm/payments', requireAdminAuth, async (req, res) => {
 
   cachedPayments.unshift(newPay);
 
-  // If confirmed and linked to a quote, update quote milestones or opportunity
-  if (newPay.status === 'confirmed' && newPay.quoteId) {
-    const qIdx = cachedQuotes.findIndex((q) => q.id === newPay.quoteId || q.quoteNumber === newPay.quoteId);
-    if (qIdx >= 0) {
-      // If there's an opportunity, mark it won or update notes
-      const oppId = cachedQuotes[qIdx].opportunityId;
+  // If confirmed and linked to a quote, update quote milestones or opportunity + auto-provision Kick-off project
+  let kickoffProject = null;
+  if (newPay.status === 'confirmed') {
+    const qIdx = newPay.quoteId
+      ? cachedQuotes.findIndex((q) => q.id === newPay.quoteId || q.quoteNumber === newPay.quoteId)
+      : -1;
+    const matchedQuote = qIdx >= 0 ? cachedQuotes[qIdx] : null;
+
+    if (matchedQuote) {
+      matchedQuote.status = 'invoiced';
+      const oppId = matchedQuote.opportunityId;
       if (oppId) {
         const oIdx = cachedOpportunities.findIndex((o) => o.id === oppId);
         if (oIdx >= 0) {
@@ -2336,6 +2534,14 @@ app.post('/api/crm/payments', requireAdminAuth, async (req, res) => {
         }
       }
     }
+
+    kickoffProject = await autoProvisionKickoffProject({
+      clientName: newPay.clientName || matchedQuote?.clientName || 'Cliente Ejecutivo',
+      clientEmail: matchedQuote?.clientEmail || '',
+      companyName: matchedQuote?.clientCompany || newPay.clientName || '',
+      projectTitle: matchedQuote?.title || `Proyecto ${newPay.clientName}`,
+      serviceCategory: matchedQuote?.serviceCategory || 'software_architecture',
+    });
   }
 
   if (supabase) {
@@ -2359,7 +2565,7 @@ app.post('/api/crm/payments', requireAdminAuth, async (req, res) => {
     }
   }
 
-  return res.json({ success: true, payment: newPay });
+  return res.json({ success: true, payment: newPay, kickoffProject });
 });
 
 app.put('/api/crm/payments/:id', requireAdminAuth, async (req, res) => {
@@ -2417,6 +2623,457 @@ app.put('/api/crm/payment-config', requireAdminAuth, async (req, res) => {
   }
 
   return res.json({ success: true, config: cachedPaymentConfig });
+});
+
+// AUTOMATION 3 HELPER: Auto-Provision Client Portal Project + Kick-off Email + WhatsApp when Won or Payment Confirmed
+async function autoProvisionKickoffProject(params: {
+  clientName: string;
+  clientEmail: string;
+  clientPhone?: string;
+  companyName?: string;
+  projectTitle: string;
+  serviceCategory?: string;
+}) {
+  const cleanEmail = (params.clientEmail || '').trim().toLowerCase();
+  const existing = cachedClientProjects.find(
+    (p) =>
+      (cleanEmail && p.clientEmail.toLowerCase() === cleanEmail && p.projectName === params.projectTitle) ||
+      p.projectName === params.projectTitle
+  );
+  if (existing) return existing;
+
+  const projectId = `PRJ-${new Date().getFullYear()}-${Math.floor(100 + Math.random() * 900)}`;
+  const today = new Date().toISOString().split('T')[0];
+  const targetDate = new Date(Date.now() + 35 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
+  const newProject: any = {
+    id: projectId,
+    projectName: params.projectTitle || 'Proyecto de Ingeniería & Transformación Digital',
+    clientName: params.clientName || 'Cliente Ejecutivo',
+    clientEmail: cleanEmail || 'cliente@portal.gastonbarea.com',
+    company: params.companyName || 'Organización',
+    category: params.serviceCategory || 'Arquitectura & PMO',
+    status: 'En Desarrollo',
+    overallProgress: 20,
+    startDate: today,
+    estimatedDelivery: targetDate,
+    stagingUrl: 'https://staging.gastonbarea.com',
+    productionUrl: 'https://www.gastonbarea.com',
+    repositoryBranch: 'main',
+    architectureSummary:
+      'Despliegue auditado bajo metodología 40% Inicio · 40% Staging UAT · 20% Puesta en Producción.',
+    phases: [
+      {
+        id: `${projectId}-ph1`,
+        name: 'Fase 1 (40%): Relevamiento, Arquitectura & Entorno Base',
+        status: 'in_progress',
+        progress: 50,
+        startDate: today,
+        endDate: today,
+        deliverables: [
+          'Blueprint de Arquitectura & Modelo de Datos',
+          'Aprovisionamiento de Infraestructura & Repositorio',
+        ],
+      },
+      {
+        id: `${projectId}-ph2`,
+        name: 'Fase 2 (40%): Desarrollo de Módulos & Validación en Servidor Staging',
+        status: 'pending',
+        progress: 0,
+        startDate: today,
+        endDate: targetDate,
+        deliverables: [
+          'Módulos Funcionales en Servidor Staging con Datos Reales',
+          'Pruebas de Aceptación UAT con el Equipo del Cliente',
+        ],
+      },
+      {
+        id: `${projectId}-ph3`,
+        name: 'Fase 3 (20%): Salida a Producción (Go-Live), Capacitación & SLA',
+        status: 'pending',
+        progress: 0,
+        startDate: targetDate,
+        endDate: targetDate,
+        deliverables: [
+          'Despliegue en Dominio de Producción con SSL',
+          'Capacitación Operativa y Entrega de Documentación',
+        ],
+      },
+    ],
+    recentUpdates: [
+      {
+        id: `upd-${Date.now()}`,
+        date: today,
+        author: 'Gastón Barea (PMO)',
+        title: 'Kick-off Oficial de Proyecto Activado desde CRM',
+        description:
+          'Se habilitó el tablero de seguimiento en el Portal de Clientes con el cronograma 40 · 40 · 20%.',
+        tag: 'milestone',
+      },
+    ],
+  };
+
+  cachedClientProjects.unshift(newProject);
+
+  // Enable hasActiveService on the contact
+  cachedCrmContacts = cachedCrmContacts.map((cnt) =>
+    cleanEmail && cnt.email.toLowerCase() === cleanEmail
+      ? { ...cnt, hasActiveService: true, linkedProjectId: projectId }
+      : cnt
+  );
+
+  if (supabase) {
+    try {
+      await supabase.from('client_projects').upsert({
+        id: newProject.id,
+        client_email: newProject.clientEmail,
+        client_name: newProject.clientName,
+        company: newProject.company,
+        project_data: newProject,
+        updated_at: new Date().toISOString(),
+      });
+      if (cleanEmail) {
+        await supabase
+          .from('crm_contacts')
+          .update({ has_active_service: true, linked_project_id: projectId })
+          .eq('email', cleanEmail);
+      }
+    } catch (err) {
+      console.warn('[Auto Kick-off Project] Supabase sync warning:', err);
+    }
+  }
+
+  // Send Kick-off Email via Resend
+  sendProjectKickoffEmail({
+    clientName: newProject.clientName,
+    clientEmail: newProject.clientEmail,
+    companyName: newProject.company,
+    projectTitle: newProject.projectName,
+    projectId: newProject.id,
+  }).catch(() => {});
+
+  // Send WhatsApp Kick-off notification if enabled
+  const waCfg = getWhatsAppConfig();
+  if (waCfg.enabled && waCfg.autoNotifyOnKickoff && (params.clientPhone || waCfg.adminNotifyPhone)) {
+    dispatchWhatsAppMessage({
+      toPhone: params.clientPhone || waCfg.adminNotifyPhone,
+      contextType: 'kickoff_welcome',
+      message: `🚀 *¡Kick-off Confirmado! Proyecto ${newProject.id}*\n\nHola ${newProject.clientName}, tu proyecto *${newProject.projectName}* ya está activo en el Portal de Clientes de *gastonbarea.com*.\n\n🔗 *Portal:* https://www.gastonbarea.com/#portal\n👤 *Usuario:* ${newProject.clientEmail}\n🔑 *Clave:* cliente2026`,
+    }).catch(() => {});
+  }
+
+  return newProject;
+}
+
+// AUTOMATION 2: 1-Click Official Quote Dispatch via Resend (notificaciones@gastonbarea.com) & WhatsApp Business API
+app.post('/api/crm/quotes/:id/dispatch', requireAdminAuth, async (req, res) => {
+  const { id } = req.params;
+  const { channels = ['email'], customSubject, customIntroMessage, clientPhone } = req.body || {};
+
+  const qIdx = cachedQuotes.findIndex((q) => q.id === id || q.quoteNumber === id);
+  if (qIdx === -1) {
+    return res.status(404).json({ error: 'Presupuesto no encontrado en el CRM.' });
+  }
+
+  const quote = cachedQuotes[qIdx];
+  quote.status = 'sent';
+  quote.updatedAt = new Date().toISOString();
+  cachedQuotes[qIdx] = quote;
+
+  // Automatically advance linked opportunity to 'proposal_sent'
+  if (quote.opportunityId) {
+    const oppIdx = cachedOpportunities.findIndex((o) => o.id === quote.opportunityId);
+    if (oppIdx >= 0 && cachedOpportunities[oppIdx].stage !== 'won') {
+      cachedOpportunities[oppIdx].stage = 'proposal_sent';
+      cachedOpportunities[oppIdx].probability = 70;
+      cachedOpportunities[oppIdx].linkedQuoteId = quote.quoteNumber;
+      cachedOpportunities[oppIdx].updatedAt = new Date().toISOString();
+    }
+  }
+
+  if (supabase) {
+    try {
+      await supabase
+        .from('crm_quotes')
+        .update({ status: 'sent', updated_at: quote.updatedAt })
+        .eq('id', quote.id);
+      if (quote.opportunityId) {
+        await supabase
+          .from('crm_opportunities')
+          .update({
+            stage: 'proposal_sent',
+            probability: 70,
+            linked_quote_id: quote.quoteNumber,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', quote.opportunityId);
+      }
+    } catch (err) {
+      console.warn('[Quote Dispatch] Supabase update warning:', err);
+    }
+  }
+
+  let emailResult = null;
+  let whatsappResult = null;
+
+  if (channels.includes('email')) {
+    emailResult = await sendOfficialQuoteEmail({
+      quote,
+      paymentConfig: cachedPaymentConfig,
+      customSubject,
+      customIntroMessage,
+    });
+  }
+
+  if (channels.includes('whatsapp')) {
+    const matchedContact = cachedCrmContacts.find(
+      (c) => c.email.toLowerCase() === (quote.clientEmail || '').toLowerCase()
+    );
+    const phoneToUse = clientPhone || matchedContact?.phone || getWhatsAppConfig().adminNotifyPhone;
+    const waMessage =
+      customIntroMessage ||
+      `Hola ${quote.clientName}, te comparto el *Presupuesto Oficial #${quote.quoteNumber}* para *${quote.title}* (${quote.clientCompany || 'tu organización'}).\n\n💰 *Inversión Total:* ${quote.currency} $${Number(quote.total || 0).toLocaleString()}\n⏱️ *Plazo estimado:* ${quote.timeline}\n📊 *Esquema:* Hitos auditables 40% · 40% · 20%\n\n🔗 Podés revisarlo y aprobarlo en tu Portal de Clientes: https://www.gastonbarea.com/#portal`;
+
+    whatsappResult = await dispatchWhatsAppMessage({
+      toPhone: phoneToUse,
+      contextType: 'quote_dispatch',
+      message: waMessage,
+      metadata: { quoteId: quote.id, quoteNumber: quote.quoteNumber },
+    });
+  }
+
+  return res.json({
+    success: true,
+    quote,
+    emailResult,
+    whatsappResult,
+  });
+});
+
+// AUTOMATION 2.1: 1-Click Quote Approval (Advances Opportunity & Triggers Kick-off if requested)
+app.post('/api/crm/quotes/:id/accept', async (req, res) => {
+  const { id } = req.params;
+  const qIdx = cachedQuotes.findIndex((q) => q.id === id || q.quoteNumber === id);
+  if (qIdx === -1) {
+    return res.status(404).json({ error: 'Presupuesto no encontrado.' });
+  }
+
+  const quote = cachedQuotes[qIdx];
+  quote.status = 'accepted';
+  quote.updatedAt = new Date().toISOString();
+  cachedQuotes[qIdx] = quote;
+
+  if (quote.opportunityId) {
+    const oppIdx = cachedOpportunities.findIndex((o) => o.id === quote.opportunityId);
+    if (oppIdx >= 0) {
+      cachedOpportunities[oppIdx].stage = 'negotiation';
+      cachedOpportunities[oppIdx].probability = 90;
+      cachedOpportunities[oppIdx].updatedAt = new Date().toISOString();
+    }
+  }
+
+  if (supabase) {
+    try {
+      await supabase
+        .from('crm_quotes')
+        .update({ status: 'accepted', updated_at: quote.updatedAt })
+        .eq('id', quote.id);
+    } catch (err) {
+      console.warn('[Quote Accept] Supabase warning:', err);
+    }
+  }
+
+  return res.json({ success: true, quote });
+});
+
+// AUTOMATION 4: AI Quote Scope & Items Generator (Gemini + Deterministic Fallback)
+app.post('/api/crm/ai-generate-quote', requireAdminAuth, async (req, res) => {
+  const { promptContext, serviceCategory = 'software_architecture', currency = 'USD', companyName = '' } =
+    req.body || {};
+  const cleanContext = (promptContext || '').trim() || 'Implementación de plataforma tecnológica y arquitectura escalable';
+
+  if (ai) {
+    try {
+      const response = await ai.models.generateContent({
+        model: 'gemini-3.8-flash',
+        contents: `Genera un presupuesto técnico formal de consultoría y desarrollo para el cliente "${companyName || 'Corporativo'}" basado en este requerimiento:
+"${cleanContext}"
+Categoría: ${serviceCategory}. Moneda: ${currency}.
+Devuelve entre 3 y 4 ítems de ingeniería concretos con descripción ejecutiva, entregable auditable, horas estimadas y precio unitario acorde al mercado B2B.`,
+        config: {
+          systemInstruction: GASTON_DIGITAL_TWIN_SYSTEM_INSTRUCTION,
+          responseMimeType: 'application/json',
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              suggestedTitle: { type: Type.STRING },
+              suggestedTimeline: { type: Type.STRING },
+              items: {
+                type: Type.ARRAY,
+                items: {
+                  type: Type.OBJECT,
+                  properties: {
+                    description: { type: Type.STRING },
+                    deliverable: { type: Type.STRING },
+                    hours: { type: Type.NUMBER },
+                    unitPrice: { type: Type.NUMBER },
+                    quantity: { type: Type.NUMBER },
+                  },
+                  required: ['description', 'deliverable', 'hours', 'unitPrice', 'quantity'],
+                },
+              },
+            },
+            required: ['suggestedTitle', 'suggestedTimeline', 'items'],
+          },
+        },
+      });
+
+      if (response.text) {
+        const parsed = JSON.parse(response.text);
+        return res.json({
+          success: true,
+          isAiGenerated: true,
+          ...parsed,
+        });
+      }
+    } catch (err) {
+      console.warn('[AI Quote Generator] Fallback deterministic:', err);
+    }
+  }
+
+  // Deterministic high-precision fallback based on custom solution blueprint
+  const bp = buildCustomSolutionBlueprint(cleanContext);
+  const generatedItems = bp.tailoredServices.map((srv, idx) => ({
+    description: `${srv.code}. ${srv.title}`,
+    deliverable: `${srv.deliverable} (${srv.technicalApproach})`,
+    hours: idx === 0 ? 28 : idx === 1 ? 32 : 20,
+    unitPrice: currency === 'ARS' ? (idx === 0 ? 1400000 : 1200000) : idx === 0 ? 1450 : idx === 1 ? 1650 : 950,
+    quantity: 1,
+  }));
+
+  return res.json({
+    success: true,
+    isAiGenerated: false,
+    suggestedTitle: bp.solutionTitle,
+    suggestedTimeline: bp.estimatedTimeline,
+    items: generatedItems,
+  });
+});
+
+// ==========================================
+// WHATSAPP BUSINESS API & WEBHOOK ENDPOINTS
+// ==========================================
+
+app.get('/api/admin/whatsapp/config', requireAdminAuth, async (_req, res) => {
+  if (supabase) {
+    try {
+      const { data } = await supabase
+        .from('crm_settings')
+        .select('config')
+        .eq('id', 'whatsapp_business')
+        .maybeSingle();
+      if (data?.config) {
+        setRuntimeWhatsAppConfig(data.config);
+      }
+    } catch {
+      // Ignore if not yet stored
+    }
+  }
+  return res.json({
+    success: true,
+    status: getWhatsAppPublicStatus(),
+    config: getWhatsAppConfig(),
+  });
+});
+
+app.put('/api/admin/whatsapp/config', requireAdminAuth, async (req, res) => {
+  const newCfg = req.body?.config || req.body || {};
+  setRuntimeWhatsAppConfig(newCfg);
+
+  if (supabase) {
+    try {
+      await supabase.from('crm_settings').upsert({
+        id: 'whatsapp_business',
+        config: getWhatsAppConfig(),
+        updated_at: new Date().toISOString(),
+      });
+    } catch (err) {
+      console.error('Error saving whatsapp_business config to Supabase:', err);
+    }
+  }
+
+  return res.json({
+    success: true,
+    status: getWhatsAppPublicStatus(),
+    config: getWhatsAppConfig(),
+  });
+});
+
+app.post('/api/admin/whatsapp/send', requireAdminAuth, async (req, res) => {
+  const { toPhone, message, contextType } = req.body || {};
+  const result = await dispatchWhatsAppMessage({
+    toPhone: toPhone || getWhatsAppConfig().adminNotifyPhone,
+    message:
+      message ||
+      '✅ Prueba de Integración WhatsApp Business · gastonbarea.com (CRM & Automatización Ejecutiva Operativa).',
+    contextType: contextType || 'test_message',
+  });
+  return res.json(result);
+});
+
+// Meta WhatsApp Cloud API Webhook Verification (GET)
+app.get('/api/webhooks/whatsapp', (req, res) => {
+  const mode = req.query['hub.mode'];
+  const token = req.query['hub.verify_token'];
+  const challenge = req.query['hub.challenge'];
+
+  const expectedToken = getWhatsAppConfig().metaVerifyToken || 'gastonbarea_wa_verify_2026';
+  if (mode === 'subscribe' && token === expectedToken) {
+    return res.status(200).send(challenge);
+  }
+  return res.status(403).json({ error: 'Token de verificación de WhatsApp inválido' });
+});
+
+// Meta WhatsApp Cloud API & Evolution API Inbound Message Webhook (POST)
+app.post('/api/webhooks/whatsapp', async (req, res) => {
+  try {
+    const body = req.body || {};
+
+    // Extract sender phone, name, and text from either Meta Cloud API or Evolution API payload
+    const metaEntry = body?.entry?.[0]?.changes?.[0]?.value;
+    const metaMsg = metaEntry?.messages?.[0];
+    const metaContact = metaEntry?.contacts?.[0];
+
+    const senderPhone = normalizePhoneE164(
+      metaMsg?.from || body?.data?.key?.remoteJid?.replace('@s.whatsapp.net', '') || body?.from || ''
+    );
+    const senderName =
+      metaContact?.profile?.name || body?.data?.pushName || body?.senderName || 'Contacto WhatsApp';
+    const messageText =
+      metaMsg?.text?.body ||
+      body?.data?.message?.conversation ||
+      body?.data?.message?.extendedTextMessage?.text ||
+      body?.text ||
+      '';
+
+    if (senderPhone && messageText) {
+      await autoProvisionCrmFromWebLead({
+        source: 'whatsapp_inbound',
+        clientName: senderName,
+        clientEmail: `${senderPhone}@whatsapp.gastonbarea.com`,
+        clientPhone: senderPhone,
+        companyName: '',
+        title: `Consulta WhatsApp: ${messageText.slice(0, 48)}`,
+        notes: `Mensaje recibido por WhatsApp Business (+${senderPhone}):\n${messageText}`,
+        rawTextForCategory: messageText,
+      });
+    }
+
+    return res.status(200).json({ received: true });
+  } catch (err: any) {
+    console.error('[WhatsApp Webhook] Error:', err);
+    return res.status(200).json({ received: true });
+  }
 });
 
 // ==========================================

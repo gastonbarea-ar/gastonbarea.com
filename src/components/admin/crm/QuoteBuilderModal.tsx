@@ -57,6 +57,91 @@ export const QuoteBuilderModal: React.FC<QuoteBuilderModalProps> = ({
   const [items, setItems] = useState<QuoteItem[]>([]);
   const [milestones, setMilestones] = useState<PaymentMilestone[]>([]);
   const [terms, setTerms] = useState<string[]>([]);
+  const [aiPromptContext, setAiPromptContext] = useState<string>('');
+  const [isAiGenerating, setIsAiGenerating] = useState<boolean>(false);
+
+  const handleGenerateAiQuoteItems = async () => {
+    const contextToUse =
+      aiPromptContext.trim() ||
+      title.trim() ||
+      linkedOpportunity?.title ||
+      'Implementación de plataforma digital y automatización operativa';
+    setIsAiGenerating(true);
+    const passkey = localStorage.getItem('gb_master_passkey') || 'gaston2026';
+    const token = localStorage.getItem('gb_admin_token') || '';
+
+    try {
+      const res = await fetch('/api/crm/ai-generate-quote', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-passkey': passkey,
+          'x-admin-token': token,
+        },
+        body: JSON.stringify({
+          promptContext: contextToUse,
+          serviceCategory,
+          currency,
+          companyName: clientCompany || clientName,
+        }),
+      });
+      const data = await res.json();
+      if (data.success && Array.isArray(data.items) && data.items.length > 0) {
+        if (data.suggestedTitle) setTitle(data.suggestedTitle);
+        if (data.suggestedTimeline) setTimeline(data.suggestedTimeline);
+        const generatedItems: QuoteItem[] = data.items.map((it: any, idx: number) => ({
+          id: `item-ai-${Date.now()}-${idx}`,
+          description: it.description,
+          deliverable: it.deliverable,
+          hours: Number(it.hours || 20),
+          unitPrice: Number(it.unitPrice || 1000),
+          quantity: Number(it.quantity || 1),
+          total: Number(it.unitPrice || 1000) * Number(it.quantity || 1),
+        }));
+        setItems(generatedItems);
+
+        const newSubtotal = generatedItems.reduce((acc, curr) => acc + curr.total, 0);
+        setMilestones((prev) =>
+          (prev.length > 0
+            ? prev
+            : [
+                {
+                  id: 'ms-1',
+                  name: 'Hito 1 (40%): Anticipo de Inicio & Arquitectura Base',
+                  percentage: 40,
+                  amount: Math.round(newSubtotal * 0.4),
+                  condition: 'Aprobación de alcance e inicio de proyecto',
+                  status: 'pending' as const,
+                },
+                {
+                  id: 'ms-2',
+                  name: 'Hito 2 (40%): Entrega en Servidor Staging & Pruebas UAT',
+                  percentage: 40,
+                  amount: Math.round(newSubtotal * 0.4),
+                  condition: 'Validación funcional con datos reales',
+                  status: 'pending' as const,
+                },
+                {
+                  id: 'ms-3',
+                  name: 'Hito 3 (20%): Puesta en Producción (Go-Live) & Capacitación',
+                  percentage: 20,
+                  amount: Math.round(newSubtotal * 0.2),
+                  condition: 'Despliegue final y cierre de ciclo',
+                  status: 'pending' as const,
+                },
+              ]
+          ).map((ms) => ({
+            ...ms,
+            amount: Math.round(newSubtotal * (ms.percentage / 100)),
+          }))
+        );
+      }
+    } catch (err) {
+      console.error('Error generating quote items with AI:', err);
+    } finally {
+      setIsAiGenerating(false);
+    }
+  };
 
   // Initialize or reset form
   useEffect(() => {
@@ -265,24 +350,45 @@ export const QuoteBuilderModal: React.FC<QuoteBuilderModalProps> = ({
         {/* Content Form */}
         <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-6 text-xs">
           
-          {/* Preset Selector */}
-          <div className="p-4 rounded-2xl bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200/80 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-            <div className="flex items-center gap-2 text-blue-900 font-bold">
-              <Sparkles className="w-4 h-4 text-blue-600" />
-              <span>Cargar Plantilla Preconfigurada por Servicio:</span>
+          {/* Preset Selector + AI Custom Scope Generator */}
+          <div className="p-4 rounded-2xl bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200/80 space-y-3">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-2 text-blue-900 font-bold">
+                <Sparkles className="w-4 h-4 text-blue-600" />
+                <span>1. Cargar Plantilla Preconfigurada por Servicio:</span>
+              </div>
+              <select
+                value={selectedTemplateId}
+                onChange={handleTemplateChange}
+                className="w-full sm:w-auto px-3 py-1.5 bg-white border border-blue-300 rounded-xl text-xs font-semibold text-blue-900 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+              >
+                <option value="" disabled>Seleccionar Servicio...</option>
+                {DEFAULT_QUOTE_TEMPLATES.map((tmpl) => (
+                  <option key={tmpl.id} value={tmpl.id}>
+                    {tmpl.name}
+                  </option>
+                ))}
+              </select>
             </div>
-            <select
-              value={selectedTemplateId}
-              onChange={handleTemplateChange}
-              className="w-full sm:w-auto px-3 py-1.5 bg-white border border-blue-300 rounded-xl text-xs font-semibold text-blue-900 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
-            >
-              <option value="" disabled>Seleccionar Servicio...</option>
-              {DEFAULT_QUOTE_TEMPLATES.map((tmpl) => (
-                <option key={tmpl.id} value={tmpl.id}>
-                  {tmpl.name}
-                </option>
-              ))}
-            </select>
+
+            <div className="pt-2 border-t border-blue-200/60 flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+              <input
+                type="text"
+                value={aiPromptContext}
+                onChange={(e) => setAiPromptContext(e.target.value)}
+                placeholder="2. O describí el desafío (ej: Trazabilidad IoT + Odoo v18 para frigorífico) y generá ítems con IA..."
+                className="flex-1 px-3 py-2 bg-white border border-indigo-200 rounded-xl text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+              <button
+                type="button"
+                disabled={isAiGenerating}
+                onClick={handleGenerateAiQuoteItems}
+                className="px-4 py-2 rounded-xl bg-indigo-900 hover:bg-indigo-800 disabled:opacity-60 text-white font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                <span>{isAiGenerating ? 'Redactando con IA...' : 'Redactar Alcance e Ítems con IA'}</span>
+              </button>
+            </div>
           </div>
 
           {/* Client & General Info */}

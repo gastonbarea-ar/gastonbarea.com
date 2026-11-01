@@ -87,8 +87,10 @@ const SERVICE_LABELS: Record<ServiceCategory, { label: string; badge: string }> 
 };
 
 export const CrmDashboard: React.FC<CrmDashboardProps> = ({ passkey = 'gaston2026', onClose }) => {
-  // Navigation tabs: 'kanban' | 'directory' | 'quotes' | 'payments' | 'leads'
-  const [activeTab, setActiveTab] = useState<'kanban' | 'directory' | 'quotes' | 'payments' | 'leads'>('kanban');
+  // Navigation tabs: 'kanban' | 'directory' | 'quotes' | 'payments' | 'leads' | 'whatsapp_automations'
+  const [activeTab, setActiveTab] = useState<
+    'kanban' | 'directory' | 'quotes' | 'payments' | 'leads' | 'whatsapp_automations'
+  >('kanban');
 
   // Main data states
   const [opportunities, setOpportunities] = useState<Opportunity[]>(INITIAL_CRM_OPPORTUNITIES);
@@ -154,6 +156,33 @@ export const CrmDashboard: React.FC<CrmDashboardProps> = ({ passkey = 'gaston202
 
   const [copiedNotification, setCopiedNotification] = useState<string | null>(null);
 
+  // WhatsApp Business & CRM Automations State
+  const [waConfig, setWaConfig] = useState<any>({
+    enabled: true,
+    provider: 'evolution_api',
+    businessPhone: '5492804000000',
+    adminNotifyPhone: '5492804000000',
+    metaPhoneNumberId: '',
+    metaAccessToken: '',
+    metaBusinessAccountId: '',
+    metaVerifyToken: 'gastonbarea_wa_verify_2026',
+    evolutionApiUrl: 'http://138.219.41.106:8080',
+    evolutionInstanceName: 'gastonbarea',
+    evolutionApiKey: '',
+    webhookUrl: '',
+    autoNotifyOnLead: true,
+    autoNotifyOnQuote: true,
+    autoNotifyOnKickoff: true,
+  });
+  const [waStatus, setWaStatus] = useState<any>(null);
+  const [waTestPhone, setWaTestPhone] = useState<string>('');
+  const [waTestMessage, setWaTestMessage] = useState<string>(
+    '✅ Prueba WhatsApp Business · gastonbarea.com (CRM & Automatización Ejecutiva Operativa).'
+  );
+  const [isSavingWa, setIsSavingWa] = useState<boolean>(false);
+  const [isSendingWaTest, setIsSendingWaTest] = useState<boolean>(false);
+  const [waFeedback, setWaFeedback] = useState<{ ok: boolean; msg: string; waUrl?: string } | null>(null);
+
   // Load CRM data from backend
   const loadCrmData = async () => {
     setIsLoading(true);
@@ -184,10 +213,84 @@ export const CrmDashboard: React.FC<CrmDashboardProps> = ({ passkey = 'gaston202
           contactInquiries: leadsJson.contactInquiries || [],
         });
       }
+
+      // Load WhatsApp Business Config
+      const waRes = await fetch('/api/admin/whatsapp/config', {
+        headers: { 'x-admin-passkey': passkey },
+      });
+      if (waRes.ok) {
+        const waJson = await waRes.json();
+        if (waJson.config) setWaConfig((prev: any) => ({ ...prev, ...waJson.config }));
+        if (waJson.status) setWaStatus(waJson.status);
+      }
     } catch (err) {
       console.warn('Using local fallback for CRM data:', err);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleSaveWhatsAppConfig = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSavingWa(true);
+    setWaFeedback(null);
+    try {
+      const res = await fetch('/api/admin/whatsapp/config', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-passkey': passkey,
+        },
+        body: JSON.stringify({ config: waConfig }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setWaStatus(data.status);
+        setWaFeedback({
+          ok: true,
+          msg: '¡Configuración de WhatsApp Business guardada y sincronizada en Supabase!',
+        });
+      }
+    } catch (err: any) {
+      setWaFeedback({ ok: false, msg: err?.message || 'Error al guardar configuración.' });
+    } finally {
+      setIsSavingWa(false);
+    }
+  };
+
+  const handleSendWhatsAppTest = async () => {
+    setIsSendingWaTest(true);
+    setWaFeedback(null);
+    try {
+      const res = await fetch('/api/admin/whatsapp/send', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-passkey': passkey,
+        },
+        body: JSON.stringify({
+          toPhone: waTestPhone || waConfig.adminNotifyPhone || waConfig.businessPhone,
+          message: waTestMessage,
+          contextType: 'test_message',
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setWaFeedback({
+          ok: true,
+          msg: `¡Mensaje enviado con éxito vía ${data.provider} al +${data.toPhone}!`,
+        });
+      } else {
+        setWaFeedback({
+          ok: false,
+          msg: data.error || 'Credenciales API pendientes. Podés probar el enlace directo abajo.',
+          waUrl: data.waMeFallbackUrl,
+        });
+      }
+    } catch (err: any) {
+      setWaFeedback({ ok: false, msg: err?.message || 'Error de red.' });
+    } finally {
+      setIsSendingWaTest(false);
     }
   };
 
@@ -810,6 +913,19 @@ export const CrmDashboard: React.FC<CrmDashboardProps> = ({ passkey = 'gaston202
           >
             <Users className="w-4 h-4" />
             <span>Leads Web ({webLeads.proposals.length + webLeads.contactInquiries.length})</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('whatsapp_automations')}
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-2 cursor-pointer transition-all ${
+              activeTab === 'whatsapp_automations'
+                ? 'bg-emerald-600 text-white shadow-2xs'
+                : 'text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200'
+            }`}
+          >
+            <MessageSquare className="w-4 h-4" />
+            <span>WhatsApp Business & Automatizaciones</span>
           </button>
         </div>
 
@@ -2220,6 +2336,351 @@ export const CrmDashboard: React.FC<CrmDashboardProps> = ({ passkey = 'gaston202
             </div>
           </div>
         )}
+
+        {/* TAB 6: WHATSAPP BUSINESS & AUTOMATIZACIONES CRM */}
+        {activeTab === 'whatsapp_automations' && (
+          <div className="space-y-6">
+            {/* Active CRM Automations Status Grid */}
+            <div className="bg-white p-5 rounded-2xl border border-slate-200 space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900">
+                    4 Motores de Automatización del CRM Operativos
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Flujo punta a punta desde la captura web hasta el Kick-off en el Portal de Clientes.
+                  </p>
+                </div>
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 text-[11px] font-mono font-bold">
+                  <CheckCircle2 className="w-3.5 h-3.5" /> 4/4 ACTIVOS EN SERVIDOR
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
+                <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-1.5">
+                  <div className="font-mono text-[10px] font-bold text-emerald-700 uppercase">
+                    Automatización 01 · Activa
+                  </div>
+                  <div className="font-bold text-slate-900">
+                    Captura Web &rarr; Kanban + Portal Clientes
+                  </div>
+                  <p className="text-[11px] text-slate-600 leading-relaxed">
+                    Cada Diagnóstico IA o Contacto crea automáticamente la Empresa, el Contacto con clave <code>cliente2026</code> en el Portal y la Oportunidad en el Kanban, enviando sus accesos por Resend.
+                  </p>
+                </div>
+
+                <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-1.5">
+                  <div className="font-mono text-[10px] font-bold text-blue-700 uppercase">
+                    Automatización 02 · Activa
+                  </div>
+                  <div className="font-bold text-slate-900">
+                    Despacho 1-Clic Resend + WhatsApp Business
+                  </div>
+                  <p className="text-[11px] text-slate-600 leading-relaxed">
+                    Desde cualquier Presupuesto podés despachar el correo HTML formal vía <code>notificaciones@gastonbarea.com</code> y el mensaje por WhatsApp API, pasando la oportunidad a <em>Presupuesto Enviado</em>.
+                  </p>
+                </div>
+
+                <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-1.5">
+                  <div className="font-mono text-[10px] font-bold text-purple-700 uppercase">
+                    Automatización 03 · Activa
+                  </div>
+                  <div className="font-bold text-slate-900">
+                    Cobro Confirmado / Ganado &rarr; Kick-off 40·40·20%
+                  </div>
+                  <p className="text-[11px] text-slate-600 leading-relaxed">
+                    Al confirmar un pago o pasar una oportunidad a <em>Ganado</em>, se crea el Proyecto en el Portal de Clientes con los 3 hitos 40·40·20% y se envía el email de Kick-off.
+                  </p>
+                </div>
+
+                <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-1.5">
+                  <div className="font-mono text-[10px] font-bold text-amber-700 uppercase">
+                    Automatización 04 · Activa
+                  </div>
+                  <div className="font-bold text-slate-900">
+                    Redactor de Alcances e Ítems con IA (Gemini)
+                  </div>
+                  <p className="text-[11px] text-slate-600 leading-relaxed">
+                    Dentro de <em>Crear Presupuesto</em>, el asistente IA genera los módulos técnicos, entregables, horas y precios a medida según el desafío del cliente.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* WhatsApp Business Configuration & Live Test Hub */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+              <form
+                onSubmit={handleSaveWhatsAppConfig}
+                className="lg:col-span-7 bg-white p-5 rounded-2xl border border-slate-200 space-y-4 text-xs"
+              >
+                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                  <div>
+                    <h4 className="font-bold text-slate-900 text-sm flex items-center gap-2">
+                      <MessageSquare className="w-4 h-4 text-emerald-600" />
+                      <span>Configuración de WhatsApp Business API & Webhooks</span>
+                    </h4>
+                    <p className="text-[11px] text-slate-500 mt-0.5">
+                      Soporta Meta WhatsApp Cloud API Oficial, Evolution API en tu servidor Docker (138.219.41.106) o n8n Webhook.
+                    </p>
+                  </div>
+                  <span
+                    className={`px-2.5 py-1 rounded-full text-[10px] font-mono font-bold ${
+                      waStatus?.configured
+                        ? 'bg-emerald-100 text-emerald-800'
+                        : 'bg-amber-100 text-amber-900'
+                    }`}
+                  >
+                    {waStatus?.configured ? 'API CONECTADA' : 'MODO ENLACE DIRECTO / PENDIENTE API'}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-mono font-bold text-slate-600 mb-1">
+                      Proveedor Activo
+                    </label>
+                    <select
+                      value={waConfig.provider}
+                      onChange={(e) => setWaConfig({ ...waConfig, provider: e.target.value })}
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-semibold text-slate-900"
+                    >
+                      <option value="evolution_api">Evolution API (Docker VPS 138.219.41.106)</option>
+                      <option value="meta_cloud_api">Meta WhatsApp Cloud API Oficial</option>
+                      <option value="webhook_n8n">n8n / Webhook Externo</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-mono font-bold text-slate-600 mb-1">
+                      Tu Número WhatsApp Business
+                    </label>
+                    <input
+                      type="text"
+                      value={waConfig.businessPhone || ''}
+                      onChange={(e) => setWaConfig({ ...waConfig, businessPhone: e.target.value })}
+                      placeholder="5492804XXXXXX"
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-mono font-bold text-slate-600 mb-1">
+                      Teléfono para Recibir Alertas CRM
+                    </label>
+                    <input
+                      type="text"
+                      value={waConfig.adminNotifyPhone || ''}
+                      onChange={(e) => setWaConfig({ ...waConfig, adminNotifyPhone: e.target.value })}
+                      placeholder="5492804XXXXXX"
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-mono"
+                    />
+                  </div>
+                </div>
+
+                {waConfig.provider === 'evolution_api' && (
+                  <div className="p-4 rounded-xl bg-emerald-50/60 border border-emerald-200 space-y-3">
+                    <div className="font-mono text-[11px] font-bold text-emerald-900">
+                      Parámetros Evolution API v2 (Ideal para correr en Docker sobre tu VPS 138.219.41.106)
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div className="sm:col-span-2">
+                        <label className="block text-[10px] font-mono text-slate-600 mb-1">
+                          URL del Servidor Evolution API
+                        </label>
+                        <input
+                          type="text"
+                          value={waConfig.evolutionApiUrl || ''}
+                          onChange={(e) =>
+                            setWaConfig({ ...waConfig, evolutionApiUrl: e.target.value })
+                          }
+                          placeholder="https://wa.gastonbarea.com o http://138.219.41.106:8080"
+                          className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-xl text-xs font-mono"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-mono text-slate-600 mb-1">
+                          Nombre de Instancia
+                        </label>
+                        <input
+                          type="text"
+                          value={waConfig.evolutionInstanceName || ''}
+                          onChange={(e) =>
+                            setWaConfig({ ...waConfig, evolutionInstanceName: e.target.value })
+                          }
+                          placeholder="gastonbarea"
+                          className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-xl text-xs font-mono"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-mono text-slate-600 mb-1">
+                        Global API Key (AUTHENTICATION_API_KEY)
+                      </label>
+                      <input
+                        type="password"
+                        value={waConfig.evolutionApiKey || ''}
+                        onChange={(e) =>
+                          setWaConfig({ ...waConfig, evolutionApiKey: e.target.value })
+                        }
+                        placeholder="Pegá la API Key de tu instancia Evolution API..."
+                        className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-xl text-xs font-mono"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {waConfig.provider === 'meta_cloud_api' && (
+                  <div className="p-4 rounded-xl bg-blue-50/60 border border-blue-200 space-y-3">
+                    <div className="font-mono text-[11px] font-bold text-blue-900">
+                      Parámetros Meta WhatsApp Cloud API Oficial (developers.facebook.com)
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-[10px] font-mono text-slate-600 mb-1">
+                          Phone Number ID (Identificador de número)
+                        </label>
+                        <input
+                          type="text"
+                          value={waConfig.metaPhoneNumberId || ''}
+                          onChange={(e) =>
+                            setWaConfig({ ...waConfig, metaPhoneNumberId: e.target.value })
+                          }
+                          placeholder="Ej: 109283746512345"
+                          className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-xl text-xs font-mono"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-mono text-slate-600 mb-1">
+                          WhatsApp Business Account ID (WABA ID)
+                        </label>
+                        <input
+                          type="text"
+                          value={waConfig.metaBusinessAccountId || ''}
+                          onChange={(e) =>
+                            setWaConfig({ ...waConfig, metaBusinessAccountId: e.target.value })
+                          }
+                          placeholder="Ej: 102938475610293"
+                          className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-xl text-xs font-mono"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-mono text-slate-600 mb-1">
+                        Permanent Access Token (EAAG...)
+                      </label>
+                      <input
+                        type="password"
+                        value={waConfig.metaAccessToken || ''}
+                        onChange={(e) =>
+                          setWaConfig({ ...waConfig, metaAccessToken: e.target.value })
+                        }
+                        placeholder="EAAG..."
+                        className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-xl text-xs font-mono"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {waConfig.provider === 'webhook_n8n' && (
+                  <div className="p-4 rounded-xl bg-purple-50/60 border border-purple-200 space-y-2">
+                    <label className="block text-[10px] font-mono font-bold text-purple-900">
+                      URL del Webhook Saliente (n8n / Make / Zapier)
+                    </label>
+                    <input
+                      type="url"
+                      value={waConfig.webhookUrl || ''}
+                      onChange={(e) => setWaConfig({ ...waConfig, webhookUrl: e.target.value })}
+                      placeholder="https://n8n.gastonbarea.com/webhook/whatsapp-crm"
+                      className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-xl text-xs font-mono"
+                    />
+                  </div>
+                )}
+
+                <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+                  <div className="text-[11px] font-mono text-slate-500">
+                    Webhook Entrante listo en: <code className="bg-slate-100 px-1.5 py-0.5 rounded text-slate-800">https://www.gastonbarea.com/api/webhooks/whatsapp</code>
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={isSavingWa}
+                    className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs cursor-pointer"
+                  >
+                    {isSavingWa ? 'Guardando...' : 'Guardar Configuración WhatsApp'}
+                  </button>
+                </div>
+              </form>
+
+              {/* Right Column: Live Test & Webhook Info */}
+              <div className="lg:col-span-5 bg-white p-5 rounded-2xl border border-slate-200 space-y-4 text-xs flex flex-col justify-between">
+                <div className="space-y-3">
+                  <h4 className="font-bold text-slate-900 text-sm">
+                    Consola de Prueba en Vivo · WhatsApp Business
+                  </h4>
+                  <p className="text-[11px] text-slate-500">
+                    Probá el despacho hacia cualquier número internacional. Si aún no cargaste las claves de la API, genera el enlace directo verificado.
+                  </p>
+
+                  {waFeedback && (
+                    <div
+                      className={`p-3 rounded-xl border text-xs ${
+                        waFeedback.ok
+                          ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
+                          : 'bg-amber-50 border-amber-200 text-amber-900'
+                      }`}
+                    >
+                      <div>{waFeedback.msg}</div>
+                      {waFeedback.waUrl && (
+                        <a
+                          href={waFeedback.waUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1.5 mt-2 px-3 py-1.5 rounded-lg bg-emerald-600 text-white font-bold text-[11px]"
+                        >
+                          <MessageSquare className="w-3.5 h-3.5" />
+                          <span>Abrir Mensaje en WhatsApp Directo</span>
+                          <ExternalLink className="w-3 h-3" />
+                        </a>
+                      )}
+                    </div>
+                  )}
+
+                  <div>
+                    <label className="block text-[10px] font-mono font-bold text-slate-600 mb-1">
+                      Número Destino de Prueba (Ej: 5492804XXXXXX)
+                    </label>
+                    <input
+                      type="text"
+                      value={waTestPhone}
+                      onChange={(e) => setWaTestPhone(e.target.value)}
+                      placeholder="549..."
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-mono"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-mono font-bold text-slate-600 mb-1">
+                      Mensaje de Prueba
+                    </label>
+                    <textarea
+                      rows={3}
+                      value={waTestMessage}
+                      onChange={(e) => setWaTestMessage(e.target.value)}
+                      className="w-full p-3 bg-slate-50 border border-slate-300 rounded-xl text-xs font-mono"
+                    />
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  disabled={isSendingWaTest}
+                  onClick={handleSendWhatsAppTest}
+                  className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <MessageSquare className="w-4 h-4" />
+                  <span>{isSendingWaTest ? 'Despachando...' : 'Probar Envío WhatsApp Business'}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* MODALS */}
@@ -2252,6 +2713,18 @@ export const CrmDashboard: React.FC<CrmDashboardProps> = ({ passkey = 'gaston202
         isOpen={isFastReplyOpen}
         onClose={() => setIsFastReplyOpen(false)}
         quote={fastReplyQuote}
+        onQuoteDispatched={(updatedQuote) => {
+          setQuotes((prev) => prev.map((q) => (q.id === updatedQuote.id ? updatedQuote : q)));
+          if (updatedQuote.opportunityId) {
+            setOpportunities((prev) =>
+              prev.map((o) =>
+                o.id === updatedQuote.opportunityId && o.stage !== 'won'
+                  ? { ...o, stage: 'proposal_sent', probability: 70, linkedQuoteId: updatedQuote.quoteNumber }
+                  : o
+              )
+            );
+          }
+        }}
       />
 
       <PaymentConfigModal

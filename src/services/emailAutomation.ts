@@ -408,17 +408,23 @@ export async function sendContactAutomation(payload: ContactPayload) {
           </div>
         `,
       }),
-      // Auto-reply to client
+      // Auto-reply to client with Portal de Clientes access credentials
       dispatchTransactionalEmail({
         to: { email: payload.email, name: payload.name },
         replyTo: cfg.notificationEmail,
-        subject: `Hemos recibido tu consulta técnica [Gastón Barea]`,
+        subject: `Hemos recibido tu consulta técnica · Acceso a Portal de Clientes [Gastón Barea]`,
         html: `
-          <div style="font-family:sans-serif;padding:20px;max-width:550px;margin:0 auto;color:#334155;">
-            <h3 style="color:#0f172a;">Hola ${payload.name},</h3>
-            <p>Muchas gracias por ponerte en contacto. He recibido tu mensaje respecto al área de <strong>${payload.serviceArea}</strong>.</p>
-            <p>Revisaré los requerimientos técnicos y te responderé en el transcurso del día para evaluar la viabilidad o coordinar una llamada de diagnóstico.</p>
-            <p style="margin-top:24px;">Atentamente,<br><strong>Gastón Barea</strong><br><span style="font-size:12px;color:#64748b;">Arquitecto de Software & Consultor Tecnológico · gastonbarea.com</span></p>
+          <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;padding:24px;max-width:580px;margin:0 auto;color:#334155;background:#ffffff;border:1px solid #e2e8f0;border-radius:14px;">
+            <h3 style="color:#0f172a;margin-top:0;">Hola ${payload.name},</h3>
+            <p>Muchas gracias por ponerte en contacto. He recibido tu consulta respecto al área de <strong>${payload.serviceArea}</strong> y ya quedó ingresada en nuestro Pipeline Ejecutivo.</p>
+            <p>Además, habilitamos automáticamente tu acceso privado al <strong>Portal de Clientes de gastonbarea.com</strong> para que puedas hacer seguimiento de propuestas, agendar sesiones Google Meet Pro y consultar avances:</p>
+            <div style="background:#f8fafc;border:1px solid #cbd5e1;border-radius:10px;padding:14px 16px;margin:16px 0;font-family:monospace;font-size:12px;">
+              <div><strong>Portal de Clientes:</strong> <a href="https://www.gastonbarea.com/#portal" style="color:#2563eb;">https://www.gastonbarea.com/#portal</a></div>
+              <div style="margin-top:4px;"><strong>Usuario / Email:</strong> ${payload.email}</div>
+              <div style="margin-top:4px;"><strong>Clave de acceso inicial:</strong> cliente2026</div>
+            </div>
+            <p>Revisaré los requerimientos técnicos y te responderé a la brevedad.</p>
+            <p style="margin-top:24px;margin-bottom:0;">Atentamente,<br><strong>Gastón Barea</strong><br><span style="font-size:12px;color:#64748b;">Consultor & Director de Proyectos · www.gastonbarea.com</span></p>
           </div>
         `,
       }),
@@ -429,6 +435,215 @@ export async function sendContactAutomation(payload: ContactPayload) {
   } catch (error: any) {
     console.error('[Email Automation] Error en envío de consulta:', error);
     return { success: false, provider: cfg.provider, error: error.message };
+  }
+}
+
+/**
+ * Dispatches an Official Formal Quote (Presupuesto) via Resend.com to the client + copy to Gastón
+ */
+export async function sendOfficialQuoteEmail(params: {
+  quote: any;
+  paymentConfig?: any;
+  customSubject?: string;
+  customIntroMessage?: string;
+}) {
+  const cfg = resolveEmailConfig();
+  const { quote, paymentConfig, customSubject, customIntroMessage } = params;
+
+  if (!quote || !quote.clientEmail) {
+    return {
+      success: false,
+      configured: cfg.configured,
+      error: 'El presupuesto no tiene un correo electrónico de cliente asignado.',
+    };
+  }
+
+  if (!cfg.configured) {
+    return {
+      success: true,
+      mocked: true,
+      configured: false,
+      provider: cfg.provider,
+      fromEmail: cfg.fromEmail,
+      targetEmail: quote.clientEmail,
+      message: 'Modo simulación local (configurar RESEND_API_KEY en producción para envío real).',
+    };
+  }
+
+  const itemsRows = (quote.items || [])
+    .map(
+      (item: any, idx: number) => `
+      <tr style="border-bottom:1px solid #e2e8f0;">
+        <td style="padding:10px 12px;font-family:monospace;font-size:12px;color:#64748b;">${idx + 1}</td>
+        <td style="padding:10px 12px;">
+          <div style="font-weight:700;color:#0f172a;font-size:13px;">${item.description}</div>
+          <div style="font-size:11px;color:#64748b;margin-top:2px;">${item.deliverable || ''}</div>
+        </td>
+        <td style="padding:10px 12px;text-align:right;font-family:monospace;font-size:12px;font-weight:700;color:#0f172a;white-space:nowrap;">
+          ${quote.currency} $${Number(item.total || 0).toLocaleString()}
+        </td>
+      </tr>`
+    )
+    .join('');
+
+  const milestonesRows = (quote.milestones || [])
+    .map(
+      (ms: any) => `
+      <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px 12px;margin-bottom:8px;">
+        <div style="font-family:monospace;font-size:12px;font-weight:700;color:#1e40af;">
+          ${ms.percentage}% — ${quote.currency} $${Number(ms.amount || 0).toLocaleString()} · ${ms.name}
+        </div>
+        <div style="font-size:11px;color:#475569;margin-top:2px;">Condición: ${ms.condition}</div>
+      </div>`
+    )
+    .join('');
+
+  const cbuInfo = paymentConfig?.bankTransfer
+    ? `<div style="font-size:12px;color:#334155;margin-top:8px;">
+        <strong>Transferencia / Mercado Pago:</strong> CBU <code>${paymentConfig.bankTransfer.cbu}</code> · Alias: <code>${paymentConfig.bankTransfer.alias}</code> (${paymentConfig.bankTransfer.titular})
+       </div>`
+    : '';
+
+  const subject =
+    customSubject ||
+    `Presupuesto Formal #${quote.quoteNumber}: ${quote.title} [Gastón Barea]`;
+
+  const html = `
+  <!DOCTYPE html>
+  <html>
+  <body style="margin:0;padding:24px 12px;background:#f8fafc;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#0f172a;">
+    <table width="100%" cellpadding="0" cellspacing="0" style="max-width:640px;margin:0 auto;background:#ffffff;border:1px solid #e2e8f0;border-radius:16px;overflow:hidden;">
+      <tr>
+        <td style="padding:24px 28px;background:linear-gradient(135deg,#091428 0%,#1e1b4b 100%);color:#ffffff;">
+          <div style="font-family:monospace;font-size:11px;color:#34d399;font-weight:700;text-transform:uppercase;">
+            PRESUPUESTO OFICIAL #${quote.quoteNumber}
+          </div>
+          <h2 style="margin:8px 0 4px 0;font-size:19px;color:#ffffff;">${quote.title}</h2>
+          <div style="font-size:12px;color:#cbd5e1;">Preparado para ${quote.clientName} ${quote.clientCompany ? `· ${quote.clientCompany}` : ''}</div>
+        </td>
+      </tr>
+      <tr>
+        <td style="padding:28px;">
+          ${
+            customIntroMessage
+              ? `<p style="font-size:13px;line-height:1.6;color:#334155;white-space:pre-line;background:#f8fafc;padding:14px;border-radius:10px;border:1px solid #e2e8f0;">${customIntroMessage}</p>`
+              : `<p style="font-size:14px;line-height:1.6;color:#334155;">Estimado/a <strong>${quote.clientName}</strong>, te comparto el detalle formal de alcance técnico, entregables y esquema de inversión para <strong>${quote.title}</strong>.</p>`
+          }
+          <h4 style="font-family:monospace;font-size:11px;text-transform:uppercase;color:#475569;margin:20px 0 8px 0;">Desglose de Entregables</h4>
+          <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;">
+            <thead>
+              <tr style="background:#f1f5f9;font-family:monospace;font-size:11px;color:#475569;text-align:left;">
+                <th style="padding:8px 12px;">#</th>
+                <th style="padding:8px 12px;">Módulo / Entregable</th>
+                <th style="padding:8px 12px;text-align:right;">Total</th>
+              </tr>
+            </thead>
+            <tbody>${itemsRows}</tbody>
+            <tfoot>
+              <tr style="background:#eff6ff;font-family:monospace;font-size:14px;font-weight:700;color:#1e3a8a;">
+                <td colspan="2" style="padding:12px;text-align:right;">INVERSIÓN TOTAL (${quote.timeline || 'A convenir'}):</td>
+                <td style="padding:12px;text-align:right;">${quote.currency} $${Number(quote.total || 0).toLocaleString()}</td>
+              </tr>
+            </tfoot>
+          </table>
+
+          <h4 style="font-family:monospace;font-size:11px;text-transform:uppercase;color:#475569;margin:22px 0 8px 0;">Esquema de Hitos Auditables (40 · 40 · 20%)</h4>
+          ${milestonesRows}
+          ${cbuInfo}
+
+          <div style="text-align:center;margin:28px 0 12px 0;">
+            <a href="https://www.gastonbarea.com/#portal" style="display:inline-block;background:#291B64;color:#ffffff;text-decoration:none;font-weight:700;font-size:13px;padding:12px 24px;border-radius:10px;">
+              Ver y Aprobar en el Portal de Clientes &rarr;
+            </a>
+          </div>
+        </td>
+      </tr>
+    </table>
+  </body>
+  </html>`;
+
+  try {
+    const internalRecipients = [
+      { email: quote.clientEmail, name: quote.clientName },
+      { email: cfg.notificationEmail, name: 'Gastón Barea' },
+    ];
+    const result = await dispatchTransactionalEmail({
+      to: internalRecipients,
+      replyTo: cfg.notificationEmail,
+      subject,
+      html,
+    });
+    return {
+      success: true,
+      configured: true,
+      provider: cfg.provider,
+      fromEmail: cfg.fromEmail,
+      targetEmail: quote.clientEmail,
+      result,
+    };
+  } catch (err: any) {
+    return {
+      success: false,
+      configured: true,
+      provider: cfg.provider,
+      error: err?.message || 'Error al despachar presupuesto por correo.',
+    };
+  }
+}
+
+/**
+ * Dispatches an automated Project Kick-off Email when an opportunity is Won or Hito 1 (40%) payment is confirmed
+ */
+export async function sendProjectKickoffEmail(params: {
+  clientName: string;
+  clientEmail: string;
+  companyName?: string;
+  projectTitle: string;
+  projectId: string;
+}) {
+  const cfg = resolveEmailConfig();
+  if (!cfg.configured || !params.clientEmail || !/\S+@\S+\.\S+/.test(params.clientEmail)) {
+    return { success: true, mocked: true };
+  }
+
+  try {
+    await dispatchTransactionalEmail({
+      to: [
+        { email: params.clientEmail, name: params.clientName },
+        { email: cfg.notificationEmail, name: 'Gastón Barea' },
+      ],
+      replyTo: cfg.notificationEmail,
+      subject: `🚀 Kick-off Confirmado: ${params.projectTitle} · Portal de Clientes Activo`,
+      html: `
+        <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;padding:24px;max-width:580px;margin:0 auto;background:#ffffff;border:1px solid #e2e8f0;border-radius:14px;color:#0f172a;">
+          <div style="font-family:monospace;font-size:11px;font-weight:700;color:#059669;text-transform:uppercase;">
+            PROYECTO EN EJECUCIÓN · HITOS 40 · 40 · 20%
+          </div>
+          <h2 style="margin:8px 0 12px 0;font-size:19px;color:#0f172a;">
+            ¡Bienvenido/a al Kick-off de ${params.projectTitle}!
+          </h2>
+          <p style="font-size:14px;line-height:1.6;color:#334155;">
+            Hola <strong>${params.clientName}</strong>, confirmamos el inicio formal del proyecto para <strong>${params.companyName || 'tu organización'}</strong>.
+          </p>
+          <p style="font-size:14px;line-height:1.6;color:#334155;">
+            Ya se encuentra habilitado tu tablero de seguimiento en tiempo real en el <strong>Portal de Clientes</strong> con el cronograma de hitos auditables (40% Inicio · 40% Staging UAT · 20% Go-Live):
+          </p>
+          <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:14px 16px;margin:16px 0;font-family:monospace;font-size:12px;color:#14532d;">
+            <div><strong>Acceso al Portal:</strong> <a href="https://www.gastonbarea.com/#portal" style="color:#059669;">https://www.gastonbarea.com/#portal</a></div>
+            <div style="margin-top:4px;"><strong>Usuario:</strong> ${params.clientEmail}</div>
+            <div style="margin-top:4px;"><strong>Clave inicial:</strong> cliente2026</div>
+            <div style="margin-top:4px;"><strong>ID de Proyecto:</strong> ${params.projectId}</div>
+          </div>
+          <p style="font-size:12px;color:#64748b;margin-bottom:0;">
+            Gastón Barea · Dirección Ejecutiva de Proyectos & Arquitectura Tecnológica
+          </p>
+        </div>
+      `,
+    });
+    return { success: true };
+  } catch (err: any) {
+    console.error('[Kickoff Email Error]:', err);
+    return { success: false, error: err?.message };
   }
 }
 
@@ -511,3 +726,4 @@ export async function sendTestTransactionalEmail(recipientOverride?: string) {
     };
   }
 }
+
