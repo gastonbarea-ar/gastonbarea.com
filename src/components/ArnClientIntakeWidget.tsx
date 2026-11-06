@@ -1,9 +1,8 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import {
   Sparkles,
   Mic,
   MicOff,
-  Send,
   CheckCircle2,
   ArrowRight,
   UserCheck,
@@ -12,11 +11,16 @@ import {
   Video,
   RefreshCw,
   Zap,
-  Building2,
+  Users,
+  ShieldCheck,
+  Mail,
+  Send,
 } from 'lucide-react';
 import {
   parseNaturalArnCommand,
   buildAutonomous404020Quote,
+  EMPLOYEE_SCALE_OPTIONS,
+  calculateEmployeeTierPricing,
 } from '../utils/arnEngine';
 import { Quote } from '../types/crm';
 
@@ -36,28 +40,30 @@ interface ArnIntakeResult {
   quote: Quote;
   token?: string;
   kickoffActivated?: boolean;
+  emailSent?: boolean;
+  emailMessage?: string;
 }
 
 const QUICK_ARN_CLIENT_EXAMPLES = [
   {
-    label: 'Odoo ERP v18 & Inventario',
-    text: 'Soy Martín de Distribuidora Austral, necesitamos implementar Odoo ERP v18 e inventario B2B',
-    channel: 'martin@distribuidoraaustral.com',
+    label: 'Odoo ERP v18 (Base 5 emp.)',
+    text: 'Necesitamos implementar Odoo ERP v18 con inventario B2B, facturación y compras',
+    employees: 5,
   },
   {
-    label: 'IA Services & Gemelo Digital',
-    text: 'Soy Carolina de Grupo BioPatagonia, queremos integrar un Gemelo Digital con IA y agentes RAG',
-    channel: 'carolina@biopatagonia.com',
+    label: 'Odoo + E-Commerce (10 emp.)',
+    text: 'Queremos integrar Odoo ERP con tienda E-Commerce B2B2C y logística multi-depósito',
+    employees: 10,
   },
   {
-    label: 'Bioeconomía & Trazabilidad IoT',
-    text: 'Soy Federico de Bodega Andina, buscamos trazabilidad IoT de lotes y pasaporte digital',
-    channel: 'federico@bodegaandina.com',
+    label: 'Gemelo Digital IA (15 emp.)',
+    text: 'Buscamos automatizar operaciones con IA Services, Gemelo Digital y agentes RAG corporativos',
+    employees: 15,
   },
   {
-    label: 'Dirección PMO / Arquitectura',
-    text: 'Soy Lucía de TechSur, necesitamos dirección ejecutiva PMO y arquitectura cloud en Linux/Docker',
-    channel: 'lucia@techsur.io',
+    label: 'Trazabilidad & PMO (25 emp.)',
+    text: 'Necesitamos dirección ejecutiva PMO, trazabilidad IoT de lotes y arquitectura cloud Linux/Docker',
+    employees: 25,
   },
 ];
 
@@ -69,13 +75,44 @@ export const ArnClientIntakeWidget: React.FC<ArnClientIntakeWidgetProps> = ({
   onWhatsAppClick,
 }) => {
   const [message, setMessage] = useState<string>(initialMessage);
-  const [contactChannel, setContactChannel] = useState<string>('');
+  const [employeeCount, setEmployeeCount] = useState<number>(5);
+  const [contactChannel, setContactChannel] = useState<string>(() => {
+    try {
+      const saved = localStorage.getItem('gb_client_user');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed?.email && !String(parsed.email).endsWith('@portal-arn.com')) {
+          return parsed.email;
+        }
+      }
+    } catch {
+      // ignore
+    }
+    return '';
+  });
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [isListeningVoice, setIsListeningVoice] = useState<boolean>(false);
   const [isApprovingQuote, setIsApprovingQuote] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string>('');
   const [intakeResult, setIntakeResult] = useState<ArnIntakeResult | null>(null);
+  const [resendEmailInput, setResendEmailInput] = useState<string>('');
+  const [isResendingEmail, setIsResendingEmail] = useState<boolean>(false);
+  const [resendFeedback, setResendFeedback] = useState<string>('');
   const recognitionRef = useRef<any>(null);
+
+  // Live preview of Base (5 personal) + Scale Increment (10, 15, 25, 50+) + Monthly Support Fee
+  const livePricingPreview = useMemo(() => {
+    const previewParsed = parseNaturalArnCommand(
+      message || 'Implementación Odoo ERP & Arquitectura',
+      contactChannel,
+      employeeCount
+    );
+    return calculateEmployeeTierPricing({
+      employeeCount,
+      serviceCategory: previewParsed.serviceCategory,
+      currency: previewParsed.currency,
+    });
+  }, [message, contactChannel, employeeCount]);
 
   const toggleVoiceDictation = () => {
     if (isListeningVoice) {
@@ -94,7 +131,7 @@ export const ArnClientIntakeWidget: React.FC<ArnClientIntakeWidgetProps> = ({
       (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SpeechRecognitionApi) {
       setErrorMsg(
-        'Tu navegador móvil o de escritorio no soporta dictado directo. Escribí en una línea o tocá un ejemplo rápido arriba.'
+        'Tu navegador no soporta dictado directo. Escribí en una línea o tocá un ejemplo rápido arriba.'
       );
       return;
     }
@@ -129,17 +166,27 @@ export const ArnClientIntakeWidget: React.FC<ArnClientIntakeWidgetProps> = ({
     }
   };
 
-  const handleExecuteArnIntake = async (e?: React.FormEvent, customMsg?: string, customChan?: string) => {
+  const handleExecuteArnIntake = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    const rawMsg = (customMsg ?? message).trim();
-    const rawChan = (customChan ?? contactChannel).trim();
+    const rawMsg = message.trim();
+    const rawChan = contactChannel.trim();
 
     if (!rawMsg) {
-      setErrorMsg('Contanos en una línea qué proyecto o solución buscás evaluar.');
+      setErrorMsg('Contanos en una línea qué proyecto o solución buscás evaluar (o tocá un ejemplo arriba).');
+      return;
+    }
+
+    const hasEmailInChannel = /\S+@\S+\.\S+/.test(rawChan);
+    const hasEmailInMessage = /\S+@\S+\.\S+/.test(rawMsg);
+    if (!hasEmailInChannel && !hasEmailInMessage) {
+      setErrorMsg(
+        'Ingresá tu correo electrónico real en el paso 3 para que te enviemos el presupuesto formal 40/40/20 + soporte mensual a tu bandeja de entrada.'
+      );
       return;
     }
 
     setErrorMsg('');
+    setResendFeedback('');
     setIsSubmitting(true);
 
     try {
@@ -149,12 +196,12 @@ export const ArnClientIntakeWidget: React.FC<ArnClientIntakeWidgetProps> = ({
         body: JSON.stringify({
           message: rawMsg,
           contactChannel: rawChan,
+          employeeCount,
         }),
       });
       const data = await res.json();
 
       if (res.ok && data.success && data.quote && data.client) {
-        // Persist instant Client Portal session so #portal opens logged in with the new quote
         if (data.token) {
           localStorage.setItem('gb_client_token', data.token);
         }
@@ -170,13 +217,20 @@ export const ArnClientIntakeWidget: React.FC<ArnClientIntakeWidgetProps> = ({
           // ignore storage quota
         }
 
+        const resolvedClientEmail =
+          data.client.email || data.parsed?.clientEmail || rawChan || 'contacto@portal-arn.com';
+        setResendEmailInput(resolvedClientEmail);
         setIntakeResult({
           clientName: data.client.name || data.parsed?.clientName || 'Ejecutivo ARN',
-          clientEmail: data.client.email || data.parsed?.clientEmail || 'contacto@portal-arn.com',
+          clientEmail: resolvedClientEmail,
           companyName: data.client.company || data.parsed?.companyName || 'Organización',
           serviceCategory: data.parsed?.serviceCategory || 'software_architecture',
           quote: data.quote,
           token: data.token,
+          emailSent: Boolean(data.emailResult?.success),
+          emailMessage: data.emailResult?.success
+            ? `Presupuesto #${data.quote.quoteNumber} enviado por correo a ${resolvedClientEmail} y notificaciones@gastonbarea.com`
+            : data.emailResult?.error || 'Copia disponible en tu Portal de Clientes.',
         });
         setIsSubmitting(false);
         return;
@@ -185,7 +239,7 @@ export const ArnClientIntakeWidget: React.FC<ArnClientIntakeWidgetProps> = ({
       // Deterministic client-side fallback if offline
     }
 
-    const fallbackParsed = parseNaturalArnCommand(rawMsg, rawChan);
+    const fallbackParsed = parseNaturalArnCommand(rawMsg, rawChan, employeeCount);
     const fallbackQuote = buildAutonomous404020Quote({
       opportunityId: `opp-arn-local-${Date.now()}`,
       clientName: fallbackParsed.clientName,
@@ -195,6 +249,7 @@ export const ArnClientIntakeWidget: React.FC<ArnClientIntakeWidgetProps> = ({
       title: fallbackParsed.summaryTitle,
       totalAmount: fallbackParsed.estimatedValue,
       currency: fallbackParsed.currency,
+      employeeCount: fallbackParsed.employeeCount,
       notes: fallbackParsed.extractedNotes,
     });
     const fallbackToken = `gb_cli_arn_${Date.now()}`;
@@ -212,6 +267,7 @@ export const ArnClientIntakeWidget: React.FC<ArnClientIntakeWidgetProps> = ({
 
     localStorage.setItem('gb_client_token', fallbackToken);
     localStorage.setItem('gb_client_user', JSON.stringify(fallbackClient));
+    setResendEmailInput(fallbackParsed.clientEmail);
 
     setIntakeResult({
       clientName: fallbackParsed.clientName,
@@ -220,8 +276,51 @@ export const ArnClientIntakeWidget: React.FC<ArnClientIntakeWidgetProps> = ({
       serviceCategory: fallbackParsed.serviceCategory,
       quote: fallbackQuote,
       token: fallbackToken,
+      emailSent: false,
+      emailMessage: 'Propuesta generada localmente. Podés reenviarla a tu correo abajo.',
     });
     setIsSubmitting(false);
+  };
+
+  const handleResendQuoteEmail = async () => {
+    if (!intakeResult || !resendEmailInput.trim() || isResendingEmail) return;
+    if (!/\S+@\S+\.\S+/.test(resendEmailInput.trim())) {
+      setResendFeedback('Ingresá un correo válido (ej: tu-nombre@empresa.com).');
+      return;
+    }
+    setIsResendingEmail(true);
+    setResendFeedback('');
+    try {
+      const res = await fetch('/api/arn/resend-quote-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          quote: intakeResult.quote,
+          targetEmail: resendEmailInput.trim(),
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setResendFeedback(`✓ Presupuesto enviado a ${data.targetEmail} y notificaciones@gastonbarea.com`);
+        setIntakeResult((prev) =>
+          prev
+            ? {
+                ...prev,
+                clientEmail: data.targetEmail,
+                emailSent: true,
+              }
+            : null
+        );
+      } else {
+        setResendFeedback(
+          data?.emailResult?.error || data?.error || 'No se pudo enviar el correo en este momento.'
+        );
+      }
+    } catch {
+      setResendFeedback('Error de red al intentar reenviar el correo.');
+    } finally {
+      setIsResendingEmail(false);
+    }
   };
 
   const handleInstantApproveQuote = async () => {
@@ -277,14 +376,14 @@ export const ArnClientIntakeWidget: React.FC<ArnClientIntakeWidgetProps> = ({
         <div className="flex flex-wrap items-center gap-2">
           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-mono font-bold uppercase tracking-wider bg-emerald-400 text-emerald-950">
             <Zap className="w-3.5 h-3.5 shrink-0" />
-            <span>ARN · Cero Formularios</span>
+            <span>ARN · Cotizador Autónomo por Dotación</span>
           </span>
           <span
             className={`text-xs font-mono font-semibold ${
               isDark || variant === 'portal-compact' ? 'text-emerald-300' : 'text-[#291B64]'
             }`}
           >
-            Auto-Perfilado IA + Propuesta 40/40/20 + Acceso Instantáneo al Portal
+            Base 5 Personal + Escala (10, 15, 25+) + Servicio Mensual con Soporte SLA Incluido
           </span>
         </div>
 
@@ -293,20 +392,20 @@ export const ArnClientIntakeWidget: React.FC<ArnClientIntakeWidgetProps> = ({
             isDark || variant === 'portal-compact' ? 'text-neutral-300' : 'text-slate-500'
           }`}
         >
-          1 línea de texto o voz · Sin formularios largos
+          Envío directo a tu Email + Portal Clientes
         </div>
       </div>
 
       {!intakeResult ? (
         <form onSubmit={(e) => handleExecuteArnIntake(e)} className="space-y-4">
-          {/* Quick-Tap Mobile/Desktop Example Pills */}
+          {/* Quick-Tap Mobile/Desktop Example Buttons */}
           <div className="space-y-1.5">
             <div
               className={`text-[11px] font-mono ${
                 isDark || variant === 'portal-compact' ? 'text-neutral-300' : 'text-slate-600'
               }`}
             >
-              Tocá un ejemplo rápido para probar cómo interactúa el cliente o escribí/dictá tu caso:
+              Tocá un caso rápido para autocompletar la necesidad (y poné tu email real abajo para recibir la prueba):
             </div>
             <div className="flex items-center gap-2 overflow-x-auto pb-1.5 -mx-1 px-1 snap-x">
               {QUICK_ARN_CLIENT_EXAMPLES.map((ex, idx) => (
@@ -315,7 +414,7 @@ export const ArnClientIntakeWidget: React.FC<ArnClientIntakeWidgetProps> = ({
                   type="button"
                   onClick={() => {
                     setMessage(ex.text);
-                    setContactChannel(ex.channel);
+                    setEmployeeCount(ex.employees);
                     setErrorMsg('');
                   }}
                   className={`snap-start shrink-0 px-3 py-2 min-h-[38px] text-xs font-semibold transition-colors cursor-pointer border ${
@@ -330,14 +429,14 @@ export const ArnClientIntakeWidget: React.FC<ArnClientIntakeWidgetProps> = ({
             </div>
           </div>
 
-          {/* Step 1: Natural Language / Voice Input (text-base on mobile prevents iOS auto-zoom) */}
+          {/* Step 1: Natural Language / Voice Input */}
           <div className="space-y-2">
             <label
               className={`block text-xs sm:text-sm font-semibold ${
                 isDark || variant === 'portal-compact' ? 'text-white' : 'text-slate-900'
               }`}
             >
-              1. Contanos en una frase quién sos, tu empresa y qué necesitás resolver:
+              1. Contanos en una frase tu nombre/empresa y qué necesitás implementar:
             </label>
             <div className="relative flex items-stretch gap-2">
               <input
@@ -347,7 +446,7 @@ export const ArnClientIntakeWidget: React.FC<ArnClientIntakeWidgetProps> = ({
                   setMessage(e.target.value);
                   if (errorMsg) setErrorMsg('');
                 }}
-                placeholder="Ej: Soy Martín de AgroSur, necesitamos Odoo v18 o trazabilidad IoT..."
+                placeholder="Ej: Soy Gastón de AgroSur, necesitamos Odoo ERP v18 o trazabilidad IoT..."
                 className={`flex-1 px-3.5 py-3 min-h-[48px] text-base sm:text-sm rounded-none border focus:outline-none ${
                   isDark || variant === 'portal-compact'
                     ? 'bg-black/50 text-white placeholder:text-neutral-400 border-white/20 focus:border-emerald-400'
@@ -381,14 +480,114 @@ export const ArnClientIntakeWidget: React.FC<ArnClientIntakeWidgetProps> = ({
             </div>
           </div>
 
-          {/* Step 2: Single Contact Channel + 1-Click Action Button */}
+          {/* Step 2: Mandatory Employee Headcount Condition (Base 5 -> 10 -> 15 -> 25 -> 50+) */}
+          <div className="space-y-2">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+              <label
+                className={`flex items-center gap-1.5 text-xs sm:text-sm font-semibold ${
+                  isDark || variant === 'portal-compact' ? 'text-white' : 'text-slate-900'
+                }`}
+              >
+                <Users className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span>2. Condición de Dotación: ¿Cuántos empleados posee la empresa?</span>
+              </label>
+              <span
+                className={`text-[11px] font-mono ${
+                  isDark || variant === 'portal-compact' ? 'text-emerald-300' : 'text-[#291B64]'
+                }`}
+              >
+                Base hasta 5 personal · Incremento progresivo cada 5 empleados
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+              {EMPLOYEE_SCALE_OPTIONS.map((opt) => {
+                const isSelected = employeeCount === opt.count;
+                return (
+                  <button
+                    key={opt.count}
+                    type="button"
+                    onClick={() => setEmployeeCount(opt.count)}
+                    className={`p-2.5 text-left border transition-all cursor-pointer min-h-[54px] flex flex-col justify-between ${
+                      isSelected
+                        ? isDark || variant === 'portal-compact'
+                          ? 'bg-emerald-400 text-emerald-950 border-emerald-300 font-bold shadow-md'
+                          : 'bg-[#291B64] text-white border-[#291B64] font-bold shadow-md'
+                        : isDark || variant === 'portal-compact'
+                        ? 'bg-black/40 hover:bg-white/10 text-neutral-200 border-white/15'
+                        : 'bg-[#F7F7FA] hover:bg-slate-200/70 text-slate-800 border-slate-300'
+                    }`}
+                  >
+                    <div className="text-xs font-mono font-bold leading-tight">{opt.shortLabel}</div>
+                    <div
+                      className={`text-[10px] font-mono mt-1 ${
+                        isSelected
+                          ? isDark || variant === 'portal-compact'
+                            ? 'text-emerald-900'
+                            : 'text-emerald-300'
+                          : 'opacity-70'
+                      }`}
+                    >
+                      {opt.rangeLabel}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Live Breakdown Bar: Base 5 Personal + Scaling + Monthly Support Included */}
+            <div
+              className={`p-3 border grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs font-mono ${
+                isDark || variant === 'portal-compact'
+                  ? 'bg-black/40 border-emerald-400/25 text-neutral-200'
+                  : 'bg-slate-50 border-slate-300 text-slate-800'
+              }`}
+            >
+              <div>
+                <div className="text-[10px] uppercase opacity-75">Implementación Base (5 Personal)</div>
+                <div className="font-bold text-sm mt-0.5">
+                  USD ${livePricingPreview.baseImplementationCost.toLocaleString()}
+                  {livePricingPreview.scaleIncrementCost > 0 && (
+                    <span className="text-emerald-400 ml-1.5">
+                      + ${livePricingPreview.scaleIncrementCost.toLocaleString()} (Escala a{' '}
+                      {employeeCount} emp.)
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              <div>
+                <div className="text-[10px] uppercase opacity-75">Total Implementación (40/40/20)</div>
+                <div className="font-bold text-sm text-emerald-400 mt-0.5">
+                  USD ${livePricingPreview.totalImplementationCost.toLocaleString()}
+                </div>
+              </div>
+
+              <div className="flex items-start gap-1.5">
+                <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                <div>
+                  <div className="text-[10px] uppercase opacity-75">
+                    Servicio Mensual + Soporte SLA Incluido
+                  </div>
+                  <div className="font-bold text-sm text-emerald-400 mt-0.5">
+                    USD ${livePricingPreview.monthlySupportFee.toLocaleString()} / mes
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Step 3: Client Real Email Input + 1-Click Action Button */}
           <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-stretch">
             <div className="md:col-span-5">
               <input
-                type="text"
+                type="email"
                 value={contactChannel}
-                onChange={(e) => setContactChannel(e.target.value)}
-                placeholder="2. Tu Email o WhatsApp (ej: martin@empresa.com)"
+                onChange={(e) => {
+                  setContactChannel(e.target.value);
+                  if (errorMsg) setErrorMsg('');
+                }}
+                placeholder="3. Tu Email real para recibir el presupuesto (ej: vos@empresa.com)"
                 className={`w-full h-full min-h-[48px] px-3.5 py-3 text-base sm:text-sm rounded-none border focus:outline-none ${
                   isDark || variant === 'portal-compact'
                     ? 'bg-black/50 text-white placeholder:text-neutral-400 border-white/20 focus:border-emerald-400'
@@ -406,12 +605,12 @@ export const ArnClientIntakeWidget: React.FC<ArnClientIntakeWidgetProps> = ({
                 {isSubmitting ? (
                   <>
                     <RefreshCw className="w-4 h-4 animate-spin shrink-0" />
-                    <span>Perfilando Nodo ARN y Cotización 40/40/20...</span>
+                    <span>Calculando Dotación, Enviando Email y Abriendo Portal...</span>
                   </>
                 ) : (
                   <>
                     <Sparkles className="w-4 h-4 shrink-0" />
-                    <span>Generar Propuesta 40/40/20 & Entrar a Mi Portal (1-Clic)</span>
+                    <span>Recibir Presupuesto 40/40/20 por Email & Entrar al Portal</span>
                     <ArrowRight className="w-4 h-4 shrink-0" />
                   </>
                 )}
@@ -420,13 +619,13 @@ export const ArnClientIntakeWidget: React.FC<ArnClientIntakeWidgetProps> = ({
           </div>
 
           {errorMsg && (
-            <div className="p-3 bg-rose-500/15 border border-rose-400/40 text-xs font-mono text-rose-200">
+            <div className="p-3 bg-rose-500/20 border border-rose-400/50 text-xs font-mono text-rose-200">
               {errorMsg}
             </div>
           )}
         </form>
       ) : (
-        /* INSTANT ARN NODE & 40/40/20 QUOTE RESULT ON THE HOME PAGE */
+        /* INSTANT ARN NODE & 40/40/20 QUOTE + MONTHLY SUPPORT RESULT */
         <div className="space-y-5 animate-fadeIn">
           <div
             className={`p-4 sm:p-5 border ${
@@ -440,7 +639,7 @@ export const ArnClientIntakeWidget: React.FC<ArnClientIntakeWidgetProps> = ({
                 <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
                 <div>
                   <div className="text-xs font-mono font-bold uppercase text-emerald-400">
-                    NODO DE RELACIÓN ARN CREADO Y SESIÓN DE PORTAL ACTIVA
+                    NODO ARN CREADO · {intakeResult.quote.employeeRangeLabel || `Dotación ${employeeCount} empleados`}
                   </div>
                   <div className="text-sm sm:text-base font-bold">
                     {intakeResult.clientName} · {intakeResult.companyName} ({intakeResult.clientEmail})
@@ -453,24 +652,108 @@ export const ArnClientIntakeWidget: React.FC<ArnClientIntakeWidgetProps> = ({
               </span>
             </div>
 
-            <div className="pt-3 grid grid-cols-1 lg:grid-cols-12 gap-4 items-center">
-              <div className="lg:col-span-7 space-y-1.5">
+            {/* Email Status & Instant Resend Bar */}
+            <div
+              className={`mt-3 p-3 border flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+                isDark || variant === 'portal-compact'
+                  ? 'bg-black/40 border-white/15'
+                  : 'bg-white border-slate-200'
+              }`}
+            >
+              <div className="flex items-center gap-2 text-xs font-mono">
+                <Mail className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span>
+                  {intakeResult.emailMessage ||
+                    `Enviado a ${intakeResult.clientEmail} y notificaciones@gastonbarea.com`}
+                </span>
+              </div>
+
+              <div className="flex items-center gap-1.5">
+                <input
+                  type="email"
+                  value={resendEmailInput}
+                  onChange={(e) => setResendEmailInput(e.target.value)}
+                  placeholder="Enviar copia a otro email..."
+                  className={`px-2.5 py-1.5 text-xs font-mono border focus:outline-none min-w-[190px] ${
+                    isDark || variant === 'portal-compact'
+                      ? 'bg-black/60 text-white border-white/20'
+                      : 'bg-slate-50 text-slate-900 border-slate-300'
+                  }`}
+                />
+                <button
+                  type="button"
+                  onClick={handleResendQuoteEmail}
+                  disabled={isResendingEmail}
+                  className="px-3 py-1.5 text-xs font-mono font-bold bg-emerald-400 text-emerald-950 hover:bg-emerald-300 transition-colors inline-flex items-center gap-1 cursor-pointer shrink-0"
+                >
+                  <Send className="w-3.5 h-3.5" />
+                  <span>{isResendingEmail ? 'Enviando...' : 'Reenviar Email'}</span>
+                </button>
+              </div>
+            </div>
+            {resendFeedback && (
+              <div className="mt-2 text-xs font-mono text-emerald-300">{resendFeedback}</div>
+            )}
+
+            <div className="pt-4 grid grid-cols-1 lg:grid-cols-12 gap-4 items-center">
+              <div className="lg:col-span-6 space-y-1.5">
                 <div className="text-xs font-mono opacity-80">
-                  PROPUESTA TÉCNICA Y ECONÓMICA ESTRUCTURADA AUTOMÁTICAMENTE:
+                  PROPUESTA CON IMPLEMENTACIÓN BASE (5 PERSONAL) + ESCALAMIENTO:
                 </div>
                 <div className="font-display text-lg sm:text-xl font-bold">
                   {intakeResult.quote.title}
                 </div>
                 <div className="text-xs opacity-85">
-                  Plazo estimado: <strong>{intakeResult.quote.timeline}</strong> · Validez:{' '}
-                  <strong>{intakeResult.quote.validUntil}</strong>
+                  Dotación contemplada:{' '}
+                  <strong>
+                    {intakeResult.quote.employeeRangeLabel ||
+                      `Hasta ${intakeResult.quote.employeeCount || 5} empleados`}
+                  </strong>{' '}
+                  · Plazo: <strong>{intakeResult.quote.timeline}</strong>
                 </div>
+                {intakeResult.quote.baseImplementationCost && (
+                  <div className="text-xs font-mono text-emerald-300">
+                    Base (hasta 5 emp.): {intakeResult.quote.currency} $
+                    {intakeResult.quote.baseImplementationCost.toLocaleString()}
+                    {intakeResult.quote.scaleIncrementCost
+                      ? ` + Escalamiento dotación: ${intakeResult.quote.currency} $${intakeResult.quote.scaleIncrementCost.toLocaleString()}`
+                      : ' (Sin recargo de escala)'}
+                  </div>
+                )}
               </div>
 
-              <div className="lg:col-span-5 flex flex-col sm:items-end justify-center">
-                <div className="text-xs font-mono opacity-75">INVERSIÓN ESTIMADA (ESQUEMA 40/40/20)</div>
-                <div className="font-mono text-2xl sm:text-3xl font-bold text-emerald-400">
-                  {intakeResult.quote.currency} ${Number(intakeResult.quote.total || 0).toLocaleString()}
+              <div className="lg:col-span-6 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div
+                  className={`p-3 border ${
+                    isDark || variant === 'portal-compact'
+                      ? 'bg-black/40 border-white/15'
+                      : 'bg-white border-slate-200'
+                  }`}
+                >
+                  <div className="text-[10px] font-mono uppercase opacity-75">
+                    1. Inversión Implementación (40/40/20)
+                  </div>
+                  <div className="font-mono text-xl sm:text-2xl font-bold text-emerald-400 mt-0.5">
+                    {intakeResult.quote.currency} $
+                    {Number(intakeResult.quote.total || 0).toLocaleString()}
+                  </div>
+                </div>
+
+                <div
+                  className={`p-3 border ${
+                    isDark || variant === 'portal-compact'
+                      ? 'bg-emerald-950/70 border-emerald-400/40'
+                      : 'bg-emerald-100/70 border-emerald-500/40'
+                  }`}
+                >
+                  <div className="text-[10px] font-mono uppercase text-emerald-300">
+                    2. Servicio Mensual + Soporte SLA
+                  </div>
+                  <div className="font-mono text-xl sm:text-2xl font-bold text-emerald-400 mt-0.5">
+                    {intakeResult.quote.currency} $
+                    {Number(intakeResult.quote.monthlySupportFee || 250).toLocaleString()}{' '}
+                    <span className="text-xs font-normal">/ mes</span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -492,12 +775,8 @@ export const ArnClientIntakeWidget: React.FC<ArnClientIntakeWidgetProps> = ({
                       {intakeResult.quote.currency} ${Number(m.amount || 0).toLocaleString()}
                     </span>
                   </div>
-                  <div className="text-xs font-semibold mt-1 line-clamp-1">
-                    {(m as any).title || (m as any).name || (m as any).label}
-                  </div>
-                  <div className="text-[11px] opacity-75 mt-0.5 line-clamp-2">
-                    {(m as any).description || (m as any).deliverable || (m as any).triggerCondition}
-                  </div>
+                  <div className="text-xs font-semibold mt-1 line-clamp-1">{m.name}</div>
+                  <div className="text-[11px] opacity-75 mt-0.5 line-clamp-2">{m.condition}</div>
                 </div>
               ))}
             </div>
@@ -541,7 +820,7 @@ export const ArnClientIntakeWidget: React.FC<ArnClientIntakeWidgetProps> = ({
                 type="button"
                 onClick={() =>
                   onWhatsAppClick(
-                    `Hola Gastón, acabo de generar mi Nodo ARN y la propuesta ${intakeResult.quote.quoteNumber} (${intakeResult.quote.title} - ${intakeResult.quote.currency} $${intakeResult.quote.total.toLocaleString()}) para ${intakeResult.companyName}.`
+                    `Hola Gastón, acabo de generar mi Nodo ARN y el presupuesto ${intakeResult.quote.quoteNumber} (${intakeResult.quote.title} · ${intakeResult.quote.employeeRangeLabel || 'Base 5 emp.'} · Implementación ${intakeResult.quote.currency} $${intakeResult.quote.total.toLocaleString()} + Soporte Mensual $${Number(intakeResult.quote.monthlySupportFee || 250).toLocaleString()}/mes) para ${intakeResult.companyName}.`
                   )
                 }
                 className={`min-h-[48px] px-4 py-3 text-xs font-mono font-semibold border transition-colors inline-flex items-center justify-center gap-2 cursor-pointer ${
@@ -560,7 +839,7 @@ export const ArnClientIntakeWidget: React.FC<ArnClientIntakeWidgetProps> = ({
                 type="button"
                 onClick={() =>
                   onScheduleClick(
-                    `Revisión de Propuesta ARN ${intakeResult.quote.quoteNumber} (${intakeResult.companyName} - ${intakeResult.quote.title})`
+                    `Revisión de Propuesta ARN ${intakeResult.quote.quoteNumber} (${intakeResult.companyName} - ${intakeResult.quote.employeeRangeLabel || 'Dotación Base'})`
                   )
                 }
                 className={`min-h-[48px] px-4 py-3 text-xs font-mono font-semibold border transition-colors inline-flex items-center justify-center gap-2 cursor-pointer ${
@@ -577,7 +856,7 @@ export const ArnClientIntakeWidget: React.FC<ArnClientIntakeWidgetProps> = ({
 
           <div className="flex flex-wrap items-center justify-between gap-2 pt-1 text-xs font-mono opacity-80">
             <span>
-              Tus credenciales automáticas de Portal: <strong>{intakeResult.clientEmail}</strong> / Clave:{' '}
+              Credenciales de tu Portal: <strong>{intakeResult.clientEmail}</strong> / Clave:{' '}
               <strong>cliente2026</strong>
             </span>
             <button
@@ -588,7 +867,7 @@ export const ArnClientIntakeWidget: React.FC<ArnClientIntakeWidgetProps> = ({
               }}
               className="underline hover:text-emerald-400 cursor-pointer"
             >
-              Cotizar otra necesidad con ARN
+              Cotizar otra dotación o proyecto con ARN
             </button>
           </div>
         </div>

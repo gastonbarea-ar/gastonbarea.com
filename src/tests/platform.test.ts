@@ -384,23 +384,57 @@ import {
   parseNaturalArnCommand,
   buildAutonomous404020Quote,
   computeArnRelationshipNodes,
+  calculateEmployeeTierPricing,
 } from '../utils/arnEngine.ts';
 
-describe('9. Motor ARN (Automated Relationship Network — Cero Formularios)', () => {
-  it('debe extraer cliente, empresa, email, vertical y monto desde una instrucción natural sin formularios', () => {
+describe('9. Motor ARN (Automated Relationship Network — Cero Formularios & Escala por Dotación)', () => {
+  it('debe extraer cliente, empresa, email, vertical, dotación de personal y monto desde una instrucción natural sin formularios', () => {
     const parsed = parseNaturalArnCommand(
-      'Hablé con Valeria de Bodega Austral, correo valeria@bodegaaustral.com, necesitan Odoo v18 ERP e inventario por USD 5400, armar propuesta 40/40/20'
+      'Hablé con Valeria de Bodega Austral, correo valeria@bodegaaustral.com, somos 10 empleados y necesitan Odoo v18 ERP e inventario por USD 5400, armar propuesta 40/40/20'
     );
     assert.equal(parsed.clientName, 'Valeria');
     assert.equal(parsed.clientEmail, 'valeria@bodegaaustral.com');
     assert.equal(parsed.companyName, 'Bodega Austral');
     assert.equal(parsed.serviceCategory, 'odoo_erp');
+    assert.equal(parsed.employeeCount, 10);
     assert.equal(parsed.estimatedValue, 5400);
     assert.equal(parsed.currency, 'USD');
     assert.equal(parsed.shouldGenerateQuote, true);
+    assert.ok(parsed.monthlySupportFee >= 250);
   });
 
-  it('debe generar una cotización formal 40/40/20 exacta sin intervención manual', () => {
+  it('debe calcular implementación base (hasta 5 personal) e incrementar progresivamente a 10, 15, 25+ junto con el abono mensual con soporte SLA incluido', () => {
+    const base5 = calculateEmployeeTierPricing({
+      employeeCount: 5,
+      serviceCategory: 'odoo_erp',
+      currency: 'USD',
+    });
+    const tier10 = calculateEmployeeTierPricing({
+      employeeCount: 10,
+      serviceCategory: 'odoo_erp',
+      currency: 'USD',
+    });
+    const tier15 = calculateEmployeeTierPricing({
+      employeeCount: 15,
+      serviceCategory: 'odoo_erp',
+      currency: 'USD',
+    });
+
+    assert.equal(base5.scaleIncrementCost, 0);
+    assert.equal(base5.totalImplementationCost, base5.baseImplementationCost);
+    assert.equal(base5.monthlySupportFee, 250);
+
+    // Al pasar de 5 a 10 empleados (+1 tramo de 5 personal) incrementa el costo de implementación y soporte mensual
+    assert.ok(tier10.scaleIncrementCost > 0);
+    assert.equal(tier10.totalImplementationCost, tier10.baseImplementationCost + tier10.scaleIncrementCost);
+    assert.ok(tier10.monthlySupportFee > base5.monthlySupportFee);
+
+    // Al pasar a 15 empleados (+2 tramos de 5 personal) vuelve a escalar proporcionalmente
+    assert.equal(tier15.scaleIncrementCost, tier10.scaleIncrementCost * 2);
+    assert.ok(tier15.monthlySupportFee > tier10.monthlySupportFee);
+  });
+
+  it('debe generar una cotización formal 40/40/20 con desglose de dotación y servicio mensual con soporte incluido', () => {
     const quote = buildAutonomous404020Quote({
       opportunityId: 'opp-test-arn',
       clientName: 'Valeria',
@@ -408,17 +442,20 @@ describe('9. Motor ARN (Automated Relationship Network — Cero Formularios)', (
       companyName: 'Bodega Austral',
       serviceCategory: 'odoo_erp',
       title: 'Implementación Odoo v18 · Bodega Austral',
-      totalAmount: 5000,
+      employeeCount: 10,
       currency: 'USD',
     });
-    assert.equal(quote.total, 5000);
+    assert.equal(quote.employeeCount, 10);
+    assert.ok((quote.scaleIncrementCost || 0) > 0);
+    assert.ok((quote.monthlySupportFee || 0) > 250);
     assert.equal(quote.milestones.length, 3);
-    assert.equal(quote.milestones[0].amount, 2000);
-    assert.equal(quote.milestones[1].amount, 2000);
-    assert.equal(quote.milestones[2].amount, 1000);
+    assert.equal(
+      quote.milestones[0].amount + quote.milestones[1].amount + quote.milestones[2].amount,
+      quote.total
+    );
   });
 
-  it('debe calcular nodos de relación ARN ordenados por impulso y sugerir acción autónoma en 1 clic', () => {
+  it('debe calcular nodos de relación ARN ordenados por impulso con condición de empleados y soporte mensual', () => {
     const nodes = computeArnRelationshipNodes({
       opportunities: INITIAL_CRM_OPPORTUNITIES,
       companies: INITIAL_CRM_COMPANIES,
@@ -429,6 +466,8 @@ describe('9. Motor ARN (Automated Relationship Network — Cero Formularios)', (
     assert.ok(nodes.length > 0);
     assert.ok(nodes[0].momentumScore >= nodes[nodes.length - 1].momentumScore);
     assert.ok(nodes[0].autonomousAction.buttonLabel.length > 5);
+    assert.ok((nodes[0].employeeCount || 0) >= 1);
+    assert.ok((nodes[0].monthlySupportFee || 0) >= 250);
   });
 });
 

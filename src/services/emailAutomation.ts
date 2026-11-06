@@ -514,6 +514,12 @@ export async function sendOfficialQuoteEmail(params: {
        </div>`
     : '';
 
+  const employeeRangeText = quote.employeeRangeLabel || `Hasta ${quote.employeeCount || 5} empleados (Implementación Base)`;
+  const monthlyFeeAmount = Number(quote.monthlySupportFee || (quote.currency === 'ARS' ? 280000 : 250));
+  const monthlySupportDescription =
+    quote.monthlySupportDetails ||
+    `Servicio mensual continuo con Soporte Técnico SLA, monitoreo proactivo, mantenimiento evolutivo y backups para ${employeeRangeText.toLowerCase()}.`;
+
   const subject =
     customSubject ||
     `Presupuesto Formal #${quote.quoteNumber}: ${quote.title} [Gastón Barea]`;
@@ -526,10 +532,13 @@ export async function sendOfficialQuoteEmail(params: {
       <tr>
         <td style="padding:24px 28px;background:linear-gradient(135deg,#091428 0%,#1e1b4b 100%);color:#ffffff;">
           <div style="font-family:monospace;font-size:11px;color:#34d399;font-weight:700;text-transform:uppercase;">
-            PRESUPUESTO OFICIAL #${quote.quoteNumber}
+            PRESUPUESTO OFICIAL ARN #${quote.quoteNumber}
           </div>
           <h2 style="margin:8px 0 4px 0;font-size:19px;color:#ffffff;">${quote.title}</h2>
           <div style="font-size:12px;color:#cbd5e1;">Preparado para ${quote.clientName} ${quote.clientCompany ? `· ${quote.clientCompany}` : ''}</div>
+          <div style="margin-top:8px;display:inline-block;background:rgba(52,211,153,0.16);border:1px solid rgba(52,211,153,0.4);color:#6ee7b7;padding:4px 10px;border-radius:6px;font-family:monospace;font-size:11px;">
+            Condición de Dotación: ${employeeRangeText}
+          </div>
         </td>
       </tr>
       <tr>
@@ -537,9 +546,9 @@ export async function sendOfficialQuoteEmail(params: {
           ${
             customIntroMessage
               ? `<p style="font-size:13px;line-height:1.6;color:#334155;white-space:pre-line;background:#f8fafc;padding:14px;border-radius:10px;border:1px solid #e2e8f0;">${customIntroMessage}</p>`
-              : `<p style="font-size:14px;line-height:1.6;color:#334155;">Estimado/a <strong>${quote.clientName}</strong>, te comparto el detalle formal de alcance técnico, entregables y esquema de inversión para <strong>${quote.title}</strong>.</p>`
+              : `<p style="font-size:14px;line-height:1.6;color:#334155;">Estimado/a <strong>${quote.clientName}</strong>, te comparto el detalle formal de alcance técnico, entregables auditables (implementación base desde 5 personal y escalamiento progresivo) y el servicio mensual con soporte incluido para <strong>${quote.title}</strong>.</p>`
           }
-          <h4 style="font-family:monospace;font-size:11px;text-transform:uppercase;color:#475569;margin:20px 0 8px 0;">Desglose de Entregables</h4>
+          <h4 style="font-family:monospace;font-size:11px;text-transform:uppercase;color:#475569;margin:20px 0 8px 0;">1. Inversión de Implementación (Base 5 Personal + Escala por Dotación)</h4>
           <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;">
             <thead>
               <tr style="background:#f1f5f9;font-family:monospace;font-size:11px;color:#475569;text-align:left;">
@@ -551,19 +560,36 @@ export async function sendOfficialQuoteEmail(params: {
             <tbody>${itemsRows}</tbody>
             <tfoot>
               <tr style="background:#eff6ff;font-family:monospace;font-size:14px;font-weight:700;color:#1e3a8a;">
-                <td colspan="2" style="padding:12px;text-align:right;">INVERSIÓN TOTAL (${quote.timeline || 'A convenir'}):</td>
+                <td colspan="2" style="padding:12px;text-align:right;">INVERSIÓN IMPLEMENTACIÓN (${quote.timeline || 'A convenir'}):</td>
                 <td style="padding:12px;text-align:right;">${quote.currency} $${Number(quote.total || 0).toLocaleString()}</td>
               </tr>
             </tfoot>
           </table>
 
-          <h4 style="font-family:monospace;font-size:11px;text-transform:uppercase;color:#475569;margin:22px 0 8px 0;">Esquema de Hitos Auditables (40 · 40 · 20%)</h4>
+          <h4 style="font-family:monospace;font-size:11px;text-transform:uppercase;color:#475569;margin:22px 0 8px 0;">2. Esquema de Hitos Auditables (40 · 40 · 20%)</h4>
           ${milestonesRows}
+
+          <h4 style="font-family:monospace;font-size:11px;text-transform:uppercase;color:#047857;margin:22px 0 8px 0;">3. Servicio Mensual Operativo con Soporte Técnico SLA Incluido</h4>
+          <div style="background:#ecfdf5;border:1px solid #a7f3d0;border-radius:10px;padding:14px 16px;margin-bottom:14px;">
+            <div style="font-family:monospace;font-size:14px;font-weight:700;color:#065f46;">
+              Abono Mensual + Soporte SLA: ${quote.currency} $${monthlyFeeAmount.toLocaleString()} / mes
+            </div>
+            <div style="font-size:12px;color:#047857;margin-top:4px;line-height:1.5;">
+              ${monthlySupportDescription}
+            </div>
+          </div>
+
           ${cbuInfo}
 
-          <div style="text-align:center;margin:28px 0 12px 0;">
+          <div style="background:#0f172a;color:#ffffff;border-radius:10px;padding:16px 18px;margin:22px 0 14px 0;font-family:monospace;font-size:12px;">
+            <div style="color:#34d399;font-weight:700;margin-bottom:6px;">ACCESO DIRECTO A TU PORTAL DE CLIENTES ARN</div>
+            <div>URL: <a href="https://www.gastonbarea.com/#portal" style="color:#38bdf8;">https://www.gastonbarea.com/#portal</a></div>
+            <div style="margin-top:4px;">Usuario: <strong>${quote.clientEmail}</strong> · Clave inicial: <strong>cliente2026</strong></div>
+          </div>
+
+          <div style="text-align:center;margin:24px 0 12px 0;">
             <a href="https://www.gastonbarea.com/#portal" style="display:inline-block;background:#291B64;color:#ffffff;text-decoration:none;font-weight:700;font-size:13px;padding:12px 24px;border-radius:10px;">
-              Ver y Aprobar en el Portal de Clientes &rarr;
+              Ver y Aprobar Presupuesto en el Portal &rarr;
             </a>
           </div>
         </td>
@@ -573,23 +599,62 @@ export async function sendOfficialQuoteEmail(params: {
   </html>`;
 
   try {
-    const internalRecipients = [
-      { email: quote.clientEmail, name: quote.clientName },
+    const isRealClientEmail =
+      Boolean(quote.clientEmail) &&
+      /\S+@\S+\.\S+/.test(quote.clientEmail) &&
+      !String(quote.clientEmail).toLowerCase().endsWith('@portal-arn.com');
+
+    const internalDestinations = [
       { email: cfg.notificationEmail, name: 'Gastón Barea' },
+      ...(cfg.backupNotificationEmail && cfg.backupNotificationEmail !== cfg.notificationEmail
+        ? [{ email: cfg.backupNotificationEmail, name: 'Gastón Barea' }]
+        : []),
     ];
-    const result = await dispatchTransactionalEmail({
-      to: internalRecipients,
-      replyTo: cfg.notificationEmail,
-      subject,
-      html,
-    });
+
+    const tasks: Promise<any>[] = [];
+    if (isRealClientEmail) {
+      tasks.push(
+        dispatchTransactionalEmail({
+          to: { email: quote.clientEmail, name: quote.clientName },
+          replyTo: cfg.notificationEmail,
+          subject,
+          html,
+        })
+      );
+    }
+
+    tasks.push(
+      dispatchTransactionalEmail({
+        to: internalDestinations,
+        replyTo: isRealClientEmail ? quote.clientEmail : cfg.notificationEmail,
+        subject: `[PRESUPUESTO ARN #${quote.quoteNumber}] ${quote.clientName} (${quote.clientCompany || 'Empresa'}) · ${employeeRangeText}`,
+        html,
+      })
+    );
+
+    const settled = await Promise.allSettled(tasks);
+    const anyFulfilled = settled.some((s) => s.status === 'fulfilled');
+
+    if (!anyFulfilled) {
+      const firstErr = settled.find((s) => s.status === 'rejected') as PromiseRejectedResult | undefined;
+      return {
+        success: false,
+        configured: true,
+        provider: cfg.provider,
+        fromEmail: cfg.fromEmail,
+        targetEmail: quote.clientEmail,
+        error: firstErr?.reason?.message || 'Error al despachar presupuesto por correo.',
+      };
+    }
+
     return {
       success: true,
       configured: true,
       provider: cfg.provider,
       fromEmail: cfg.fromEmail,
       targetEmail: quote.clientEmail,
-      result,
+      sentToClient: isRealClientEmail,
+      result: settled.map((s) => (s.status === 'fulfilled' ? s.value : s.reason?.message)),
     };
   } catch (err: any) {
     return {

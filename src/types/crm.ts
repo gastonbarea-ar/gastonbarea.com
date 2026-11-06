@@ -25,6 +25,8 @@ export interface CrmCompany {
   phone?: string;
   email?: string;
   location?: string;
+  employeeCount?: number;
+  employeeRangeLabel?: string;
   tier: 'enterprise' | 'pyme' | 'startup' | 'institution' | 'prospect';
   notes?: string;
   createdAt: string;
@@ -59,6 +61,9 @@ export interface Opportunity {
   company?: string;
   companyId?: string;
   contactId?: string;
+  employeeCount?: number;
+  employeeRangeLabel?: string;
+  monthlySupportFee?: number;
   serviceCategory: ServiceCategory;
   stage: OpportunityStage;
   value: number;
@@ -102,6 +107,12 @@ export interface Quote {
   clientEmail: string;
   clientCompany?: string;
   clientTaxId?: string; // CUIT / RFC / Tax ID
+  employeeCount?: number;
+  employeeRangeLabel?: string;
+  baseImplementationCost?: number;
+  scaleIncrementCost?: number;
+  monthlySupportFee?: number;
+  monthlySupportDetails?: string;
   serviceCategory: ServiceCategory;
   title: string;
   currency: 'USD' | 'ARS';

@@ -2132,6 +2132,14 @@ export const ClientPortalModal: React.FC<ClientPortalModalProps> = ({ isOpen = t
                                 <div className="text-sm font-bold text-[#1D1D1F]">
                                   {qt.title || 'Propuesta Formal Emitida'}
                                 </div>
+                                <div className="flex flex-wrap items-center gap-2 text-[11px] font-mono text-emerald-900">
+                                  <span className="px-2 py-0.5 bg-emerald-100/80 border border-emerald-300">
+                                    Dotación: {qt.employeeRangeLabel || `Hasta ${qt.employeeCount || 5} empleados`}
+                                  </span>
+                                  <span className="px-2 py-0.5 bg-emerald-900 text-emerald-100">
+                                    Servicio Mensual + Soporte SLA: {qt.currency} ${Number(qt.monthlySupportFee || 250).toLocaleString()}/mes
+                                  </span>
+                                </div>
                                 <p className="text-xs text-slate-600">{qt.paymentTerms}</p>
                               </div>
 
@@ -2252,7 +2260,15 @@ export const ClientPortalModal: React.FC<ClientPortalModalProps> = ({ isOpen = t
                                   </span>
                                 </div>
                                 <div className="text-sm font-bold text-[#1D1D1F] mt-1">{qt.title}</div>
-                                <p className="text-xs text-slate-600 mt-0.5">
+                                <div className="flex flex-wrap items-center gap-1.5 mt-1 text-[11px] font-mono text-emerald-900">
+                                  <span className="px-1.5 py-0.5 bg-emerald-100 border border-emerald-300">
+                                    {qt.employeeRangeLabel || `Hasta ${qt.employeeCount || 5} empleados`}
+                                  </span>
+                                  <span className="px-1.5 py-0.5 bg-emerald-900 text-emerald-100">
+                                    + Abono Soporte SLA: {qt.currency} ${Number(qt.monthlySupportFee || 250).toLocaleString()}/mes
+                                  </span>
+                                </div>
+                                <p className="text-xs text-slate-600 mt-1">
                                   {(qt as any).paymentTerms || (qt as any).notes || 'Esquema de hitos 40% / 40% / 20%'}
                                 </p>
                               </div>

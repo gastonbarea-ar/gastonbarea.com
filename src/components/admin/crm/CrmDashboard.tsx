@@ -1418,10 +1418,10 @@ export const CrmDashboard: React.FC<CrmDashboardProps> = ({ passkey = 'gaston202
                   <table className="w-full text-left text-xs border-collapse">
                     <thead>
                       <tr className="bg-slate-50 text-slate-600 font-mono text-[11px] uppercase border-b border-slate-200">
-                        <th className="py-3 px-4">Nodo ARN (Cliente · Corporación)</th>
+                        <th className="py-3 px-4">Nodo ARN (Cliente · Corporación · Dotación)</th>
                         <th className="py-3 px-4">Iniciativa & Vertical</th>
                         <th className="py-3 px-4">Estado & Última Señal Detectada</th>
-                        <th className="py-3 px-4 text-right">Valor (40/40/20)</th>
+                        <th className="py-3 px-4 text-right">Implementación + Soporte Mensual</th>
                         <th className="py-3 px-4 text-right">Acción Autónoma (1-Clic)</th>
                       </tr>
                     </thead>
@@ -1440,6 +1440,9 @@ export const CrmDashboard: React.FC<CrmDashboardProps> = ({ passkey = 'gaston202
                               <div className="text-slate-600 text-[11px]">
                                 {node.companyName} ·{' '}
                                 <span className="font-mono">{node.clientEmail}</span>
+                              </div>
+                              <div className="mt-1 inline-block px-2 py-0.5 bg-emerald-50 border border-emerald-200 text-emerald-800 font-mono text-[10px] font-bold">
+                                {node.employeeRangeLabel}
                               </div>
                             </td>
 
@@ -1474,8 +1477,13 @@ export const CrmDashboard: React.FC<CrmDashboardProps> = ({ passkey = 'gaston202
                               </div>
                             </td>
 
-                            <td className="py-3.5 px-4 align-top text-right font-mono tabular-nums font-bold text-slate-900 whitespace-nowrap">
-                              {node.currency} ${node.value.toLocaleString()}
+                            <td className="py-3.5 px-4 align-top text-right font-mono tabular-nums whitespace-nowrap">
+                              <div className="font-bold text-slate-900">
+                                {node.currency} ${node.value.toLocaleString()}
+                              </div>
+                              <div className="text-[10px] font-semibold text-emerald-700 mt-0.5">
+                                + {node.currency} ${Number(node.monthlySupportFee || 250).toLocaleString()}/mes (Soporte SLA)
+                              </div>
                             </td>
 
                             <td className="py-3.5 px-4 align-top text-right whitespace-nowrap">

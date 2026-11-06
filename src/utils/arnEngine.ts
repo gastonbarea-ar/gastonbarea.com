@@ -6,6 +6,18 @@ import {
   ServiceCategory,
 } from '../types/crm.ts';
 
+export interface EmployeePricingBreakdown {
+  employeeCount: number;
+  employeeRangeLabel: string;
+  extraBlocksOf5: number;
+  baseImplementationCost: number;
+  scaleIncrementCost: number;
+  totalImplementationCost: number;
+  monthlySupportFee: number;
+  monthlySupportDetails: string;
+  currency: 'USD' | 'ARS';
+}
+
 export interface ParsedArnCommand {
   intent:
     | 'create_or_update_node'
@@ -16,6 +28,12 @@ export interface ParsedArnCommand {
   clientEmail: string;
   companyName: string;
   phone?: string;
+  employeeCount: number;
+  employeeRangeLabel: string;
+  baseImplementationCost: number;
+  scaleIncrementCost: number;
+  monthlySupportFee: number;
+  monthlySupportDetails: string;
   serviceCategory: ServiceCategory;
   estimatedValue: number;
   currency: 'USD' | 'ARS';
@@ -42,6 +60,9 @@ export interface ArnRelationshipNode {
   clientEmail: string;
   clientPhone?: string;
   companyName: string;
+  employeeCount?: number;
+  employeeRangeLabel?: string;
+  monthlySupportFee?: number;
   serviceCategory: ServiceCategory;
   stage: Opportunity['stage'];
   value: number;
@@ -54,6 +75,133 @@ export interface ArnRelationshipNode {
   hasActiveProject: boolean;
   autonomousAction: ArnAutonomousAction;
   whatsappQuickUrl: string;
+}
+
+export const EMPLOYEE_SCALE_OPTIONS = [
+  {
+    count: 5,
+    shortLabel: 'Hasta 5 empleados (Base)',
+    rangeLabel: 'Implementación Base · 1 a 5 empleados',
+  },
+  {
+    count: 10,
+    shortLabel: '6 a 10 empleados (+5)',
+    rangeLabel: 'Escala Tramo 2 · 6 a 10 empleados',
+  },
+  {
+    count: 15,
+    shortLabel: '11 a 15 empleados (+10)',
+    rangeLabel: 'Escala Tramo 3 · 11 a 15 empleados',
+  },
+  {
+    count: 25,
+    shortLabel: '16 a 25 empleados (PyME)',
+    rangeLabel: 'Escala PyME · 16 a 25 empleados',
+  },
+  {
+    count: 50,
+    shortLabel: '26 a 50 empleados (Corp)',
+    rangeLabel: 'Escala Corporativa · 26 a 50 empleados',
+  },
+  {
+    count: 100,
+    shortLabel: '+50 empleados (Industrial)',
+    rangeLabel: 'Escala Industrial · +50 empleados',
+  },
+];
+
+export function resolveEmployeeRangeLabel(employeeCount: number): string {
+  if (employeeCount <= 5) return 'Implementación Base · Hasta 5 empleados';
+  if (employeeCount <= 10) return `Escala Tramo 2 · 6 a 10 empleados (${employeeCount} pers.)`;
+  if (employeeCount <= 15) return `Escala Tramo 3 · 11 a 15 empleados (${employeeCount} pers.)`;
+  if (employeeCount <= 25) return `Escala PyME · 16 a 25 empleados (${employeeCount} pers.)`;
+  if (employeeCount <= 50) return `Escala Corporativa · 26 a 50 empleados (${employeeCount} pers.)`;
+  return `Escala Industrial · +50 empleados (${employeeCount} pers.)`;
+}
+
+/**
+ * Calculates Base Implementation Cost (up to 5 staff) + Incremental Scaling in blocks of 5 staff (5 -> 10 -> 15 -> 25 -> 50+)
+ * + Monthly Service with Support Included (Abono Mensual + SLA).
+ */
+export function calculateEmployeeTierPricing(params: {
+  employeeCount?: number;
+  serviceCategory: ServiceCategory;
+  currency?: 'USD' | 'ARS';
+  explicitTotalOverride?: number;
+}): EmployeePricingBreakdown {
+  const currency: 'USD' | 'ARS' = params.currency === 'ARS' ? 'ARS' : 'USD';
+  const fx = currency === 'ARS' ? 1100 : 1;
+  const rawCount = Math.max(1, Math.round(Number(params.employeeCount) || 5));
+
+  // Base cost for up to 5 employees by vertical (in USD)
+  let baseUsd = 2400;
+  switch (params.serviceCategory) {
+    case 'odoo_erp':
+      baseUsd = 2500;
+      break;
+    case 'ecommerce_b2b2c':
+      baseUsd = 2300;
+      break;
+    case 'bi_analytics':
+      baseUsd = 2600;
+      break;
+    case 'linux_docker':
+      baseUsd = 1900;
+      break;
+    case 'fractional_cto':
+      baseUsd = 2200;
+      break;
+    default:
+      baseUsd = 2500;
+      break;
+  }
+
+  // Incremental blocks of 5 employees above the base 5 (e.g. 6..10 = +1 block, 11..15 = +2 blocks, etc.)
+  const extraStaff = Math.max(0, rawCount - 5);
+  const extraBlocksOf5 = Math.ceil(extraStaff / 5);
+
+  // Each additional block of 5 employees adds USD $450 for role setup, permissions, training & concurrent load
+  const incrementPerBlockUsd = 450;
+  const rawBaseCost = Math.round(baseUsd * fx);
+  const rawScaleIncrement = Math.round(extraBlocksOf5 * incrementPerBlockUsd * fx);
+  const computedTotal = rawBaseCost + rawScaleIncrement;
+
+  const totalImplementationCost =
+    params.explicitTotalOverride && params.explicitTotalOverride >= 100
+      ? Math.round(params.explicitTotalOverride)
+      : computedTotal;
+
+  // If explicitTotalOverride was passed, keep base + increment consistent with total
+  const baseImplementationCost =
+    params.explicitTotalOverride && params.explicitTotalOverride >= 100
+      ? extraBlocksOf5 > 0
+        ? Math.round(totalImplementationCost * (rawBaseCost / computedTotal))
+        : totalImplementationCost
+      : rawBaseCost;
+  const scaleIncrementCost = Math.max(0, totalImplementationCost - baseImplementationCost);
+
+  // Monthly Service + Included Support SLA scaled by employee headcount
+  // Base (up to 5 staff): USD $250/mo + USD $70/mo per additional block of 5 employees
+  const monthlySupportUsd = 250 + extraBlocksOf5 * 70;
+  const monthlySupportFee = Math.round(monthlySupportUsd * fx);
+  const employeeRangeLabel = resolveEmployeeRangeLabel(rawCount);
+
+  const monthlySupportDetails = `Servicio Mensual Operativo + Soporte Técnico SLA Incluido (${employeeRangeLabel}): incluye mesa de ayuda para hasta ${Math.max(
+    5,
+    rawCount
+  )} usuarios, monitoreo de servidor Cloud/Docker 24/7, copias de seguridad automatizadas y mantenimiento evolutivo.`;
+
+  return {
+    employeeCount: rawCount,
+    employeeRangeLabel,
+    extraBlocksOf5,
+    baseImplementationCost,
+    scaleIncrementCost,
+    totalImplementationCost,
+    monthlySupportFee,
+    monthlySupportDetails,
+    currency,
+  };
 }
 
 export function inferServiceCategoryFromText(text: string): ServiceCategory {
@@ -96,7 +244,8 @@ export function getServiceCategoryDefaultTitle(category: ServiceCategory, compan
 
 export function parseNaturalArnCommand(
   rawInput: string,
-  overrideContactChannel?: string
+  overrideContactChannel?: string,
+  overrideEmployeeCount?: number
 ): ParsedArnCommand {
   const clean = (rawInput || '').trim();
   const combined = `${clean} ${overrideContactChannel || ''}`.trim();
@@ -110,26 +259,37 @@ export function parseNaturalArnCommand(
   const phoneMatch = combined.match(/(?:\+?\d[\d\s-]{7,15}\d)/);
   const phone = phoneMatch ? phoneMatch[0].replace(/[^\d+]/g, '') : undefined;
 
-  // 3. Extract Currency & Value
+  // 3. Extract Employee Count (e.g., "somos 10 empleados", "15 personas", "empresa de 8 usuarios")
+  let detectedEmployees = overrideEmployeeCount && overrideEmployeeCount > 0 ? overrideEmployeeCount : 5;
+  const empRegex = /(?:somos|tenemos|con|para|dotaci[oó]n de|equipo de|empresa de)?\s*\b([1-9][0-9]{0,3})\s*(?:empleados|personas|usuarios|colaboradores|operarios|puestos|personal)\b/i;
+  const empMatch = clean.match(empRegex);
+  if (empMatch && empMatch[1]) {
+    const parsedEmp = Number(empMatch[1]);
+    if (!Number.isNaN(parsedEmp) && parsedEmp >= 1 && parsedEmp <= 5000) {
+      detectedEmployees = parsedEmp;
+    }
+  }
+
+  // 4. Extract Currency & Explicit Amount (if specified in command)
   const isArs = /\b(ars|pesos)\b/i.test(combined) && !/\b(usd|d[oó]lares)\b/i.test(combined);
   const currency: 'USD' | 'ARS' = isArs ? 'ARS' : 'USD';
 
-  let estimatedValue = currency === 'ARS' ? 3800000 : 4200;
+  let explicitAmountOverride: number | undefined;
   const amountRegex = /(?:usd|u\$s|ars|\$|por)\s*([0-9]{1,3}(?:[.,][0-9]{3})+|[0-9]{3,8})/i;
   const amountMatch = combined.match(amountRegex);
   if (amountMatch && amountMatch[1]) {
     const normalizedNum = Number(amountMatch[1].replace(/[.,]/g, ''));
     if (!Number.isNaN(normalizedNum) && normalizedNum >= 100) {
-      estimatedValue = normalizedNum;
+      explicitAmountOverride = normalizedNum;
     }
   }
 
-  // 4. Extract Company Name (e.g., "de Bodega Austral", "de AgroSur", "empresa X")
+  // 5. Extract Company Name (e.g., "de Bodega Austral", "de AgroSur", "empresa X")
   let companyName = 'Contacto Individual';
   const companyPatterns = [
-    /\bde\s+([A-ZÁÉÍÓÚÑ][A-Za-zÁÉÍÓÚÑáéíóúñ0-9&.\s]{2,28}?)(?:,|;|\.|\s+necesita|\s+quiere|\s+buscan|\s+por|\s+correo|\s+mail|\s+usd|\s+\$|$)/,
-    /(?:empresa|corporaci[oó]n|compa[ñn][ií]a)\s+([A-ZÁÉÍÓÚÑa-záéíóúñ0-9&.\s]{2,28}?)(?:,|;|\.|\s+por|\s+necesita|\s+correo|\s+mail|\s+tel|\s+usd|\s+\$|$)/i,
-    /((?:grupo|bodega|distribuidora|frigor[ií]fico|cooperativa|estudio|laboratorio)\s+[A-ZÁÉÍÓÚÑa-záéíóúñ0-9&.\s]{2,24}?)(?:,|;|\.|\s+por|\s+necesita|\s+correo|\s+mail|\s+tel|\s+usd|\s+\$|$)/i,
+    /\bde\s+([A-ZÁÉÍÓÚÑ][A-Za-zÁÉÍÓÚÑáéíóúñ0-9&.\s]{2,28}?)(?:,|;|\.|\s+somos|\s+tenemos|\s+con|\s+necesita|\s+quiere|\s+buscan|\s+por|\s+correo|\s+mail|\s+usd|\s+\$|$)/,
+    /(?:empresa|corporaci[oó]n|compa[ñn][ií]a)\s+([A-ZÁÉÍÓÚÑa-záéíóúñ0-9&.\s]{2,28}?)(?:,|;|\.|\s+somos|\s+tenemos|\s+por|\s+necesita|\s+correo|\s+mail|\s+tel|\s+usd|\s+\$|$)/i,
+    /((?:grupo|bodega|distribuidora|frigor[ií]fico|cooperativa|estudio|laboratorio)\s+[A-ZÁÉÍÓÚÑa-záéíóúñ0-9&.\s]{2,24}?)(?:,|;|\.|\s+somos|\s+tenemos|\s+por|\s+necesita|\s+correo|\s+mail|\s+tel|\s+usd|\s+\$|$)/i,
   ];
   for (const pattern of companyPatterns) {
     const m = clean.match(pattern);
@@ -147,7 +307,7 @@ export function parseNaturalArnCommand(
     }
   }
 
-  // 5. Extract Client Name
+  // 6. Extract Client Name
   let clientName = '';
   const namePatterns = [
     /(?:con|cliente|contacto|soy|mi nombre es|para)\s+([A-ZÁÉÍÓÚÑa-záéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑa-záéíóúñ]+)?)(?:\s+de\s+|\s+empresa|,|\.|\s+correo|\s+mail|\s+necesita|$)/i,
@@ -200,6 +360,14 @@ export function parseNaturalArnCommand(
 
   const serviceCategory = inferServiceCategoryFromText(clean);
 
+  // Calculate employee-tiered implementation + monthly support pricing
+  const pricing = calculateEmployeeTierPricing({
+    employeeCount: detectedEmployees,
+    serviceCategory,
+    currency,
+    explicitTotalOverride: explicitAmountOverride,
+  });
+
   const shouldActivateKickoff =
     lower.includes('kickoff') ||
     lower.includes('iniciar proyecto') ||
@@ -235,8 +403,14 @@ export function parseNaturalArnCommand(
     clientEmail,
     companyName,
     phone,
+    employeeCount: pricing.employeeCount,
+    employeeRangeLabel: pricing.employeeRangeLabel,
+    baseImplementationCost: pricing.baseImplementationCost,
+    scaleIncrementCost: pricing.scaleIncrementCost,
+    monthlySupportFee: pricing.monthlySupportFee,
+    monthlySupportDetails: pricing.monthlySupportDetails,
     serviceCategory,
-    estimatedValue,
+    estimatedValue: pricing.totalImplementationCost,
     currency,
     shouldGenerateQuote,
     shouldScheduleMeet,
@@ -251,13 +425,21 @@ export function buildAutonomous404020Quote(params: {
   clientName: string;
   clientEmail: string;
   companyName?: string;
+  employeeCount?: number;
   serviceCategory: ServiceCategory;
   title: string;
-  totalAmount: number;
+  totalAmount?: number;
   currency: 'USD' | 'ARS';
   notes?: string;
 }): Quote {
-  const total = Math.max(500, Math.round(params.totalAmount || 4200));
+  const pricing = calculateEmployeeTierPricing({
+    employeeCount: params.employeeCount || 5,
+    serviceCategory: params.serviceCategory,
+    currency: params.currency,
+    explicitTotalOverride: params.totalAmount,
+  });
+
+  const total = pricing.totalImplementationCost;
   const m1 = Math.round(total * 0.4);
   const m2 = Math.round(total * 0.4);
   const m3 = total - m1 - m2;
@@ -267,6 +449,31 @@ export function buildAutonomous404020Quote(params: {
 
   const quoteNum = `COT-ARN-${new Date().getFullYear()}-${String(Math.floor(100 + Math.random() * 899))}`;
 
+  const items: Quote['items'] = [
+    {
+      id: `item-base-${Date.now()}`,
+      description: `1. Implementación Base (Dotación inicial hasta 5 empleados) — ${params.title}`,
+      deliverable:
+        'Arquitectura Base, Aprovisionamiento Cloud/Docker, Configuración Core, Staging UAT y Puesta en Producción para hasta 5 usuarios',
+      hours: 45,
+      unitPrice: pricing.baseImplementationCost,
+      quantity: 1,
+      total: pricing.baseImplementationCost,
+    },
+  ];
+
+  if (pricing.scaleIncrementCost > 0) {
+    items.push({
+      id: `item-scale-${Date.now() + 1}`,
+      description: `2. Escalamiento por Dotación de Personal (${pricing.employeeRangeLabel})`,
+      deliverable: `Parametrización de roles adicionales, permisos multi-área, licenciamiento operativo y capacitación para ${pricing.employeeCount} empleados (+${pricing.extraBlocksOf5} bloque(s) de 5 personas)`,
+      hours: pricing.extraBlocksOf5 * 10,
+      unitPrice: pricing.scaleIncrementCost,
+      quantity: 1,
+      total: pricing.scaleIncrementCost,
+    });
+  }
+
   return {
     id: `qt-arn-${Date.now()}`,
     quoteNumber: quoteNum,
@@ -274,42 +481,20 @@ export function buildAutonomous404020Quote(params: {
     clientName: params.clientName,
     clientEmail: params.clientEmail,
     clientCompany: params.companyName,
+    employeeCount: pricing.employeeCount,
+    employeeRangeLabel: pricing.employeeRangeLabel,
+    baseImplementationCost: pricing.baseImplementationCost,
+    scaleIncrementCost: pricing.scaleIncrementCost,
+    monthlySupportFee: pricing.monthlySupportFee,
+    monthlySupportDetails: pricing.monthlySupportDetails,
     serviceCategory: params.serviceCategory,
     title: params.title,
     currency: params.currency,
-    items: [
-      {
-        id: `item-1-${Date.now()}`,
-        description: 'Fase 1 (40%): Relevamiento de Arquitectura, Kickoff & Entorno Base',
-        deliverable: 'Blueprint Técnico + Entorno Cloud/Docker Provisionado',
-        hours: 25,
-        unitPrice: m1,
-        quantity: 1,
-        total: m1,
-      },
-      {
-        id: `item-2-${Date.now()}`,
-        description: 'Fase 2 (40%): Desarrollo Core, Integraciones API & Entorno Staging UAT',
-        deliverable: 'Sistema en Staging UAT validado con datos reales del cliente',
-        hours: 35,
-        unitPrice: m2,
-        quantity: 1,
-        total: m2,
-      },
-      {
-        id: `item-3-${Date.now()}`,
-        description: 'Fase 3 (20%): Puesta en Producción (Go-Live), Capacitación & Handover',
-        deliverable: 'Despliegue en Producción + Manual Operativo + Garantía SLA',
-        hours: 15,
-        unitPrice: m3,
-        quantity: 1,
-        total: m3,
-      },
-    ],
+    items,
     subtotal: total,
     taxPercent: 0,
     total,
-    timeline: '4 a 6 semanas (Sprints Ágiles)',
+    timeline: pricing.employeeCount > 15 ? '5 a 8 semanas (Sprints Ágiles)' : '4 a 6 semanas (Sprints Ágiles)',
     milestones: [
       {
         id: `ms-1-${Date.now()}`,
@@ -324,7 +509,7 @@ export function buildAutonomous404020Quote(params: {
         name: 'Hito 2 · Entrega en Staging UAT & Homologación (40%)',
         percentage: 40,
         amount: m2,
-        condition: 'Contra entrega funcional en servidor de Staging UAT',
+        condition: `Contra entrega funcional en servidor Staging UAT para ${pricing.employeeCount} usuarios`,
         status: 'pending',
       },
       {
@@ -337,9 +522,10 @@ export function buildAutonomous404020Quote(params: {
       },
     ],
     termsAndConditions: [
-      'Esquema de inversión transparente por hitos verificables 40% / 40% / 20%.',
+      `Condición de Dotación Relevada: ${pricing.employeeRangeLabel} (Base 5 empleados incrementándose en tramos de 5).`,
+      `Servicio Mensual con Soporte SLA Incluido (post Go-Live): ${pricing.currency} $${pricing.monthlySupportFee.toLocaleString()} / mes (${pricing.monthlySupportDetails}).`,
+      'Esquema de inversión de implementación por hitos verificables 40% / 40% / 20%.',
       'Aprobación instantánea en 1 clic desde el Portal Clientes ARN (#portal).',
-      'Incluye seguimiento en vivo de Sprints, Bitácora Técnica y canal SLA directo con Gastón Barea.',
     ],
     status: 'sent',
     validUntil: validDate.toISOString().split('T')[0],
@@ -435,9 +621,15 @@ export function computeArnRelationshipNodes(params: {
         clientEmail: opp.clientEmail,
         clientPhone: opp.clientPhone,
         companyName: opp.company || 'Contacto Individual',
+        employeeCount: opp.employeeCount || linkedQuote?.employeeCount || 5,
+        employeeRangeLabel:
+          opp.employeeRangeLabel ||
+          linkedQuote?.employeeRangeLabel ||
+          'Implementación Base · Hasta 5 empleados',
+        monthlySupportFee: opp.monthlySupportFee || linkedQuote?.monthlySupportFee || 250,
         serviceCategory: opp.serviceCategory,
         stage: opp.stage,
-        value: opp.value || linkedQuote?.total || 3500,
+        value: opp.value || linkedQuote?.total || 2500,
         currency: opp.currency || linkedQuote?.currency || 'USD',
         momentumScore,
         statusLabel,

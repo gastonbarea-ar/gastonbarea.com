@@ -55,6 +55,7 @@ import {
   buildAutonomous404020Quote,
   computeArnRelationshipNodes,
   getServiceCategoryDefaultTitle,
+  calculateEmployeeTierPricing,
   ParsedArnCommand,
 } from './src/utils/arnEngine.ts';
 
@@ -1896,6 +1897,8 @@ function syncContactAndCompanyFromOpportunity(opp: {
   companyId?: string;
   contactId?: string;
   stage?: string;
+  employeeCount?: number;
+  employeeRangeLabel?: string;
 }) {
   let resolvedCompanyId = opp.companyId;
   const cleanCompanyName = (opp.company || '').trim();
@@ -1906,15 +1909,22 @@ function syncContactAndCompanyFromOpportunity(opp: {
     );
     if (existingCompany) {
       resolvedCompanyId = existingCompany.id;
+      if (opp.employeeCount) {
+        (existingCompany as any).employeeCount = opp.employeeCount;
+        (existingCompany as any).employeeRangeLabel = opp.employeeRangeLabel;
+      }
     } else {
+      const empCount = opp.employeeCount || 5;
       const newCompany = {
         id: `cmp-${Date.now()}`,
         name: cleanCompanyName,
         industry: 'Tecnología & Operaciones',
         phone: opp.clientPhone || '',
         email: opp.clientEmail || '',
-        tier: 'pyme' as const,
-        notes: 'Empresa incorporada automáticamente desde el Pipeline CRM.',
+        tier: empCount >= 50 ? ('enterprise' as const) : empCount > 5 ? ('pyme' as const) : ('startup' as const),
+        employeeCount: empCount,
+        employeeRangeLabel: opp.employeeRangeLabel || `Hasta ${empCount} empleados`,
+        notes: `Empresa incorporada automáticamente desde ARN (${opp.employeeRangeLabel || `Dotación: ${empCount} empleados`}).`,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
@@ -4470,9 +4480,10 @@ app.post('/api/admin/test-email', requireAdminAuth, async (req, res) => {
 
 async function resolveArnCommandWithAi(
   rawInput: string,
-  contactChannel?: string
+  contactChannel?: string,
+  overrideEmployeeCount?: number
 ): Promise<ParsedArnCommand> {
-  const deterministic = parseNaturalArnCommand(rawInput, contactChannel);
+  const deterministic = parseNaturalArnCommand(rawInput, contactChannel, overrideEmployeeCount);
   if (!ai || !rawInput || rawInput.trim().length < 8) {
     return deterministic;
   }
@@ -4480,7 +4491,7 @@ async function resolveArnCommandWithAi(
   try {
     const response = await ai.models.generateContent({
       model: 'gemini-3.8-flash',
-      contents: `Extraé las entidades comerciales y técnicas de la siguiente nota o mensaje natural para el motor ARN de Gastón Barea.\nTexto: "${rawInput}"\nCanal adicional: "${contactChannel || ''}"`,
+      contents: `Extraé las entidades comerciales, dotación de empleados y técnicas de la siguiente nota o mensaje natural para el motor ARN de Gastón Barea.\nTexto: "${rawInput}"\nCanal adicional: "${contactChannel || ''}"\nCantidad de empleados indicada: "${overrideEmployeeCount || ''}"`,
       config: {
         responseMimeType: 'application/json',
         responseSchema: {
@@ -4490,6 +4501,10 @@ async function resolveArnCommandWithAi(
             clientEmail: { type: Type.STRING },
             companyName: { type: Type.STRING },
             phone: { type: Type.STRING },
+            employeeCount: {
+              type: Type.NUMBER,
+              description: 'Cantidad de empleados de la empresa (ej. 5, 10, 15, 25, 50)',
+            },
             serviceCategory: {
               type: Type.STRING,
               description:
@@ -4521,6 +4536,19 @@ async function resolveArnCommandWithAi(
       parsedJson.companyName && parsedJson.companyName.trim().length >= 2
         ? parsedJson.companyName.trim()
         : deterministic.companyName;
+    const resolvedCurrency = parsedJson.currency === 'ARS' ? 'ARS' : deterministic.currency;
+    const resolvedEmployeeCount =
+      overrideEmployeeCount && overrideEmployeeCount >= 1
+        ? overrideEmployeeCount
+        : typeof parsedJson.employeeCount === 'number' && parsedJson.employeeCount >= 1
+        ? parsedJson.employeeCount
+        : deterministic.employeeCount;
+
+    const tierPricing = calculateEmployeeTierPricing({
+      employeeCount: resolvedEmployeeCount,
+      serviceCategory: resolvedCategory,
+      currency: resolvedCurrency,
+    });
 
     return {
       ...deterministic,
@@ -4535,11 +4563,14 @@ async function resolveArnCommandWithAi(
       companyName: resolvedCompany,
       phone: parsedJson.phone || deterministic.phone,
       serviceCategory: resolvedCategory,
-      estimatedValue:
-        typeof parsedJson.estimatedValue === 'number' && parsedJson.estimatedValue >= 100
-          ? parsedJson.estimatedValue
-          : deterministic.estimatedValue,
-      currency: parsedJson.currency === 'ARS' ? 'ARS' : deterministic.currency,
+      employeeCount: tierPricing.employeeCount,
+      employeeRangeLabel: tierPricing.employeeRangeLabel,
+      baseImplementationCost: tierPricing.baseImplementationCost,
+      scaleIncrementCost: tierPricing.scaleIncrementCost,
+      monthlySupportFee: tierPricing.monthlySupportFee,
+      monthlySupportDetails: tierPricing.monthlySupportDetails,
+      estimatedValue: tierPricing.totalImplementationCost,
+      currency: resolvedCurrency,
       shouldGenerateQuote:
         typeof parsedJson.shouldGenerateQuote === 'boolean'
           ? parsedJson.shouldGenerateQuote
@@ -4561,12 +4592,16 @@ async function resolveArnCommandWithAi(
 
 // 13A. Admin Omnibar: Natural Language / Voice / WhatsApp Command Execution
 app.post('/api/arn/command', requireAdminAuth, async (req, res) => {
-  const { commandText } = req.body || {};
+  const { commandText, employeeCount } = req.body || {};
   if (!commandText || !String(commandText).trim()) {
     return res.status(400).json({ error: 'Ingresá o dictá una instrucción en lenguaje natural.' });
   }
 
-  const parsed = await resolveArnCommandWithAi(String(commandText));
+  const parsed = await resolveArnCommandWithAi(
+    String(commandText),
+    undefined,
+    employeeCount ? Number(employeeCount) : undefined
+  );
   const actionsExecuted: string[] = [];
 
   // 1. Upsert Company & Contact in ARN Directory
@@ -4576,9 +4611,11 @@ app.post('/api/arn/command', requireAdminAuth, async (req, res) => {
     clientPhone: parsed.phone,
     company: parsed.companyName,
     stage: parsed.shouldActivateKickoff ? 'won' : 'contacted',
+    employeeCount: parsed.employeeCount,
+    employeeRangeLabel: parsed.employeeRangeLabel,
   });
   actionsExecuted.push(
-    `Nodo de Relación sincronizado: ${parsed.clientName} (${parsed.companyName}) · Portal habilitado (${parsed.clientEmail})`
+    `Nodo de Relación sincronizado: ${parsed.clientName} (${parsed.companyName} · ${parsed.employeeRangeLabel}) · Portal habilitado (${parsed.clientEmail})`
   );
 
   // 2. Create or update Opportunity
@@ -4609,8 +4646,13 @@ app.post('/api/arn/command', requireAdminAuth, async (req, res) => {
     stage: targetStage as any,
     value: parsed.estimatedValue,
     currency: parsed.currency,
+    employeeCount: parsed.employeeCount,
+    employeeRangeLabel: parsed.employeeRangeLabel,
+    baseImplementationCost: parsed.baseImplementationCost,
+    scaleIncrementCost: parsed.scaleIncrementCost,
+    monthlySupportFee: parsed.monthlySupportFee,
     probability: targetStage === 'won' ? 100 : targetStage === 'proposal_sent' ? 75 : 55,
-    notes: `[Comando ARN]: ${parsed.extractedNotes}`,
+    notes: `[Comando ARN · ${parsed.employeeRangeLabel}]: ${parsed.extractedNotes}`,
     source: 'manual' as const,
     createdAt: existingOpp?.createdAt || new Date().toISOString(),
     updatedAt: new Date().toISOString(),
@@ -4622,11 +4664,12 @@ app.post('/api/arn/command', requireAdminAuth, async (req, res) => {
     cachedOpportunities.unshift(oppPayload);
   }
   actionsExecuted.push(
-    `Oportunidad ARN "${oppPayload.title}" (${oppPayload.currency} $${oppPayload.value.toLocaleString()}) en etapa ${oppPayload.stage.toUpperCase()}`
+    `Oportunidad ARN "${oppPayload.title}" (${oppPayload.currency} $${oppPayload.value.toLocaleString()} + Abono Mensual $${parsed.monthlySupportFee.toLocaleString()}/mes) en etapa ${oppPayload.stage.toUpperCase()}`
   );
 
   // 3. Auto-generate 40/40/20 Quote if requested
   let createdQuote: any = null;
+  let emailResult: any = null;
   if (parsed.shouldGenerateQuote || parsed.shouldActivateKickoff) {
     createdQuote = buildAutonomous404020Quote({
       opportunityId: oppId,
@@ -4637,6 +4680,7 @@ app.post('/api/arn/command', requireAdminAuth, async (req, res) => {
       title: parsed.summaryTitle,
       totalAmount: parsed.estimatedValue,
       currency: parsed.currency,
+      employeeCount: parsed.employeeCount,
       notes: parsed.extractedNotes,
     });
     if (parsed.shouldActivateKickoff) {
@@ -4647,15 +4691,13 @@ app.post('/api/arn/command', requireAdminAuth, async (req, res) => {
       o.id === oppId ? { ...o, linkedQuoteId: createdQuote.quoteNumber } : o
     );
     actionsExecuted.push(
-      `Cotización 40/40/20 ${createdQuote.quoteNumber} generada automáticamente (${createdQuote.currency} $${createdQuote.total.toLocaleString()})`
+      `Cotización 40/40/20 ${createdQuote.quoteNumber} generada automáticamente (${createdQuote.currency} $${createdQuote.total.toLocaleString()} + Soporte Mensual $${createdQuote.monthlySupportFee.toLocaleString()}/mes)`
     );
 
-    if (parsed.clientEmail && !parsed.clientEmail.endsWith('@portal-arn.com')) {
-      sendOfficialQuoteEmail({
-        quote: createdQuote,
-        paymentConfig: cachedPaymentConfig,
-      }).catch(() => {});
-    }
+    emailResult = await sendOfficialQuoteEmail({
+      quote: createdQuote,
+      paymentConfig: cachedPaymentConfig,
+    }).catch((err) => ({ success: false, error: err?.message }));
   }
 
   // 4. Auto-provision 40/40/20 Kickoff Project if requested
@@ -4714,6 +4756,7 @@ app.post('/api/arn/command', requireAdminAuth, async (req, res) => {
     opportunity: oppPayload,
     quote: createdQuote,
     project: kickoffProject,
+    emailResult,
     arnNodes,
     data: {
       opportunities: cachedOpportunities,
@@ -4736,6 +4779,7 @@ app.post('/api/arn/autopilot', requireAdminAuth, async (req, res) => {
   const actionsExecuted: string[] = [];
   let createdQuote: any = null;
   let kickoffProject: any = null;
+  let emailResult: any = null;
 
   if (actionType === 'auto_quote_40_40_20') {
     createdQuote = buildAutonomous404020Quote({
@@ -4745,8 +4789,9 @@ app.post('/api/arn/autopilot', requireAdminAuth, async (req, res) => {
       companyName: opp.company,
       serviceCategory: opp.serviceCategory,
       title: opp.title,
-      totalAmount: opp.value || 4200,
+      totalAmount: opp.value,
       currency: opp.currency || 'USD',
+      employeeCount: (opp as any).employeeCount || 5,
       notes: opp.notes,
     });
     cachedQuotes.unshift(createdQuote);
@@ -4759,12 +4804,10 @@ app.post('/api/arn/autopilot', requireAdminAuth, async (req, res) => {
       `Propuesta 40/40/20 (${createdQuote.quoteNumber}) emitida y publicada automáticamente en el Portal del cliente.`
     );
 
-    if (opp.clientEmail && !opp.clientEmail.endsWith('@portal-arn.com')) {
-      sendOfficialQuoteEmail({
-        quote: createdQuote,
-        paymentConfig: cachedPaymentConfig,
-      }).catch(() => {});
-    }
+    emailResult = await sendOfficialQuoteEmail({
+      quote: createdQuote,
+      paymentConfig: cachedPaymentConfig,
+    }).catch((err) => ({ success: false, error: err?.message }));
   } else if (actionType === 'auto_kickoff_project') {
     let targetQuote = cachedQuotes.find(
       (q) =>
@@ -4780,8 +4823,9 @@ app.post('/api/arn/autopilot', requireAdminAuth, async (req, res) => {
         companyName: opp.company,
         serviceCategory: opp.serviceCategory,
         title: opp.title,
-        totalAmount: opp.value || 4200,
+        totalAmount: opp.value,
         currency: opp.currency || 'USD',
+        employeeCount: (opp as any).employeeCount || 5,
       });
       cachedQuotes.unshift(targetQuote);
     }
@@ -4819,6 +4863,7 @@ app.post('/api/arn/autopilot', requireAdminAuth, async (req, res) => {
     opportunity: opp,
     quote: createdQuote,
     project: kickoffProject,
+    emailResult,
     data: {
       opportunities: cachedOpportunities,
       companies: cachedCrmCompanies,
@@ -4831,7 +4876,7 @@ app.post('/api/arn/autopilot', requireAdminAuth, async (req, res) => {
 
 // 13C. Client Zero-Form Conversational Intake (/api/arn/intake)
 app.post('/api/arn/intake', async (req, res) => {
-  const { message, contactChannel } = req.body || {};
+  const { message, contactChannel, employeeCount } = req.body || {};
   if (!message && !contactChannel) {
     return res
       .status(400)
@@ -4840,7 +4885,8 @@ app.post('/api/arn/intake', async (req, res) => {
 
   const parsed = await resolveArnCommandWithAi(
     String(message || 'Evaluación de arquitectura y propuesta 40/40/20'),
-    String(contactChannel || '')
+    String(contactChannel || ''),
+    employeeCount ? Number(employeeCount) : undefined
   );
 
   // 1. Auto-create/update Company & Contact with active Portal credentials
@@ -4850,6 +4896,8 @@ app.post('/api/arn/intake', async (req, res) => {
     clientPhone: parsed.phone,
     company: parsed.companyName,
     stage: 'proposal_sent',
+    employeeCount: parsed.employeeCount,
+    employeeRangeLabel: parsed.employeeRangeLabel,
   });
 
   // 2. Create Opportunity in ARN Pipeline
@@ -4867,8 +4915,13 @@ app.post('/api/arn/intake', async (req, res) => {
     stage: 'proposal_sent' as const,
     value: parsed.estimatedValue,
     currency: parsed.currency,
+    employeeCount: parsed.employeeCount,
+    employeeRangeLabel: parsed.employeeRangeLabel,
+    baseImplementationCost: parsed.baseImplementationCost,
+    scaleIncrementCost: parsed.scaleIncrementCost,
+    monthlySupportFee: parsed.monthlySupportFee,
     probability: 70,
-    notes: `[Auto-Perfilado ARN sin formularios]: ${parsed.extractedNotes}`,
+    notes: `[Auto-Perfilado ARN · ${parsed.employeeRangeLabel}]: ${parsed.extractedNotes}`,
     source: 'portal_registration' as const,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
@@ -4884,6 +4937,7 @@ app.post('/api/arn/intake', async (req, res) => {
     title: parsed.summaryTitle,
     totalAmount: parsed.estimatedValue,
     currency: parsed.currency,
+    employeeCount: parsed.employeeCount,
     notes: parsed.extractedNotes,
   });
 
@@ -4912,17 +4966,16 @@ app.post('/api/arn/intake', async (req, res) => {
     expiresAt: Date.now() + 1000 * 60 * 60 * 24 * 7,
   });
 
-  // 5. Notify Gastón at notificaciones@gastonbarea.com
-  sendContactAutomation({
-    name: parsed.clientName,
-    email: parsed.clientEmail,
-    serviceArea: parsed.summaryTitle,
-    requirements: `[INGRESO AUTÓNOMO ARN CERO-FORMULARIOS]\nEmpresa detectada: ${parsed.companyName}\nWhatsApp/Tel: ${
-      parsed.phone || 'No especificado'
-    }\nPropuesta 40/40/20 auto-emitida: ${autoQuote.quoteNumber} (${
-      autoQuote.currency
-    } $${autoQuote.total.toLocaleString()})\nMensaje original: ${parsed.extractedNotes}`,
-  }).catch(() => {});
+  // 5. AWAIT Transactional Quote Email to Client + Gastón (notificaciones@gastonbarea.com)
+  // Crucial for Vercel Serverless so the container does not freeze before Resend HTTP completes
+  const emailResult = await sendOfficialQuoteEmail({
+    quote: autoQuote,
+    paymentConfig: cachedPaymentConfig,
+    customSubject: `📄 Presupuesto 40/40/20 #${autoQuote.quoteNumber} (${parsed.employeeRangeLabel}) · ${autoQuote.title}`,
+  }).catch((err) => ({
+    success: false,
+    error: err?.message || 'Error al despachar presupuesto por correo.',
+  }));
 
   return res.json({
     success: true,
@@ -4931,7 +4984,40 @@ app.post('/api/arn/intake', async (req, res) => {
     opportunity: newOpp,
     quote: autoQuote,
     parsed,
-    message: `¡Bienvenido/a ${parsed.clientName}! Perfilamos tu nodo ARN para ${parsed.companyName} y generamos tu propuesta 40/40/20 (${autoQuote.quoteNumber}) sin formularios.`,
+    emailResult,
+    message: `¡Bienvenido/a ${parsed.clientName}! Perfilamos tu nodo ARN para ${parsed.companyName} (${parsed.employeeRangeLabel}) y enviamos tu presupuesto 40/40/20 (${autoQuote.quoteNumber}) + Soporte Mensual a ${parsed.clientEmail}.`,
+  });
+});
+
+// 13D. Resend / Forward ARN Quote to a specific email address
+app.post('/api/arn/resend-quote-email', async (req, res) => {
+  const { quote, targetEmail } = req.body || {};
+  if (!quote || !targetEmail || !/\S+@\S+\.\S+/.test(String(targetEmail).trim())) {
+    return res.status(400).json({
+      success: false,
+      error: 'Ingresá un correo electrónico válido para enviar la copia del presupuesto.',
+    });
+  }
+
+  const cleanTargetEmail = String(targetEmail).trim().toLowerCase();
+  const updatedQuote = {
+    ...quote,
+    clientEmail: cleanTargetEmail,
+  };
+
+  const emailResult = await sendOfficialQuoteEmail({
+    quote: updatedQuote,
+    paymentConfig: cachedPaymentConfig,
+    customSubject: `📄 Presupuesto 40/40/20 #${updatedQuote.quoteNumber} (${updatedQuote.employeeRangeLabel || 'Dotación Base'}) · ${updatedQuote.title}`,
+  }).catch((err) => ({
+    success: false,
+    error: err?.message || 'Error al reenviar el presupuesto por correo.',
+  }));
+
+  return res.json({
+    success: emailResult.success,
+    targetEmail: cleanTargetEmail,
+    emailResult,
   });
 });
 
