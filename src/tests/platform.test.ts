@@ -14,7 +14,7 @@ import {
   buildAiStudyDossierHtml,
 } from '../lib/domainLogic.ts';
 import { PROJECTS_CATALOG } from '../data/projectsData.ts';
-import { SITE_CONFIG } from '../data/siteConfig.ts';
+import { SITE_CONFIG, DEFAULT_BOOKING_AVAILABILITY } from '../data/siteConfig.ts';
 import { INITIAL_BLOG_POSTS } from '../data/blogData.ts';
 import {
   INITIAL_CRM_COMPANIES,
@@ -31,6 +31,7 @@ import {
 } from '../services/whatsappAutomation.ts';
 import {
   buildGoogleCalendarInviteUrl,
+  buildBookingIcsInvite,
   getBookingTypeLabel,
 } from '../services/emailAutomation.ts';
 
@@ -347,6 +348,32 @@ describe('8. Integración WhatsApp Business API & Automatizaciones CRM (whatsapp
     assert.ok(calUrl.startsWith('https://calendar.google.com/calendar/render?action=TEMPLATE'));
     assert.ok(calUrl.includes('dates=20261112T180000Z/20261112T184500Z'));
     assert.ok(calUrl.includes(encodeURIComponent('https://meet.google.com/gastonbarea-consultoria')));
+  });
+
+  it('debe usar notificaciones@gastonbarea.com y generar invitación nativa .ics (RFC 5545) adjuntable por Resend', () => {
+    assert.equal(SITE_CONFIG.email, 'notificaciones@gastonbarea.com');
+    assert.equal(DEFAULT_BOOKING_AVAILABILITY.notificationEmail, 'notificaciones@gastonbarea.com');
+    assert.ok(DEFAULT_BOOKING_AVAILABILITY.slots.filter((s) => s.enabled).length >= 4);
+
+    const ics = buildBookingIcsInvite({
+      bookingId: 'book-test-2026',
+      clientName: 'Gastón Prueba',
+      clientEmail: 'xpatagonia.com@gmail.com',
+      company: 'XGaston',
+      type: 'discovery_ia',
+      date: '2026-11-12',
+      timeSlot: '15:00 - 15:45 (GMT-3)',
+      meetingUrl: 'https://meet.google.com/gastonbarea-consultoria',
+      agendaTopic: 'Evaluar estudio preliminar IA',
+    });
+
+    assert.ok(ics.includes('BEGIN:VCALENDAR'));
+    assert.ok(ics.includes('METHOD:REQUEST'));
+    assert.ok(ics.includes('ORGANIZER;CN="Gastón Barea":mailto:notificaciones@gastonbarea.com'));
+    assert.ok(ics.includes('mailto:xpatagonia.com@gmail.com'));
+    assert.ok(ics.includes('DTSTART:20261112T180000Z'));
+    assert.ok(ics.includes('DTEND:20261112T184500Z'));
+    assert.ok(ics.includes('END:VCALENDAR'));
   });
 });
 

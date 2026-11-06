@@ -471,31 +471,48 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
                     2. Horario (GMT-3 Argentina)
                   </label>
                   <div className="grid grid-cols-2 gap-1.5">
-                    {[
-                      { label: '10:00 hs', value: '10:00 - 10:45 (GMT-3)' },
-                      { label: '11:30 hs', value: '11:30 - 12:15 (GMT-3)' },
-                      { label: '15:00 hs', value: '15:00 - 15:45 (GMT-3)' },
-                      { label: '17:00 hs', value: '17:00 - 17:45 (GMT-3)' },
-                    ].map((slot) => {
-                      const active = bookingSlot === slot.value;
-                      return (
-                        <button
-                          key={slot.value}
-                          type="button"
-                          onClick={() => setBookingSlot(slot.value)}
-                          className={`p-2 border text-center font-mono text-xs transition-all cursor-pointer ${
-                            active
-                              ? 'bg-[#291B64] text-white border-[#291B64] font-bold'
-                              : 'bg-white text-[#1D1D1F] border-black/15 hover:border-[#291B64]'
-                          }`}
-                        >
-                          {slot.label}
-                        </button>
-                      );
-                    })}
+                    {(availabilityConfig.slots || DEFAULT_BOOKING_AVAILABILITY.slots)
+                      .filter((s) => s.enabled)
+                      .map((slot) => {
+                        const isOccupied = (occupiedSlotsByDate[bookingDate] || []).includes(
+                          slot.value
+                        );
+                        const active = bookingSlot === slot.value && !isOccupied;
+                        return (
+                          <button
+                            key={slot.value}
+                            type="button"
+                            disabled={isOccupied}
+                            onClick={() => {
+                              setBookingSlot(slot.value);
+                              setBookingConflictMsg('');
+                            }}
+                            className={`p-2 border text-center font-mono text-xs transition-all ${
+                              isOccupied
+                                ? 'bg-slate-100 text-slate-400 border-slate-200 line-through cursor-not-allowed'
+                                : active
+                                ? 'bg-[#291B64] text-white border-[#291B64] font-bold cursor-pointer'
+                                : 'bg-white text-[#1D1D1F] border-black/15 hover:border-[#291B64] cursor-pointer'
+                            }`}
+                          >
+                            <div>{slot.label}</div>
+                            {isOccupied && (
+                              <span className="block text-[9px] text-rose-600 font-bold no-underline uppercase">
+                                Ocupado
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })}
                   </div>
                 </div>
               </div>
+
+              {bookingConflictMsg && (
+                <div className="p-3 bg-rose-50 border border-rose-200 text-rose-800 text-xs font-medium">
+                  {bookingConflictMsg}
+                </div>
+              )}
 
               {/* Step 2: Contact Info to receive the automated Google Meet link */}
               <div className="space-y-3">

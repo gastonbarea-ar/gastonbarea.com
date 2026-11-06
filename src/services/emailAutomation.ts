@@ -29,7 +29,7 @@ function resolveEmailConfig() {
   const backupNotificationEmail =
     process.env.BACKUP_NOTIFICATION_EMAIL?.trim() ||
     SITE_CONFIG.email ||
-    'gastonbarea.com@gmail.com';
+    'notificaciones@gastonbarea.com';
 
   return {
     activeApiKey,
@@ -92,6 +92,11 @@ interface OutboundEmailMessage {
   subject: string;
   html: string;
   replyTo?: string;
+  attachments?: Array<{
+    filename: string;
+    content: string;
+    content_type?: string;
+  }>;
 }
 
 /**
@@ -110,19 +115,24 @@ async function dispatchTransactionalEmail(message: OutboundEmailMessage) {
   }
 
   if (cfg.provider === 'resend.com') {
+    const payload: Record<string, any> = {
+      from: `${cfg.fromName} <${cfg.fromEmail}>`,
+      to: uniqueEmails,
+      reply_to: message.replyTo || cfg.notificationEmail,
+      subject: message.subject,
+      html: message.html,
+    };
+    if (message.attachments && message.attachments.length > 0) {
+      payload.attachments = message.attachments;
+    }
+
     const response = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${cfg.activeApiKey}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        from: `${cfg.fromName} <${cfg.fromEmail}>`,
-        to: uniqueEmails,
-        reply_to: message.replyTo || cfg.notificationEmail,
-        subject: message.subject,
-        html: message.html,
-      }),
+      body: JSON.stringify(payload),
     });
 
     if (!response.ok) {
@@ -1024,6 +1034,103 @@ export function buildGoogleCalendarInviteUrl(params: {
   )}`;
 }
 
+export function buildBookingIcsInvite(params: {
+  bookingId: string;
+  clientName: string;
+  clientEmail: string;
+  company?: string;
+  type?: string;
+  date: string;
+  timeSlot: string;
+  meetingUrl: string;
+  agendaTopic?: string;
+  organizerEmail?: string;
+}): string {
+  const {
+    bookingId,
+    clientName,
+    clientEmail,
+    company,
+    type,
+    date,
+    timeSlot,
+    meetingUrl,
+    agendaTopic,
+    organizerEmail = 'notificaciones@gastonbarea.com',
+  } = params;
+
+  const sessionLabel = getBookingTypeLabel(type);
+  const summary = `Google Meet Pro · Gastón Barea + ${clientName}${
+    company && company !== 'Empresa' && company !== 'Contacto Individual' ? ` (${company})` : ''
+  }`;
+
+  const cleanDate = (date || new Date().toISOString().split('T')[0]).replace(/-/g, '');
+  const timeMatches = (timeSlot || '15:00 - 15:45').match(/(\d{1,2}):(\d{2})/g);
+
+  const parseToUtcStr = (hhmm: string, addMinutesFallback = 0) => {
+    const [hh, mm] = hhmm.split(':').map(Number);
+    const y = Number(cleanDate.slice(0, 4)) || 2026;
+    const m = (Number(cleanDate.slice(4, 6)) || 1) - 1;
+    const d = Number(cleanDate.slice(6, 8)) || 1;
+    // Argentina GMT-3 -> UTC is +3 hours
+    const utcDate = new Date(Date.UTC(y, m, d, hh + 3, mm + addMinutesFallback, 0));
+    return utcDate.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
+  };
+
+  const dtStart =
+    timeMatches && timeMatches.length >= 1
+      ? parseToUtcStr(timeMatches[0], 0)
+      : parseToUtcStr('15:00', 0);
+  const dtEnd =
+    timeMatches && timeMatches.length >= 2
+      ? parseToUtcStr(timeMatches[1], 0)
+      : parseToUtcStr(timeMatches?.[0] || '15:00', 45);
+  const dtStamp = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
+
+  const escapeIcsText = (str: string) =>
+    (str || '')
+      .replace(/\\/g, '\\\\')
+      .replace(/;/g, '\\;')
+      .replace(/,/g, '\\,')
+      .replace(/\r?\n/g, '\\n');
+
+  const descriptionText = [
+    `Sesión 1-on-1 confirmada con Gastón Barea (${sessionLabel}).`,
+    `Sala Google Meet Pro: ${meetingUrl}`,
+    `Horario (Argentina GMT-3): ${date} · ${timeSlot}`,
+    agendaTopic ? `Tema Principal: ${agendaTopic}` : '',
+    `Portal de Clientes: https://www.gastonbarea.com/#portal`,
+    `Contacto oficial: ${organizerEmail}`,
+  ]
+    .filter(Boolean)
+    .join('\n');
+
+  return [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//Gaston Barea//Portal Clientes & Agenda Google Meet//ES',
+    'CALSCALE:GREGORIAN',
+    'METHOD:REQUEST',
+    'BEGIN:VEVENT',
+    `UID:${bookingId}@gastonbarea.com`,
+    `DTSTAMP:${dtStamp}`,
+    `DTSTART:${dtStart}`,
+    `DTEND:${dtEnd}`,
+    `SUMMARY:${escapeIcsText(summary)}`,
+    `DESCRIPTION:${escapeIcsText(descriptionText)}`,
+    `LOCATION:${escapeIcsText(meetingUrl)}`,
+    `ORGANIZER;CN="Gastón Barea":mailto:${organizerEmail}`,
+    `ATTENDEE;CUTYPE=INDIVIDUAL;ROLE=REQ-PARTICIPANT;PARTSTAT=NEEDS-ACTION;RSVP=TRUE;CN="${escapeIcsText(
+      clientName
+    )}":mailto:${clientEmail}`,
+    `ATTENDEE;CUTYPE=INDIVIDUAL;ROLE=REQ-PARTICIPANT;PARTSTAT=ACCEPTED;CN="Gastón Barea":mailto:${organizerEmail}`,
+    'STATUS:CONFIRMED',
+    'SEQUENCE:0',
+    'END:VEVENT',
+    'END:VCALENDAR',
+  ].join('\r\n');
+}
+
 export async function sendBookingConfirmationEmail(params: {
   bookingId: string;
   clientName: string;
@@ -1037,7 +1144,7 @@ export async function sendBookingConfirmationEmail(params: {
   googleCalendarUrl: string;
   agendaTopic?: string;
 }) {
-  const cfg = getEmailConfig();
+  const cfg = resolveEmailConfig();
   const {
     bookingId,
     clientName,
@@ -1056,7 +1163,26 @@ export async function sendBookingConfirmationEmail(params: {
   const whatsappConfirmText = `Hola Gastón, acabo de agendar nuestra sesión "${sessionLabel}" para el día ${date} en el horario ${timeSlot}. Tema: ${agendaTopic || 'Diagnóstico y seguimiento'}.`;
   const whatsappUrl = `https://wa.me/5492804697193?text=${encodeURIComponent(whatsappConfirmText)}`;
 
-  if (!cfg.isConfigured) {
+  const icsContent = buildBookingIcsInvite({
+    bookingId,
+    clientName,
+    clientEmail,
+    company,
+    type,
+    date,
+    timeSlot,
+    meetingUrl,
+    agendaTopic,
+    organizerEmail: cfg.notificationEmail,
+  });
+
+  const icsAttachment = {
+    filename: 'invitacion-meet-gastonbarea.ics',
+    content: Buffer.from(icsContent, 'utf-8').toString('base64'),
+    content_type: 'text/calendar; charset=utf-8; method=REQUEST',
+  };
+
+  if (!cfg.configured) {
     console.log(
       '[Email Automation - Booking Confirmation Dry Run]:',
       clientEmail,
@@ -1068,6 +1194,7 @@ export async function sendBookingConfirmationEmail(params: {
       success: true,
       configured: false,
       provider: cfg.provider,
+      icsGenerated: true,
       message: 'Modo simulación activo.',
     };
   }
@@ -1086,7 +1213,7 @@ export async function sendBookingConfirmationEmail(params: {
             ${sessionLabel}
           </h1>
           <div style="font-family:monospace;font-size:12px;color:#94a3b8;">
-            ID Reserva: <strong style="color:#ffffff;">${bookingId}</strong> · Estado: <strong style="color:#34d399;">Confirmada</strong>
+            ID Reserva: <strong style="color:#ffffff;">${bookingId}</strong> · Estado: <strong style="color:#34d399;">Confirmada (Archivo .ICS adjunto)</strong>
           </div>
         </td>
       </tr>
@@ -1125,16 +1252,17 @@ export async function sendBookingConfirmationEmail(params: {
 
           <div style="background:#0f172a;color:#ffffff;border-radius:10px;padding:16px 18px;margin-top:20px;">
             <div style="font-family:monospace;font-size:11px;color:#34d399;font-weight:700;text-transform:uppercase;">
-              SINCRONIZADO EN TU PORTAL DE CLIENTES
+              INVITACIÓN DE CALENDARIO (.ICS) ADJUNTA & PORTAL DE CLIENTES
             </div>
             <p style="font-size:12px;color:#cbd5e1;line-height:1.5;margin:6px 0 0 0;">
-              Podés consultar tus reuniones, subir consultas previas o descargar propuestas desde <a href="https://www.gastonbarea.com/#portal" style="color:#34d399;">https://www.gastonbarea.com/#portal</a>.
+              Este correo incluye la invitación de calendario estándar (<strong>.ics</strong>) para agregarla en 1 clic a tu agenda y ya está sincronizada en <a href="https://www.gastonbarea.com/#portal" style="color:#34d399;">https://www.gastonbarea.com/#portal</a>. Cualquier consulta podés responder directamente a <strong>${cfg.notificationEmail}</strong>.
             </p>
           </div>
 
           <p style="font-size:12px;color:#64748b;margin-top:22px;margin-bottom:0;">
             ¡Nos vemos en la sesión!<br/>
-            <strong>Gastón Barea</strong> · Consultor y Desarrollador de Proyectos de Base Tecnológica & Bioeconomía
+            <strong>Gastón Barea</strong> · Consultor y Desarrollador de Proyectos de Base Tecnológica & Bioeconomía<br/>
+            <span style="font-family:monospace;">${cfg.notificationEmail}</span>
           </p>
         </td>
       </tr>
@@ -1156,12 +1284,14 @@ export async function sendBookingConfirmationEmail(params: {
         replyTo: cfg.notificationEmail,
         subject: `📅 Confirmación Google Meet: ${sessionLabel} (${date} · ${timeSlot})`,
         html,
+        attachments: [icsAttachment],
       }),
       dispatchTransactionalEmail({
         to: internalRecipients,
         replyTo: clientEmail,
         subject: `[NUEVA REUNIÓN AGENDADA] ${clientName} (${company || 'Particular'}) · ${date} ${timeSlot}${phone ? ` · Tel: ${phone}` : ''}`,
         html,
+        attachments: [icsAttachment],
       }),
     ]);
 
@@ -1169,6 +1299,7 @@ export async function sendBookingConfirmationEmail(params: {
       success: clientRes.status === 'fulfilled' || internalRes.status === 'fulfilled',
       configured: true,
       provider: cfg.provider,
+      icsGenerated: true,
     };
   } catch (err: any) {
     console.error('[sendBookingConfirmationEmail Error]:', err);

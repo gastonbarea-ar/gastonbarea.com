@@ -53,6 +53,11 @@ import {
   INITIAL_CRM_OPPORTUNITIES,
   INITIAL_CRM_QUOTES,
 } from '../../data/crmTemplates';
+import {
+  DEFAULT_BOOKING_AVAILABILITY,
+  BookingAvailabilityConfig,
+  SITE_CONFIG,
+} from '../../data/siteConfig';
 
 interface ClientPortalModalProps {
   isOpen?: boolean;
@@ -161,6 +166,11 @@ export const ClientPortalModal: React.FC<ClientPortalModalProps> = ({ isOpen = t
   );
   const [bookingPhone, setBookingPhone] = useState<string>('');
   const [isSubmittingBooking, setIsSubmittingBooking] = useState<boolean>(false);
+  const [availabilityConfig, setAvailabilityConfig] = useState<BookingAvailabilityConfig>(
+    DEFAULT_BOOKING_AVAILABILITY
+  );
+  const [occupiedSlotsByDate, setOccupiedSlotsByDate] = useState<Record<string, string[]>>({});
+  const [bookingConflictMsg, setBookingConflictMsg] = useState<string>('');
   const [lastBookingConfirmation, setLastBookingConfirmation] = useState<{
     booking: ConsultingBooking;
     emailSent: boolean;
@@ -171,13 +181,38 @@ export const ClientPortalModal: React.FC<ClientPortalModalProps> = ({ isOpen = t
   // Milestone payment detail modal
   const [selectedMilestoneForPayment, setSelectedMilestoneForPayment] = useState<ProjectMilestoneItem | null>(null);
 
-  // Check existing session
+  // Check existing session and load booking availability
   useEffect(() => {
     if (!isOpen) return;
+    fetch('/api/bookings/availability')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (data?.success) {
+          if (data.config) setAvailabilityConfig(data.config);
+          if (data.occupiedSlotsByDate) setOccupiedSlotsByDate(data.occupiedSlotsByDate);
+        }
+      })
+      .catch(() => {
+        // Fallback to default availability
+      });
     if (token) {
       verifyActiveSession();
     }
   }, [isOpen, token]);
+
+  // Auto-select first available slot if current slot is occupied on selected date
+  useEffect(() => {
+    const occupiedOnDate = occupiedSlotsByDate[bookingDate] || [];
+    const enabledSlots = (availabilityConfig.slots || DEFAULT_BOOKING_AVAILABILITY.slots).filter(
+      (s) => s.enabled
+    );
+    if (occupiedOnDate.includes(bookingSlot) || !enabledSlots.some((s) => s.value === bookingSlot)) {
+      const firstFree = enabledSlots.find((s) => !occupiedOnDate.includes(s.value));
+      if (firstFree) {
+        setBookingSlot(firstFree.value);
+      }
+    }
+  }, [bookingDate, occupiedSlotsByDate, availabilityConfig]);
 
   const verifyActiveSession = async () => {
     try {
@@ -804,16 +839,21 @@ export const ClientPortalModal: React.FC<ClientPortalModalProps> = ({ isOpen = t
       'Nov',
       'Dic',
     ];
+    const enabledWeekdays =
+      availabilityConfig.enabledWeekdays?.length > 0
+        ? availabilityConfig.enabledWeekdays
+        : [1, 2, 3, 4, 5];
+    const blockedSet = new Set(availabilityConfig.blockedDates || []);
     const cursor = new Date();
     let added = 0;
     let offset = 0;
-    while (added < 5 && offset < 14) {
+    while (added < 5 && offset < 21) {
       offset++;
       const d = new Date(cursor);
       d.setDate(cursor.getDate() + offset);
       const dow = d.getDay();
-      if (dow !== 0 && dow !== 6) {
-        const iso = d.toISOString().split('T')[0];
+      const iso = d.toISOString().split('T')[0];
+      if (enabledWeekdays.includes(dow) && !blockedSet.has(iso)) {
         const dayName = offset === 1 ? 'Mañana' : weekdayNames[dow];
         const shortLabel = `${d.getDate()} ${monthNames[d.getMonth()]}`;
         days.push({ iso, shortLabel, dayName });
@@ -851,7 +891,7 @@ export const ClientPortalModal: React.FC<ClientPortalModalProps> = ({ isOpen = t
       `Google Meet Pro · Gastón Barea (${getFriendlyBookingTypeTitle(b.type)})`
     );
     const details = encodeURIComponent(
-      `Videollamada 1-on-1 con Gastón Barea.\nSala Google Meet: ${b.meetingUrl}\nHorario: ${b.date} · ${b.timeSlot}\nTema: ${
+      `Videollamada 1-on-1 con Gastón Barea.\nSala Google Meet: ${b.meetingUrl}\nOrganizador: ${SITE_CONFIG.email}\nHorario: ${b.date} · ${b.timeSlot}\nTema: ${
         b.agendaTopic || 'Diagnóstico y seguimiento'
       }`
     );
@@ -864,6 +904,7 @@ export const ClientPortalModal: React.FC<ClientPortalModalProps> = ({ isOpen = t
   const handleCreateBooking = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmittingBooking(true);
+    setBookingConflictMsg('');
 
     const activeClientEmail = clientSession?.email || emailInput || 'cliente@empresa.com';
     const activeClientName = clientSession?.name || 'Cliente';
@@ -880,7 +921,8 @@ export const ClientPortalModal: React.FC<ClientPortalModalProps> = ({ isOpen = t
       type: bookingType,
       date: bookingDate,
       timeSlot: bookingSlot,
-      meetingUrl: 'https://meet.google.com/gastonbarea-consultoria',
+      meetingUrl:
+        availabilityConfig.googleMeetUrl || 'https://meet.google.com/gastonbarea-consultoria',
       agendaTopic: resolvedTopic,
       status: 'confirmed',
       createdAt: new Date().toISOString(),
@@ -913,14 +955,22 @@ export const ClientPortalModal: React.FC<ClientPortalModalProps> = ({ isOpen = t
           phone: bookingPhone.trim() || undefined,
         }),
       });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.success && data.booking) {
-          newBooking = data.booking;
-          emailSent = Boolean(data.emailSent);
-          if (data.googleCalendarUrl) googleCalendarUrl = data.googleCalendarUrl;
-          if (data.whatsappConfirmUrl) whatsappConfirmUrl = data.whatsappConfirmUrl;
-        }
+      const data = await res.json();
+      if (res.status === 409) {
+        if (data.occupiedSlotsByDate) setOccupiedSlotsByDate(data.occupiedSlotsByDate);
+        setBookingConflictMsg(
+          data.error ||
+            'Ese horario acaba de ser reservado. Por favor elegí otra franja horaria disponible.'
+        );
+        setIsSubmittingBooking(false);
+        return;
+      }
+      if (res.ok && data.success && data.booking) {
+        if (data.occupiedSlotsByDate) setOccupiedSlotsByDate(data.occupiedSlotsByDate);
+        newBooking = data.booking;
+        emailSent = Boolean(data.emailSent);
+        if (data.googleCalendarUrl) googleCalendarUrl = data.googleCalendarUrl;
+        if (data.whatsappConfirmUrl) whatsappConfirmUrl = data.whatsappConfirmUrl;
       }
     } catch (err) {
       console.warn('Network issue creating booking, saving locally:', err);
@@ -2837,38 +2887,58 @@ export const ClientPortalModal: React.FC<ClientPortalModalProps> = ({ isOpen = t
                               Horario (Hora Argentina GMT-3)
                             </label>
                             <div className="grid grid-cols-2 gap-2">
-                              {[
-                                { label: '10:00 hs', value: '10:00 - 10:45 (GMT-3)', tag: 'Mañana' },
-                                { label: '11:30 hs', value: '11:30 - 12:15 (GMT-3)', tag: 'Mediodía' },
-                                { label: '15:00 hs', value: '15:00 - 15:45 (GMT-3)', tag: 'Tarde' },
-                                { label: '17:00 hs', value: '17:00 - 17:45 (GMT-3)', tag: 'Tarde' },
-                              ].map((slot) => {
-                                const active = bookingSlot === slot.value;
-                                return (
-                                  <button
-                                    key={slot.value}
-                                    type="button"
-                                    onClick={() => setBookingSlot(slot.value)}
-                                    className={`p-2.5 border text-left transition-all cursor-pointer flex items-center justify-between ${
-                                      active
-                                        ? 'bg-[#291B64] text-white border-[#291B64] font-bold'
-                                        : 'bg-white text-[#1D1D1F] border-black/15 hover:border-[#291B64]'
-                                    }`}
-                                  >
-                                    <span className="text-xs font-mono font-bold">{slot.label}</span>
-                                    <span
-                                      className={`text-[10px] font-mono ${
-                                        active ? 'text-emerald-300' : 'text-slate-400'
+                              {(availabilityConfig.slots || DEFAULT_BOOKING_AVAILABILITY.slots)
+                                .filter((s) => s.enabled)
+                                .map((slot) => {
+                                  const isOccupied = (
+                                    occupiedSlotsByDate[bookingDate] || []
+                                  ).includes(slot.value);
+                                  const active = bookingSlot === slot.value && !isOccupied;
+                                  return (
+                                    <button
+                                      key={slot.value}
+                                      type="button"
+                                      disabled={isOccupied}
+                                      onClick={() => {
+                                        setBookingSlot(slot.value);
+                                        setBookingConflictMsg('');
+                                      }}
+                                      className={`p-2.5 border text-left transition-all flex items-center justify-between ${
+                                        isOccupied
+                                          ? 'bg-slate-100 text-slate-400 border-slate-200 line-through cursor-not-allowed'
+                                          : active
+                                          ? 'bg-[#291B64] text-white border-[#291B64] font-bold cursor-pointer'
+                                          : 'bg-white text-[#1D1D1F] border-black/15 hover:border-[#291B64] cursor-pointer'
                                       }`}
                                     >
-                                      {slot.tag}
-                                    </span>
-                                  </button>
-                                );
-                              })}
+                                      <span className="text-xs font-mono font-bold">
+                                        {slot.label}
+                                      </span>
+                                      {isOccupied ? (
+                                        <span className="text-[9px] font-mono font-bold text-rose-600 no-underline uppercase">
+                                          Ocupado
+                                        </span>
+                                      ) : (
+                                        <span
+                                          className={`text-[10px] font-mono ${
+                                            active ? 'text-emerald-300' : 'text-slate-400'
+                                          }`}
+                                        >
+                                          {slot.tag}
+                                        </span>
+                                      )}
+                                    </button>
+                                  );
+                                })}
                             </div>
                           </div>
                         </div>
+
+                        {bookingConflictMsg && (
+                          <div className="p-3.5 bg-rose-50 border border-rose-200 text-rose-800 text-xs font-medium">
+                            {bookingConflictMsg}
+                          </div>
+                        )}
 
                         {/* PASO 3: TEMA O CONSULTA CON CHIPS RÁPIDOS + WHATSAPP OPCIONAL */}
                         <div className="space-y-2.5 pt-1">
@@ -2930,8 +3000,12 @@ export const ClientPortalModal: React.FC<ClientPortalModalProps> = ({ isOpen = t
                           <div className="text-[11px] text-slate-600 flex items-center gap-2">
                             <Mail className="w-4 h-4 text-[#291B64] shrink-0" />
                             <span>
-                              Te enviaremos al instante el enlace de <strong>Google Meet Pro</strong> a{' '}
-                              <strong>{clientSession?.email}</strong>.
+                              Te enviaremos al instante el enlace de <strong>Google Meet Pro</strong> + invitación <strong>.ics</strong> a{' '}
+                              <strong>{clientSession?.email}</strong> (vía{' '}
+                              <code className="font-mono text-[#291B64]">
+                                {availabilityConfig.notificationEmail || SITE_CONFIG.email}
+                              </code>
+                              ).
                             </span>
                           </div>
 

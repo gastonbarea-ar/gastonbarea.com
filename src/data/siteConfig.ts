@@ -65,12 +65,79 @@ const getEnvVar = (key: string): string | undefined => {
   return undefined;
 };
 
+export interface BookingSlotOption {
+  id: string;
+  label: string;
+  value: string;
+  tag: string;
+  enabled: boolean;
+}
+
+export interface BookingAvailabilityConfig {
+  notificationEmail: string;
+  googleMeetUrl: string;
+  enabledWeekdays: number[]; // 1=Lun, 2=Mar, 3=Mié, 4=Jue, 5=Vie, 6=Sáb
+  slots: BookingSlotOption[];
+  blockedDates: string[]; // ['2026-11-20', ...]
+}
+
+export const DEFAULT_BOOKING_AVAILABILITY: BookingAvailabilityConfig = {
+  notificationEmail: 'notificaciones@gastonbarea.com',
+  googleMeetUrl: 'https://meet.google.com/gastonbarea-consultoria',
+  enabledWeekdays: [1, 2, 3, 4, 5],
+  slots: [
+    {
+      id: 'slot-0900',
+      label: '09:00 hs',
+      value: '09:00 - 09:45 (GMT-3)',
+      tag: 'Mañana',
+      enabled: false,
+    },
+    {
+      id: 'slot-1000',
+      label: '10:00 hs',
+      value: '10:00 - 10:45 (GMT-3)',
+      tag: 'Mañana',
+      enabled: true,
+    },
+    {
+      id: 'slot-1130',
+      label: '11:30 hs',
+      value: '11:30 - 12:15 (GMT-3)',
+      tag: 'Mediodía',
+      enabled: true,
+    },
+    {
+      id: 'slot-1500',
+      label: '15:00 hs',
+      value: '15:00 - 15:45 (GMT-3)',
+      tag: 'Tarde',
+      enabled: true,
+    },
+    {
+      id: 'slot-1700',
+      label: '17:00 hs',
+      value: '17:00 - 17:45 (GMT-3)',
+      tag: 'Tarde',
+      enabled: true,
+    },
+    {
+      id: 'slot-1830',
+      label: '18:30 hs',
+      value: '18:30 - 19:15 (GMT-3)',
+      tag: 'Última Hora',
+      enabled: false,
+    },
+  ],
+  blockedDates: [],
+};
+
 export const SITE_CONFIG: SiteConfig = {
   name: 'Gastón Barea',
   role: 'Consultor y Desarrollador de Proyectos de Base Tecnológica & Bioeconomía',
   location: 'Chubut, Patagonia Argentina · Dirección de Proyectos & Consultoría Global',
   domain: 'gastonbarea.com',
-  email: 'gastonbarea.com@gmail.com',
+  email: 'notificaciones@gastonbarea.com',
 
   social: {
     linkedin:
@@ -93,7 +160,7 @@ export const SITE_CONFIG: SiteConfig = {
   booking: {
     googleMeetUrl:
       getEnvVar('VITE_GOOGLE_MEET_URL') ||
-      'https://meet.google.com/gb-consultoria-pro',
+      'https://meet.google.com/gastonbarea-consultoria',
     calendlyUrl:
       getEnvVar('VITE_CALENDLY_URL') ||
       'https://calendly.com/gastonbarea/30min',

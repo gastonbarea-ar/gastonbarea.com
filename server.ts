@@ -23,7 +23,11 @@ import {
   dispatchWhatsAppMessage,
   normalizePhoneE164,
 } from './src/services/whatsappAutomation.ts';
-import { SITE_CONFIG } from './src/data/siteConfig.ts';
+import {
+  SITE_CONFIG,
+  DEFAULT_BOOKING_AVAILABILITY,
+  BookingAvailabilityConfig,
+} from './src/data/siteConfig.ts';
 import { INITIAL_BLOG_POSTS } from './src/data/blogData.ts';
 import {
   DEFAULT_PAYMENT_CONFIG,
@@ -3897,7 +3901,77 @@ app.post('/api/client/tickets', (req, res) => {
   return res.json({ success: true, ticket: newTicket });
 });
 
-// 8. Client & Public: Book Consulting Advisory Call (Automated Meet Link + Google Calendar + Resend Email + CRM Sync)
+// In-memory / Runtime Booking Availability Config (Configurable from Admin Dashboard)
+let cachedBookingAvailability: BookingAvailabilityConfig = {
+  ...DEFAULT_BOOKING_AVAILABILITY,
+  slots: DEFAULT_BOOKING_AVAILABILITY.slots.map((s) => ({ ...s })),
+  enabledWeekdays: [...DEFAULT_BOOKING_AVAILABILITY.enabledWeekdays],
+  blockedDates: [...DEFAULT_BOOKING_AVAILABILITY.blockedDates],
+};
+
+function computeOccupiedSlotsByDate(): Record<string, string[]> {
+  const map: Record<string, string[]> = {};
+  for (const b of cachedClientBookings) {
+    if (!b.date || !b.timeSlot) continue;
+    if (!map[b.date]) map[b.date] = [];
+    if (!map[b.date].includes(b.timeSlot)) {
+      map[b.date].push(b.timeSlot);
+    }
+  }
+  return map;
+}
+
+// 8A. Public & Portal: Get Real-Time Booking Availability & Occupied Slots
+app.get('/api/bookings/availability', (_req, res) => {
+  return res.json({
+    success: true,
+    config: cachedBookingAvailability,
+    occupiedSlotsByDate: computeOccupiedSlotsByDate(),
+  });
+});
+
+// 8B. Admin Side: Update Booking Availability Rules, Slots, Blocked Dates & Meet Link
+app.put('/api/admin/bookings/availability', requireAdminAuth, (req, res) => {
+  const { notificationEmail, googleMeetUrl, enabledWeekdays, slots, blockedDates } =
+    req.body || {};
+
+  if (typeof notificationEmail === 'string' && notificationEmail.trim()) {
+    cachedBookingAvailability.notificationEmail = notificationEmail.trim();
+  }
+  if (typeof googleMeetUrl === 'string' && googleMeetUrl.trim()) {
+    cachedBookingAvailability.googleMeetUrl = googleMeetUrl.trim();
+    if (cachedSiteConfig?.booking) {
+      cachedSiteConfig.booking.googleMeetUrl = googleMeetUrl.trim();
+    }
+  }
+  if (Array.isArray(enabledWeekdays) && enabledWeekdays.length > 0) {
+    cachedBookingAvailability.enabledWeekdays = enabledWeekdays
+      .map(Number)
+      .filter((d) => d >= 0 && d <= 6);
+  }
+  if (Array.isArray(slots) && slots.length > 0) {
+    cachedBookingAvailability.slots = slots.map((s: any) => ({
+      id: String(s.id || `slot-${Date.now()}`),
+      label: String(s.label || s.value || '15:00 hs'),
+      value: String(s.value || '15:00 - 15:45 (GMT-3)'),
+      tag: String(s.tag || 'Turno'),
+      enabled: Boolean(s.enabled),
+    }));
+  }
+  if (Array.isArray(blockedDates)) {
+    cachedBookingAvailability.blockedDates = blockedDates
+      .map((d: any) => String(d).trim())
+      .filter(Boolean);
+  }
+
+  return res.json({
+    success: true,
+    config: cachedBookingAvailability,
+    occupiedSlotsByDate: computeOccupiedSlotsByDate(),
+  });
+});
+
+// 8C. Client & Public: Book Consulting Advisory Call (Automated Meet Link + Google Calendar + .ICS Resend Email + Slot Lock)
 app.post('/api/client/bookings', async (req, res) => {
   const client = getClientFromRequest(req);
   const { type, date, timeSlot, agendaTopic, clientEmail, clientName, company, phone } =
@@ -3929,7 +4003,28 @@ app.post('/api/client/bookings', async (req, res) => {
     agendaTopic || 'Reunión de diagnóstico técnico y seguimiento de arquitectura'
   ).trim();
 
+  // Check if date is blocked or slot is already occupied
+  if (cachedBookingAvailability.blockedDates.includes(resolvedDate)) {
+    return res.status(409).json({
+      success: false,
+      error: `La fecha ${resolvedDate} no tiene disponibilidad habilitada. Por favor elegí otro día hábil.`,
+      occupiedSlotsByDate: computeOccupiedSlotsByDate(),
+    });
+  }
+
+  const alreadyOccupied = cachedClientBookings.some(
+    (b) => b.date === resolvedDate && b.timeSlot === resolvedSlot
+  );
+  if (alreadyOccupied) {
+    return res.status(409).json({
+      success: false,
+      error: `El horario ${resolvedSlot} del día ${resolvedDate} ya fue reservado. Por favor seleccioná otro horario disponible.`,
+      occupiedSlotsByDate: computeOccupiedSlotsByDate(),
+    });
+  }
+
   const baseMeetUrl =
+    cachedBookingAvailability.googleMeetUrl ||
     cachedSiteConfig?.booking?.googleMeetUrl ||
     SITE_CONFIG.booking.googleMeetUrl ||
     'https://meet.google.com/gastonbarea-consultoria';
@@ -4047,6 +4142,7 @@ app.post('/api/client/bookings', async (req, res) => {
     emailSent,
     googleCalendarUrl,
     whatsappConfirmUrl,
+    occupiedSlotsByDate: computeOccupiedSlotsByDate(),
   });
 });
 

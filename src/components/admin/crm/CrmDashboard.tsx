@@ -60,6 +60,10 @@ import { QuotePreviewModal } from './QuotePreviewModal';
 import { FastReplyModal } from './FastReplyModal';
 import { PaymentConfigModal } from './PaymentConfigModal';
 import { PaymentRecordModal } from './PaymentRecordModal';
+import {
+  DEFAULT_BOOKING_AVAILABILITY,
+  BookingAvailabilityConfig,
+} from '../../../data/siteConfig';
 
 interface CrmDashboardProps {
   passkey?: string;
@@ -183,6 +187,18 @@ export const CrmDashboard: React.FC<CrmDashboardProps> = ({ passkey = 'gaston202
   const [isSendingWaTest, setIsSendingWaTest] = useState<boolean>(false);
   const [waFeedback, setWaFeedback] = useState<{ ok: boolean; msg: string; waUrl?: string } | null>(null);
 
+  // Booking & Calendar Availability Configurator State (notificaciones@gastonbarea.com)
+  const [bookingAvailability, setBookingAvailability] = useState<BookingAvailabilityConfig>(
+    DEFAULT_BOOKING_AVAILABILITY
+  );
+  const [occupiedSlotsByDate, setOccupiedSlotsByDate] = useState<Record<string, string[]>>({});
+  const [newBlockedDateInput, setNewBlockedDateInput] = useState<string>('');
+  const [isSavingAvailability, setIsSavingAvailability] = useState<boolean>(false);
+  const [availabilityFeedback, setAvailabilityFeedback] = useState<{
+    ok: boolean;
+    msg: string;
+  } | null>(null);
+
   // Load CRM data from backend
   const loadCrmData = async () => {
     setIsLoading(true);
@@ -223,11 +239,97 @@ export const CrmDashboard: React.FC<CrmDashboardProps> = ({ passkey = 'gaston202
         if (waJson.config) setWaConfig((prev: any) => ({ ...prev, ...waJson.config }));
         if (waJson.status) setWaStatus(waJson.status);
       }
+
+      // Load Booking Availability & Occupied Slots
+      const availRes = await fetch('/api/bookings/availability');
+      if (availRes.ok) {
+        const availJson = await availRes.json();
+        if (availJson.config) setBookingAvailability(availJson.config);
+        if (availJson.occupiedSlotsByDate) setOccupiedSlotsByDate(availJson.occupiedSlotsByDate);
+      }
     } catch (err) {
       console.warn('Using local fallback for CRM data:', err);
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleSaveBookingAvailability = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSavingAvailability(true);
+    setAvailabilityFeedback(null);
+    try {
+      const res = await fetch('/api/admin/bookings/availability', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-passkey': passkey,
+        },
+        body: JSON.stringify({ config: bookingAvailability }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        if (data.config) setBookingAvailability(data.config);
+        if (data.occupiedSlotsByDate) setOccupiedSlotsByDate(data.occupiedSlotsByDate);
+        setAvailabilityFeedback({
+          ok: true,
+          msg: `¡Disponibilidad de Agenda y correo organizador (${
+            data.config?.notificationEmail || 'notificaciones@gastonbarea.com'
+          }) actualizados!`,
+        });
+      } else {
+        setAvailabilityFeedback({
+          ok: false,
+          msg: data.error || 'Error al actualizar la disponibilidad.',
+        });
+      }
+    } catch (err: any) {
+      setAvailabilityFeedback({
+        ok: false,
+        msg: err?.message || 'Error de red al guardar disponibilidad.',
+      });
+    } finally {
+      setIsSavingAvailability(false);
+    }
+  };
+
+  const handleToggleWeekday = (dayNumber: number) => {
+    setBookingAvailability((prev) => {
+      const exists = prev.enabledWeekdays.includes(dayNumber);
+      const next = exists
+        ? prev.enabledWeekdays.filter((d) => d !== dayNumber)
+        : [...prev.enabledWeekdays, dayNumber].sort();
+      return {
+        ...prev,
+        enabledWeekdays: next.length > 0 ? next : [1],
+      };
+    });
+  };
+
+  const handleToggleSlot = (slotValue: string) => {
+    setBookingAvailability((prev) => ({
+      ...prev,
+      slots: prev.slots.map((s) => (s.value === slotValue ? { ...s, enabled: !s.enabled } : s)),
+    }));
+  };
+
+  const handleAddBlockedDate = () => {
+    if (!newBlockedDateInput) return;
+    setBookingAvailability((prev) => {
+      if (prev.blockedDates.includes(newBlockedDateInput)) return prev;
+      return {
+        ...prev,
+        blockedDates: [...prev.blockedDates, newBlockedDateInput].sort(),
+      };
+    });
+    setNewBlockedDateInput('');
+  };
+
+  const handleRemoveBlockedDate = (isoDate: string) => {
+    setBookingAvailability((prev) => ({
+      ...prev,
+      blockedDates: prev.blockedDates.filter((d) => d !== isoDate),
+    }));
   };
 
   const handleSaveWhatsAppConfig = async (e: React.FormEvent) => {
@@ -2679,6 +2781,229 @@ export const CrmDashboard: React.FC<CrmDashboardProps> = ({ passkey = 'gaston202
                 </button>
               </div>
             </div>
+
+            {/* Agenda Google Meet, Horarios GMT-3 & Invitación .ics (notificaciones@gastonbarea.com) */}
+            <form
+              onSubmit={handleSaveBookingAvailability}
+              className="bg-white p-5 rounded-2xl border border-slate-200 space-y-5 text-xs"
+            >
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
+                <div>
+                  <h4 className="font-bold text-slate-900 text-sm flex items-center gap-2">
+                    <Calendar className="w-4 h-4 text-blue-600" />
+                    <span>
+                      Configuración de Agenda Google Meet, Horarios GMT-3 & Invitación Nativa .ics
+                    </span>
+                  </h4>
+                  <p className="text-[11px] text-slate-500 mt-0.5">
+                    Sin requerir OAuth de Google Cloud en Vercel: cada turno confirmado bloquea automáticamente esa franja horaria y envía el archivo <code>invitacion-meet-gastonbarea.ics</code> vía Resend desde <code>notificaciones@gastonbarea.com</code>.
+                  </p>
+                </div>
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 text-blue-800 border border-blue-200 text-[10px] font-mono font-bold">
+                  <Mail className="w-3.5 h-3.5" /> {bookingAvailability.notificationEmail}
+                </span>
+              </div>
+
+              {availabilityFeedback && (
+                <div
+                  className={`p-3 rounded-xl border text-xs font-medium ${
+                    availabilityFeedback.ok
+                      ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
+                      : 'bg-rose-50 border-rose-200 text-rose-900'
+                  }`}
+                >
+                  {availabilityFeedback.msg}
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[11px] font-mono font-bold text-slate-600 mb-1">
+                    Correo Organizador & Receptor de Invitaciones (.ics)
+                  </label>
+                  <input
+                    type="email"
+                    required
+                    value={bookingAvailability.notificationEmail}
+                    onChange={(e) =>
+                      setBookingAvailability({
+                        ...bookingAvailability,
+                        notificationEmail: e.target.value,
+                      })
+                    }
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-mono text-slate-900"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-mono font-bold text-slate-600 mb-1">
+                    Enlace Sala Google Meet Pro por Defecto
+                  </label>
+                  <input
+                    type="url"
+                    required
+                    value={bookingAvailability.googleMeetUrl}
+                    onChange={(e) =>
+                      setBookingAvailability({
+                        ...bookingAvailability,
+                        googleMeetUrl: e.target.value,
+                      })
+                    }
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-mono text-slate-900"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+                {/* Días Hábiles Activos */}
+                <div className="lg:col-span-5 space-y-2">
+                  <label className="block text-[11px] font-mono font-bold text-slate-600">
+                    1. Días Hábiles Habilitados en el Selector
+                  </label>
+                  <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5">
+                    {[
+                      { day: 1, label: 'Lun' },
+                      { day: 2, label: 'Mar' },
+                      { day: 3, label: 'Mié' },
+                      { day: 4, label: 'Jue' },
+                      { day: 5, label: 'Vie' },
+                      { day: 6, label: 'Sáb' },
+                    ].map((d) => {
+                      const active = bookingAvailability.enabledWeekdays.includes(d.day);
+                      return (
+                        <button
+                          key={d.day}
+                          type="button"
+                          onClick={() => handleToggleWeekday(d.day)}
+                          className={`py-2 px-2 rounded-xl border text-center font-mono text-xs font-bold cursor-pointer transition-colors ${
+                            active
+                              ? 'bg-blue-600 text-white border-blue-600'
+                              : 'bg-slate-50 text-slate-500 border-slate-200 hover:bg-slate-100'
+                          }`}
+                        >
+                          {d.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Fechas Bloqueadas (Feriados / Vacaciones) */}
+                  <div className="pt-2 space-y-2">
+                    <label className="block text-[11px] font-mono font-bold text-slate-600">
+                      Bloquear Fecha Específica (Feriado / Viaje)
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="date"
+                        value={newBlockedDateInput}
+                        onChange={(e) => setNewBlockedDateInput(e.target.value)}
+                        className="px-3 py-1.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-mono"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleAddBlockedDate}
+                        className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs cursor-pointer"
+                      >
+                        + Bloquear Día
+                      </button>
+                    </div>
+                    {bookingAvailability.blockedDates.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5 pt-1">
+                        {bookingAvailability.blockedDates.map((iso) => (
+                          <span
+                            key={iso}
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-rose-50 border border-rose-200 text-rose-800 font-mono text-[11px]"
+                          >
+                            <span>{iso}</span>
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveBlockedDate(iso)}
+                              className="text-rose-600 hover:text-rose-900 font-bold cursor-pointer"
+                            >
+                              ×
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Franjas Horarias Activas */}
+                <div className="lg:col-span-7 space-y-2">
+                  <label className="block text-[11px] font-mono font-bold text-slate-600">
+                    2. Franjas Horarias Disponibles (Hora Argentina GMT-3)
+                  </label>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    {bookingAvailability.slots.map((slot) => (
+                      <button
+                        key={slot.value}
+                        type="button"
+                        onClick={() => handleToggleSlot(slot.value)}
+                        className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer flex items-center justify-between ${
+                          slot.enabled
+                            ? 'bg-emerald-50 border-emerald-300 text-emerald-950 font-bold'
+                            : 'bg-slate-50 border-slate-200 text-slate-400'
+                        }`}
+                      >
+                        <div>
+                          <div className="font-mono text-xs">{slot.label}</div>
+                          <div className="text-[10px] opacity-75">{slot.tag}</div>
+                        </div>
+                        <span
+                          className={`text-[10px] font-mono px-2 py-0.5 rounded-md ${
+                            slot.enabled
+                              ? 'bg-emerald-600 text-white'
+                              : 'bg-slate-200 text-slate-600'
+                          }`}
+                        >
+                          {slot.enabled ? 'Activo' : 'Oculto'}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Resumen de Turnos Ya Reservados (Auto-bloqueados) */}
+                  <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-1.5 mt-2">
+                    <div className="text-[10px] font-mono font-bold uppercase text-slate-600">
+                      Turnos Reservados (Bloqueados Automáticamente para Evitar Superposición):
+                    </div>
+                    {Object.keys(occupiedSlotsByDate).length === 0 ? (
+                      <div className="text-[11px] text-slate-500">
+                        No hay turnos ocupados actualmente.
+                      </div>
+                    ) : (
+                      <div className="flex flex-wrap gap-1.5">
+                        {Object.entries(occupiedSlotsByDate).map(([dateIso, slots]) =>
+                          slots.map((s) => (
+                            <span
+                              key={`${dateIso}-${s}`}
+                              className="px-2 py-0.5 rounded bg-amber-100 text-amber-900 font-mono text-[10px] font-semibold"
+                            >
+                              {dateIso} · {s.split(' ')[0]} hs
+                            </span>
+                          ))
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+                <span className="text-[11px] text-slate-500">
+                  Los cambios impactan en vivo tanto en el botón <strong>¡Hablemos! Agendar Meet</strong> como en el <strong>Portal de Clientes</strong>.
+                </span>
+                <button
+                  type="submit"
+                  disabled={isSavingAvailability}
+                  className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs cursor-pointer"
+                >
+                  {isSavingAvailability
+                    ? 'Guardando Disponibilidad...'
+                    : 'Guardar Disponibilidad de Agenda'}
+                </button>
+              </div>
+            </form>
           </div>
         )}
       </div>
