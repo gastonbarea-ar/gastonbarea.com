@@ -3210,7 +3210,7 @@ app.post('/api/crm/ai-generate-quote', requireAdminAuth, async (req, res) => {
   if (ai) {
     try {
       const response = await ai.models.generateContent({
-        model: 'gemini-3.8-flash',
+        model: 'gemini-3-flash-preview',
         contents: `Genera un presupuesto técnico formal de consultoría y desarrollo para el cliente "${companyName || 'Corporativo'}" basado en este requerimiento:
 "${cleanContext}"
 Categoría: ${serviceCategory}. Moneda: ${currency}.
@@ -4489,8 +4489,8 @@ async function resolveArnCommandWithAi(
   }
 
   try {
-    const response = await ai.models.generateContent({
-      model: 'gemini-3.8-flash',
+    const aiCall = ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
       contents: `Extraé las entidades comerciales, dotación de empleados y técnicas de la siguiente nota o mensaje natural para el motor ARN de Gastón Barea.\nTexto: "${rawInput}"\nCanal adicional: "${contactChannel || ''}"\nCantidad de empleados indicada: "${overrideEmployeeCount || ''}"`,
       config: {
         responseMimeType: 'application/json',
@@ -4519,6 +4519,12 @@ async function resolveArnCommandWithAi(
         },
       },
     });
+
+    const timeoutGuard = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('ARN AI parser timeout (2.5s)')), 2500)
+    );
+
+    const response = await Promise.race([aiCall, timeoutGuard]);
 
     const parsedJson = JSON.parse((response.text ?? '{}').trim());
     const validCategories = [
