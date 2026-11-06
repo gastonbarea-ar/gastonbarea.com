@@ -64,6 +64,7 @@ import {
   DEFAULT_BOOKING_AVAILABILITY,
   BookingAvailabilityConfig,
 } from '../../../data/siteConfig';
+import { computeArnRelationshipNodes } from '../../../utils/arnEngine';
 
 interface CrmDashboardProps {
   passkey?: string;
@@ -199,6 +200,18 @@ export const CrmDashboard: React.FC<CrmDashboardProps> = ({ passkey = 'gaston202
     msg: string;
   } | null>(null);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+
+  // ARN (Automated Relationship Network) Zero-Form Copiloto & Autonomous Radar State
+  const [arnCommandInput, setArnCommandInput] = useState<string>('');
+  const [isExecutingArnCommand, setIsExecutingArnCommand] = useState<boolean>(false);
+  const [isListeningVoice, setIsListeningVoice] = useState<boolean>(false);
+  const [isExecutingAutopilotId, setIsExecutingAutopilotId] = useState<string | null>(null);
+  const [arnViewMode, setArnViewMode] = useState<'radar' | 'kanban'>('radar');
+  const [arnExecutionLog, setArnExecutionLog] = useState<{
+    actionsExecuted: string[];
+    quote?: Quote | null;
+    opportunity?: Opportunity | null;
+  } | null>(null);
 
   // Load CRM data from backend
   const loadCrmData = async () => {
@@ -844,6 +857,136 @@ export const CrmDashboard: React.FC<CrmDashboardProps> = ({ passkey = 'gaston202
     }
   };
 
+  // ARN Copiloto: Execute Natural Language / Voice / Pasted WhatsApp Command
+  const handleExecuteArnCommand = async (e?: React.FormEvent, presetCommand?: string) => {
+    if (e) e.preventDefault();
+    const textToRun = (presetCommand ?? arnCommandInput).trim();
+    if (!textToRun || isExecutingArnCommand) return;
+
+    setIsExecutingArnCommand(true);
+    setArnExecutionLog(null);
+
+    try {
+      const res = await fetch('/api/arn/command', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-passkey': passkey,
+        },
+        body: JSON.stringify({ commandText: textToRun }),
+      });
+      const json = await res.json();
+      if (res.ok && json.success) {
+        if (json.data) {
+          if (json.data.opportunities) setOpportunities(json.data.opportunities);
+          if (json.data.companies) setCompanies(json.data.companies);
+          if (json.data.contacts) setContacts(json.data.contacts);
+          if (json.data.quotes) setQuotes(json.data.quotes);
+          if (json.data.payments) setPayments(json.data.payments);
+        }
+        setArnExecutionLog({
+          actionsExecuted: json.actionsExecuted || [],
+          quote: json.quote || null,
+          opportunity: json.opportunity || null,
+        });
+        setArnCommandInput('');
+        setCopiedNotification('¡Comando ARN ejecutado! Nodos, propuesta 40/40/20 y Portal Clientes sincronizados sin formularios.');
+        setTimeout(() => setCopiedNotification(null), 4500);
+      }
+    } catch (err) {
+      console.error('Error executing ARN command:', err);
+    } finally {
+      setIsExecutingArnCommand(false);
+    }
+  };
+
+  // ARN Voice Dictation (Browser SpeechRecognition)
+  const handleToggleVoiceDictation = () => {
+    const SpeechRec =
+      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRec) {
+      setArnCommandInput(
+        'Hablé con Martín de AgroSur, correo martin@agrosur.com.ar, necesitan trazabilidad IoT y Odoo v18 por USD 5800, armar propuesta 40/40/20'
+      );
+      setCopiedNotification(
+        'Cargamos una nota rápida de ejemplo lista para ejecutar en 1 clic (tu navegador actual no expone micrófono WebSpeech).'
+      );
+      setTimeout(() => setCopiedNotification(null), 4000);
+      return;
+    }
+
+    if (isListeningVoice) {
+      setIsListeningVoice(false);
+      return;
+    }
+
+    try {
+      const recognition = new SpeechRec();
+      recognition.lang = 'es-AR';
+      recognition.interimResults = false;
+      recognition.maxAlternatives = 1;
+      setIsListeningVoice(true);
+
+      recognition.onresult = (event: any) => {
+        const transcript = event.results?.[0]?.[0]?.transcript || '';
+        if (transcript) {
+          setArnCommandInput((prev) => (prev ? `${prev} ${transcript}` : transcript));
+        }
+        setIsListeningVoice(false);
+      };
+      recognition.onerror = () => setIsListeningVoice(false);
+      recognition.onend = () => setIsListeningVoice(false);
+      recognition.start();
+    } catch {
+      setIsListeningVoice(false);
+    }
+  };
+
+  // ARN 1-Click Autonomous Action on any Relationship Node
+  const handleExecuteNodeAutopilot = async (opportunityId: string, actionType: string) => {
+    setIsExecutingAutopilotId(opportunityId);
+    try {
+      const res = await fetch('/api/arn/autopilot', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-passkey': passkey,
+        },
+        body: JSON.stringify({ opportunityId, actionType }),
+      });
+      const json = await res.json();
+      if (res.ok && json.success) {
+        if (json.data) {
+          if (json.data.opportunities) setOpportunities(json.data.opportunities);
+          if (json.data.companies) setCompanies(json.data.companies);
+          if (json.data.contacts) setContacts(json.data.contacts);
+          if (json.data.quotes) setQuotes(json.data.quotes);
+          if (json.data.payments) setPayments(json.data.payments);
+        }
+        setArnExecutionLog({
+          actionsExecuted: json.actionsExecuted || [],
+          quote: json.quote || null,
+          opportunity: json.opportunity || null,
+        });
+        setCopiedNotification(
+          json.actionsExecuted?.[0] || 'Acción autónoma ARN ejecutada en 1 clic.'
+        );
+        setTimeout(() => setCopiedNotification(null), 4000);
+      }
+    } catch (err) {
+      console.error('Error running ARN autopilot:', err);
+    } finally {
+      setIsExecutingAutopilotId(null);
+    }
+  };
+
+  const arnNodes = computeArnRelationshipNodes({
+    opportunities: filteredOpportunities,
+    companies,
+    contacts,
+    quotes,
+  });
+
   return (
     <div className="flex flex-col h-full bg-[#f8fafc] text-slate-800">
       
@@ -855,18 +998,19 @@ export const CrmDashboard: React.FC<CrmDashboardProps> = ({ passkey = 'gaston202
         </div>
       )}
 
-      {/* KPI Metrics Ribbon */}
-      <div className="p-4 sm:p-6 border-b border-slate-200/90 bg-white">
-        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 mb-4">
+      {/* KPI Metrics Ribbon & Omnibarra Copiloto ARN */}
+      <div className="p-4 sm:p-6 border-b border-slate-200/90 bg-white space-y-5">
+        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
           <div>
-            <div className="flex items-center gap-2">
-              <span className="font-mono text-xs px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-800 font-bold uppercase tracking-wider">
-                Operaciones Comerciales
+            <div className="flex items-center gap-2 text-xs font-mono text-slate-500">
+              <span className="font-bold text-[#291B64] uppercase tracking-wider">
+                Red ARN · Automated Relationship Network
               </span>
-              <span className="text-[11px] font-mono text-slate-400">Stack: Vercel + Supabase + Resend.com + CyberPanel</span>
+              <span aria-hidden="true">·</span>
+              <span>Cero Formularios · Supabase + Resend + Gemini AI</span>
             </div>
             <h2 className="text-xl font-bold tracking-tight text-slate-900 mt-1">
-              CRM Operativo & Gestión de Servicios
+              Centro Autónomo ARN & Flujo de Relaciones 40/40/20
             </h2>
           </div>
 
@@ -972,35 +1116,171 @@ export const CrmDashboard: React.FC<CrmDashboardProps> = ({ passkey = 'gaston202
             </div>
           </div>
         </div>
+
+        {/* OMNIBARRA COPILOTO ARN: VOZ, TEXTO NATURAL & INGESTA WHATSAPP SIN FORMULARIOS */}
+        <div className="p-4 sm:p-5 bg-[#0F172A] text-white border border-slate-800 space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div className="flex items-center gap-2 text-xs">
+              <Sparkles className="w-4 h-4 text-emerald-400 shrink-0" />
+              <span className="font-bold text-white">
+                Omnibarra Copiloto ARN (Cero Formularios)
+              </span>
+              <span className="text-slate-400 hidden md:inline">
+                · Escribí, dictá por voz o pegá un mensaje de WhatsApp para crear/actualizar empresa, contacto, propuesta 40/40/20 y proyecto automáticamente
+              </span>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-mono">
+              <button
+                type="button"
+                onClick={() =>
+                  handleExecuteArnCommand(
+                    undefined,
+                    'Hablé con Valeria de Bodega Austral, correo valeria@bodegaaustral.com, necesitan Odoo v18 ERP e inventario por USD 5400, armar propuesta 40/40/20'
+                  )
+                }
+                className="px-2.5 py-1 bg-white/10 hover:bg-white/20 text-slate-200 transition-colors cursor-pointer whitespace-nowrap"
+              >
+                Ej. 1: Cotizar Odoo 40/40/20
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  handleExecuteArnCommand(
+                    undefined,
+                    'Hablé con Lucas de Frigorífico Patagonia, correo lucas@frigopatagonia.com.ar, aprobar e iniciar proyecto kickoff de trazabilidad IoT por USD 6800'
+                  )
+                }
+                className="px-2.5 py-1 bg-white/10 hover:bg-white/20 text-slate-200 transition-colors cursor-pointer whitespace-nowrap"
+              >
+                Ej. 2: Kickoff Directo 40/40/20
+              </button>
+            </div>
+          </div>
+
+          <form onSubmit={handleExecuteArnCommand} className="flex flex-col sm:flex-row items-stretch gap-2">
+            <input
+              type="text"
+              value={arnCommandInput}
+              onChange={(e) => setArnCommandInput(e.target.value)}
+              placeholder='Ej: "Hablé con Martín de AgroSur (martin@agrosur.com), quieren trazabilidad IoT y Odoo por USD 6200, armale propuesta 40/40/20"...'
+              className="flex-1 px-4 py-2.5 bg-slate-900 border border-slate-700 text-xs sm:text-sm text-white placeholder:text-slate-400 focus:outline-none focus:border-emerald-400"
+            />
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={handleToggleVoiceDictation}
+                className={`px-3.5 py-2.5 text-xs font-bold border transition-colors flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
+                  isListeningVoice
+                    ? 'bg-rose-600 text-white border-rose-500'
+                    : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700'
+                }`}
+                title="Dictar instrucción por voz"
+              >
+                <span>{isListeningVoice ? 'Escuchando Voz...' : 'Dictar por Voz'}</span>
+              </button>
+
+              <button
+                type="submit"
+                disabled={isExecutingArnCommand || !arnCommandInput.trim()}
+                className="px-5 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50 whitespace-nowrap"
+              >
+                {isExecutingArnCommand ? (
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <Sparkles className="w-3.5 h-3.5" />
+                )}
+                <span>Ejecutar en ARN</span>
+              </button>
+            </div>
+          </form>
+
+          {arnExecutionLog && (
+            <div className="p-3.5 bg-slate-900 border border-emerald-500/40 text-xs space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="font-mono font-bold text-emerald-400 uppercase text-[11px]">
+                  ✓ Ejecución Autónoma ARN Completada (Cero Formularios)
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setArnExecutionLog(null)}
+                  className="text-slate-400 hover:text-white text-[11px] cursor-pointer"
+                >
+                  Ocultar ×
+                </button>
+              </div>
+              <div className="space-y-1 text-slate-200">
+                {arnExecutionLog.actionsExecuted.map((act, idx) => (
+                  <div key={idx} className="flex items-start gap-2">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
+                    <span>{act}</span>
+                  </div>
+                ))}
+              </div>
+              {arnExecutionLog.quote && (
+                <div className="pt-2 border-t border-slate-800 flex flex-wrap items-center justify-between gap-2">
+                  <span className="font-mono text-[11px] text-slate-300">
+                    Propuesta lista en Portal Cliente (#portal):{' '}
+                    <strong className="text-white">{arnExecutionLog.quote.quoteNumber}</strong> (
+                    {arnExecutionLog.quote.currency} $
+                    {arnExecutionLog.quote.total.toLocaleString()})
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPreviewQuote(arnExecutionLog.quote!);
+                        setIsQuotePreviewOpen(true);
+                      }}
+                      className="px-3 py-1 bg-white/10 hover:bg-white/20 text-white font-semibold text-[11px] cursor-pointer"
+                    >
+                      Ver / PDF 40/40/20
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFastReplyQuote(arnExecutionLog.quote!);
+                        setIsFastReplyOpen(true);
+                      }}
+                      className="px-3 py-1 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-[11px] cursor-pointer"
+                    >
+                      Enviar por WhatsApp / Email
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* Main CRM Navigation Tabs */}
+      {/* Main ARN Navigation Tabs */}
       <div className="px-6 py-2 border-b border-slate-200 bg-slate-50 flex items-center justify-between gap-4 overflow-x-auto">
         <div className="flex items-center gap-1.5">
           <button
             type="button"
             onClick={() => setActiveTab('kanban')}
-            className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-2 cursor-pointer transition-all ${
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-2 cursor-pointer transition-all whitespace-nowrap ${
               activeTab === 'kanban'
-                ? 'bg-blue-600 text-white shadow-2xs'
+                ? 'bg-[#291B64] text-white shadow-2xs'
                 : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
             }`}
           >
             <TrendingUp className="w-4 h-4" />
-            <span>Embudo Kanban ({opportunities.length})</span>
+            <span>Radar ARN & Pipeline ({opportunities.length})</span>
           </button>
 
           <button
             type="button"
             onClick={() => setActiveTab('directory')}
-            className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-2 cursor-pointer transition-all ${
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-2 cursor-pointer transition-all whitespace-nowrap ${
               activeTab === 'directory'
-                ? 'bg-blue-600 text-white shadow-2xs'
+                ? 'bg-[#291B64] text-white shadow-2xs'
                 : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
             }`}
           >
             <Building2 className="w-4 h-4" />
-            <span>Agenda: Empresas ({companies.length}) & Contactos ({contacts.length})</span>
+            <span>Red de Nodos: Empresas ({companies.length}) & Contactos ({contacts.length})</span>
           </button>
 
           <button
@@ -1089,19 +1369,173 @@ export const CrmDashboard: React.FC<CrmDashboardProps> = ({ passkey = 'gaston202
       <div className="flex-1 overflow-y-auto p-4 sm:p-6">
         
         {/* ============================================================
-            TAB 1: KANBAN PIPELINE FUNNEL
+            TAB 1: RADAR AUTÓNOMO DE NODOS ARN + PIPELINE KANBAN
         ============================================================ */}
         {activeTab === 'kanban' && (
-          <div className="flex gap-4 overflow-x-auto pb-6 min-h-[550px]">
-            {STAGES.map((stg) => {
-              const stageOpps = filteredOpportunities.filter((o) => o.stage === stg.id);
-              const stageTotal = stageOpps.reduce((acc, curr) => acc + (curr.value || 0), 0);
+          <div className="space-y-6">
+            {/* Switcher: Radar Autónomo ARN (1-Clic sin formularios) vs Vista Kanban */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 border border-slate-200">
+              <div>
+                <h3 className="text-sm font-bold text-slate-900">
+                  {arnViewMode === 'radar'
+                    ? 'Radar Autónomo de Relaciones ARN (Acciones 1-Clic sin Carga Manual)'
+                    : 'Tablero Kanban por Etapas'}
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Cada nodo se ordena automáticamente según las señales e interacciones reales detectadas en el Portal y correo.
+                </p>
+              </div>
 
-              return (
-                <div
-                  key={stg.id}
-                  className="w-72 sm:w-80 shrink-0 flex flex-col bg-slate-100/80 rounded-2xl border border-slate-200/90 overflow-hidden"
+              <div className="flex items-center gap-1 p-1 bg-slate-100 border border-slate-200 self-start">
+                <button
+                  type="button"
+                  onClick={() => setArnViewMode('radar')}
+                  className={`px-3 py-1.5 text-xs font-bold transition-colors cursor-pointer whitespace-nowrap ${
+                    arnViewMode === 'radar'
+                      ? 'bg-[#291B64] text-white'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
                 >
+                  Radar Autónomo ARN ({arnNodes.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setArnViewMode('kanban')}
+                  className={`px-3 py-1.5 text-xs font-bold transition-colors cursor-pointer whitespace-nowrap ${
+                    arnViewMode === 'kanban'
+                      ? 'bg-[#291B64] text-white'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  Vista Kanban Clásica
+                </button>
+              </div>
+            </div>
+
+            {arnViewMode === 'radar' ? (
+              <div className="border border-slate-200 bg-white overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead>
+                      <tr className="bg-slate-50 text-slate-600 font-mono text-[11px] uppercase border-b border-slate-200">
+                        <th className="py-3 px-4">Nodo ARN (Cliente · Corporación)</th>
+                        <th className="py-3 px-4">Iniciativa & Vertical</th>
+                        <th className="py-3 px-4">Estado & Última Señal Detectada</th>
+                        <th className="py-3 px-4 text-right">Valor (40/40/20)</th>
+                        <th className="py-3 px-4 text-right">Acción Autónoma (1-Clic)</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-200">
+                      {arnNodes.map((node) => {
+                        const srv =
+                          SERVICE_LABELS[node.serviceCategory] || SERVICE_LABELS.custom;
+                        const isRunning = isExecutingAutopilotId === node.opportunityId;
+
+                        return (
+                          <tr key={node.id} className="hover:bg-slate-50/80 transition-colors">
+                            <td className="py-3.5 px-4 align-top">
+                              <div className="font-bold text-slate-900 text-xs">
+                                {node.clientName}
+                              </div>
+                              <div className="text-slate-600 text-[11px]">
+                                {node.companyName} ·{' '}
+                                <span className="font-mono">{node.clientEmail}</span>
+                              </div>
+                            </td>
+
+                            <td className="py-3.5 px-4 align-top">
+                              <div className="font-bold text-slate-900">{node.statusLabel || srv.label}</div>
+                              <div className="text-slate-500 text-[11px]">
+                                {srv.label}
+                                {node.linkedQuoteId ? ` · Ref: ${node.linkedQuoteId}` : ''}
+                              </div>
+                            </td>
+
+                            <td className="py-3.5 px-4 align-top max-w-sm">
+                              <div className="flex items-center gap-2 font-semibold text-slate-900">
+                                <span
+                                  className={
+                                    node.statusTone === 'emerald'
+                                      ? 'text-emerald-700'
+                                      : node.statusTone === 'amber'
+                                      ? 'text-amber-700'
+                                      : 'text-[#291B64]'
+                                  }
+                                >
+                                  {node.statusLabel}
+                                </span>
+                                <span className="text-slate-400">·</span>
+                                <span className="font-mono tabular-nums text-[11px] text-slate-600">
+                                  Impulso {node.momentumScore}%
+                                </span>
+                              </div>
+                              <div className="text-slate-500 text-[11px] mt-0.5 line-clamp-2">
+                                {node.lastDetectedSignal}
+                              </div>
+                            </td>
+
+                            <td className="py-3.5 px-4 align-top text-right font-mono tabular-nums font-bold text-slate-900 whitespace-nowrap">
+                              {node.currency} ${node.value.toLocaleString()}
+                            </td>
+
+                            <td className="py-3.5 px-4 align-top text-right whitespace-nowrap">
+                              <div className="inline-flex items-center gap-1.5">
+                                <button
+                                  type="button"
+                                  disabled={isRunning}
+                                  onClick={() =>
+                                    handleExecuteNodeAutopilot(
+                                      node.opportunityId,
+                                      node.autonomousAction.actionType
+                                    )
+                                  }
+                                  className={`px-3 py-1.5 text-xs font-bold transition-colors inline-flex items-center gap-1.5 cursor-pointer disabled:opacity-50 ${
+                                    node.autonomousAction.actionType === 'auto_kickoff_project'
+                                      ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                                      : node.autonomousAction.actionType === 'auto_quote_40_40_20'
+                                      ? 'bg-[#291B64] hover:bg-[#382586] text-white'
+                                      : 'bg-slate-900 hover:bg-slate-800 text-white'
+                                  }`}
+                                  title={node.autonomousAction.description}
+                                >
+                                  {isRunning ? (
+                                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                                  ) : (
+                                    <Sparkles className="w-3.5 h-3.5" />
+                                  )}
+                                  <span>{node.autonomousAction.buttonLabel}</span>
+                                </button>
+
+                                <a
+                                  href={node.whatsappQuickUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 font-semibold text-xs inline-flex items-center gap-1"
+                                  title="Abrir WhatsApp con mensaje contextualizado"
+                                >
+                                  <MessageSquare className="w-3.5 h-3.5" />
+                                  <span>WA</span>
+                                </a>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ) : (
+              <div className="flex gap-4 overflow-x-auto pb-6 min-h-[550px]">
+                {STAGES.map((stg) => {
+                  const stageOpps = filteredOpportunities.filter((o) => o.stage === stg.id);
+                  const stageTotal = stageOpps.reduce((acc, curr) => acc + (curr.value || 0), 0);
+
+                  return (
+                    <div
+                      key={stg.id}
+                      className="w-72 sm:w-80 shrink-0 flex flex-col bg-slate-100/80 rounded-2xl border border-slate-200/90 overflow-hidden"
+                    >
                   {/* Column Header */}
                   <div className={`p-3.5 border-b ${stg.border} ${stg.bg} flex items-center justify-between`}>
                     <div>
@@ -1242,6 +1676,8 @@ export const CrmDashboard: React.FC<CrmDashboardProps> = ({ passkey = 'gaston202
                 </div>
               );
             })}
+              </div>
+            )}
           </div>
         )}
 

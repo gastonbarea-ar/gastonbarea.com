@@ -497,7 +497,7 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
                   }`}
                 >
                   <TrendingUp className="w-4 h-4 text-emerald-400" />
-                  <span>CRM & Oportunidades</span>
+                  <span>Red ARN & Autopiloto</span>
                 </button>
 
                 <button

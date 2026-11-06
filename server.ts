@@ -50,6 +50,13 @@ import {
   maskEmail,
   buildCustomSolutionBlueprint,
 } from './src/lib/domainLogic.ts';
+import {
+  parseNaturalArnCommand,
+  buildAutonomous404020Quote,
+  computeArnRelationshipNodes,
+  getServiceCategoryDefaultTitle,
+  ParsedArnCommand,
+} from './src/utils/arnEngine.ts';
 
 dotenv.config();
 
@@ -4455,6 +4462,477 @@ app.post('/api/admin/test-email', requireAdminAuth, async (req, res) => {
       error: err?.message || 'Error inesperado al probar envío de correo.',
     });
   }
+});
+
+// ============================================================================
+// 13. ARN ENGINE (AUTOMATED RELATIONSHIP NETWORK — ZERO-FORM & AUTOPILOT)
+// ============================================================================
+
+async function resolveArnCommandWithAi(
+  rawInput: string,
+  contactChannel?: string
+): Promise<ParsedArnCommand> {
+  const deterministic = parseNaturalArnCommand(rawInput, contactChannel);
+  if (!ai || !rawInput || rawInput.trim().length < 8) {
+    return deterministic;
+  }
+
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-3.8-flash',
+      contents: `Extraé las entidades comerciales y técnicas de la siguiente nota o mensaje natural para el motor ARN de Gastón Barea.\nTexto: "${rawInput}"\nCanal adicional: "${contactChannel || ''}"`,
+      config: {
+        responseMimeType: 'application/json',
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            clientName: { type: Type.STRING },
+            clientEmail: { type: Type.STRING },
+            companyName: { type: Type.STRING },
+            phone: { type: Type.STRING },
+            serviceCategory: {
+              type: Type.STRING,
+              description:
+                'Uno de: software_architecture, odoo_erp, ecommerce_b2b2c, fractional_cto, linux_docker, bi_analytics',
+            },
+            estimatedValue: { type: Type.NUMBER },
+            currency: { type: Type.STRING, description: 'USD o ARS' },
+            shouldGenerateQuote: { type: Type.BOOLEAN },
+            shouldActivateKickoff: { type: Type.BOOLEAN },
+            summaryTitle: { type: Type.STRING },
+          },
+        },
+      },
+    });
+
+    const parsedJson = JSON.parse((response.text ?? '{}').trim());
+    const validCategories = [
+      'software_architecture',
+      'odoo_erp',
+      'ecommerce_b2b2c',
+      'fractional_cto',
+      'linux_docker',
+      'bi_analytics',
+    ];
+    const resolvedCategory = validCategories.includes(parsedJson.serviceCategory)
+      ? parsedJson.serviceCategory
+      : deterministic.serviceCategory;
+    const resolvedCompany =
+      parsedJson.companyName && parsedJson.companyName.trim().length >= 2
+        ? parsedJson.companyName.trim()
+        : deterministic.companyName;
+
+    return {
+      ...deterministic,
+      clientName:
+        parsedJson.clientName && parsedJson.clientName.trim().length >= 2
+          ? parsedJson.clientName.trim()
+          : deterministic.clientName,
+      clientEmail:
+        parsedJson.clientEmail && parsedJson.clientEmail.includes('@')
+          ? parsedJson.clientEmail.trim().toLowerCase()
+          : deterministic.clientEmail,
+      companyName: resolvedCompany,
+      phone: parsedJson.phone || deterministic.phone,
+      serviceCategory: resolvedCategory,
+      estimatedValue:
+        typeof parsedJson.estimatedValue === 'number' && parsedJson.estimatedValue >= 100
+          ? parsedJson.estimatedValue
+          : deterministic.estimatedValue,
+      currency: parsedJson.currency === 'ARS' ? 'ARS' : deterministic.currency,
+      shouldGenerateQuote:
+        typeof parsedJson.shouldGenerateQuote === 'boolean'
+          ? parsedJson.shouldGenerateQuote
+          : deterministic.shouldGenerateQuote,
+      shouldActivateKickoff:
+        typeof parsedJson.shouldActivateKickoff === 'boolean'
+          ? parsedJson.shouldActivateKickoff
+          : deterministic.shouldActivateKickoff,
+      summaryTitle:
+        parsedJson.summaryTitle && parsedJson.summaryTitle.trim().length >= 5
+          ? parsedJson.summaryTitle.trim()
+          : getServiceCategoryDefaultTitle(resolvedCategory, resolvedCompany),
+    };
+  } catch (err) {
+    console.warn('[ARN AI Parser Fallback]:', err);
+    return deterministic;
+  }
+}
+
+// 13A. Admin Omnibar: Natural Language / Voice / WhatsApp Command Execution
+app.post('/api/arn/command', requireAdminAuth, async (req, res) => {
+  const { commandText } = req.body || {};
+  if (!commandText || !String(commandText).trim()) {
+    return res.status(400).json({ error: 'Ingresá o dictá una instrucción en lenguaje natural.' });
+  }
+
+  const parsed = await resolveArnCommandWithAi(String(commandText));
+  const actionsExecuted: string[] = [];
+
+  // 1. Upsert Company & Contact in ARN Directory
+  const { companyId, contactId } = syncContactAndCompanyFromOpportunity({
+    clientName: parsed.clientName,
+    clientEmail: parsed.clientEmail,
+    clientPhone: parsed.phone,
+    company: parsed.companyName,
+    stage: parsed.shouldActivateKickoff ? 'won' : 'contacted',
+  });
+  actionsExecuted.push(
+    `Nodo de Relación sincronizado: ${parsed.clientName} (${parsed.companyName}) · Portal habilitado (${parsed.clientEmail})`
+  );
+
+  // 2. Create or update Opportunity
+  let existingOpp = cachedOpportunities.find(
+    (o) =>
+      o.clientEmail.toLowerCase() === parsed.clientEmail.toLowerCase() &&
+      o.stage !== 'won' &&
+      o.stage !== 'lost'
+  );
+
+  const oppId = existingOpp?.id || `opp-arn-${Date.now()}`;
+  const targetStage = parsed.shouldActivateKickoff
+    ? 'won'
+    : parsed.shouldGenerateQuote
+    ? 'proposal_sent'
+    : 'contacted';
+
+  const oppPayload = {
+    id: oppId,
+    title: parsed.summaryTitle,
+    clientName: parsed.clientName,
+    clientEmail: parsed.clientEmail,
+    clientPhone: parsed.phone || existingOpp?.clientPhone,
+    company: parsed.companyName,
+    companyId,
+    contactId,
+    serviceCategory: parsed.serviceCategory,
+    stage: targetStage as any,
+    value: parsed.estimatedValue,
+    currency: parsed.currency,
+    probability: targetStage === 'won' ? 100 : targetStage === 'proposal_sent' ? 75 : 55,
+    notes: `[Comando ARN]: ${parsed.extractedNotes}`,
+    source: 'manual' as const,
+    createdAt: existingOpp?.createdAt || new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+
+  if (existingOpp) {
+    cachedOpportunities = cachedOpportunities.map((o) => (o.id === oppId ? { ...o, ...oppPayload } : o));
+  } else {
+    cachedOpportunities.unshift(oppPayload);
+  }
+  actionsExecuted.push(
+    `Oportunidad ARN "${oppPayload.title}" (${oppPayload.currency} $${oppPayload.value.toLocaleString()}) en etapa ${oppPayload.stage.toUpperCase()}`
+  );
+
+  // 3. Auto-generate 40/40/20 Quote if requested
+  let createdQuote: any = null;
+  if (parsed.shouldGenerateQuote || parsed.shouldActivateKickoff) {
+    createdQuote = buildAutonomous404020Quote({
+      opportunityId: oppId,
+      clientName: parsed.clientName,
+      clientEmail: parsed.clientEmail,
+      companyName: parsed.companyName,
+      serviceCategory: parsed.serviceCategory,
+      title: parsed.summaryTitle,
+      totalAmount: parsed.estimatedValue,
+      currency: parsed.currency,
+      notes: parsed.extractedNotes,
+    });
+    if (parsed.shouldActivateKickoff) {
+      createdQuote.status = 'accepted';
+    }
+    cachedQuotes.unshift(createdQuote);
+    cachedOpportunities = cachedOpportunities.map((o) =>
+      o.id === oppId ? { ...o, linkedQuoteId: createdQuote.quoteNumber } : o
+    );
+    actionsExecuted.push(
+      `Cotización 40/40/20 ${createdQuote.quoteNumber} generada automáticamente (${createdQuote.currency} $${createdQuote.total.toLocaleString()})`
+    );
+
+    if (parsed.clientEmail && !parsed.clientEmail.endsWith('@portal-arn.com')) {
+      sendOfficialQuoteEmail({
+        quote: createdQuote,
+        paymentConfig: cachedPaymentConfig,
+      }).catch(() => {});
+    }
+  }
+
+  // 4. Auto-provision 40/40/20 Kickoff Project if requested
+  let kickoffProject: any = null;
+  if (parsed.shouldActivateKickoff && createdQuote) {
+    kickoffProject = await autoProvisionKickoffProject({
+      clientName: createdQuote.clientName,
+      clientEmail: createdQuote.clientEmail,
+      clientPhone: parsed.phone,
+      companyName: createdQuote.clientCompany,
+      projectTitle: createdQuote.title,
+      serviceCategory: createdQuote.serviceCategory,
+      totalAmount: createdQuote.total,
+      currency: createdQuote.currency,
+      quoteNumber: createdQuote.quoteNumber,
+    });
+    actionsExecuted.push(
+      `Proyecto 40/40/20 "${kickoffProject.projectName}" aprovisionado en Portal Clientes (#portal)`
+    );
+  }
+
+  if (supabase) {
+    try {
+      await supabase.from('crm_opportunities').upsert({
+        id: oppPayload.id,
+        title: oppPayload.title,
+        client_name: oppPayload.clientName,
+        client_email: oppPayload.clientEmail,
+        company: oppPayload.company,
+        service_category: oppPayload.serviceCategory,
+        stage: oppPayload.stage,
+        value: oppPayload.value,
+        currency: oppPayload.currency,
+        probability: oppPayload.probability,
+        notes: oppPayload.notes,
+        updated_at: new Date().toISOString(),
+      });
+    } catch {
+      // non-blocking
+    }
+  }
+
+  const arnNodes = computeArnRelationshipNodes({
+    opportunities: cachedOpportunities,
+    companies: cachedCrmCompanies,
+    contacts: cachedCrmContacts,
+    quotes: cachedQuotes,
+    projects: cachedClientProjects,
+    bookings: cachedClientBookings,
+  });
+
+  return res.json({
+    success: true,
+    parsed,
+    actionsExecuted,
+    opportunity: oppPayload,
+    quote: createdQuote,
+    project: kickoffProject,
+    arnNodes,
+    data: {
+      opportunities: cachedOpportunities,
+      companies: cachedCrmCompanies,
+      contacts: cachedCrmContacts,
+      quotes: cachedQuotes,
+      payments: cachedPayments,
+    },
+  });
+});
+
+// 13B. Admin 1-Click Autonomous Node Action (/api/arn/autopilot)
+app.post('/api/arn/autopilot', requireAdminAuth, async (req, res) => {
+  const { opportunityId, actionType } = req.body || {};
+  const opp = cachedOpportunities.find((o) => o.id === opportunityId);
+  if (!opp) {
+    return res.status(404).json({ error: 'Nodo de relación no encontrado.' });
+  }
+
+  const actionsExecuted: string[] = [];
+  let createdQuote: any = null;
+  let kickoffProject: any = null;
+
+  if (actionType === 'auto_quote_40_40_20') {
+    createdQuote = buildAutonomous404020Quote({
+      opportunityId: opp.id,
+      clientName: opp.clientName,
+      clientEmail: opp.clientEmail,
+      companyName: opp.company,
+      serviceCategory: opp.serviceCategory,
+      title: opp.title,
+      totalAmount: opp.value || 4200,
+      currency: opp.currency || 'USD',
+      notes: opp.notes,
+    });
+    cachedQuotes.unshift(createdQuote);
+    opp.stage = 'proposal_sent';
+    opp.probability = 75;
+    opp.linkedQuoteId = createdQuote.quoteNumber;
+    opp.updatedAt = new Date().toISOString();
+
+    actionsExecuted.push(
+      `Propuesta 40/40/20 (${createdQuote.quoteNumber}) emitida y publicada automáticamente en el Portal del cliente.`
+    );
+
+    if (opp.clientEmail && !opp.clientEmail.endsWith('@portal-arn.com')) {
+      sendOfficialQuoteEmail({
+        quote: createdQuote,
+        paymentConfig: cachedPaymentConfig,
+      }).catch(() => {});
+    }
+  } else if (actionType === 'auto_kickoff_project') {
+    let targetQuote = cachedQuotes.find(
+      (q) =>
+        q.opportunityId === opp.id ||
+        q.quoteNumber === opp.linkedQuoteId ||
+        q.clientEmail.toLowerCase() === opp.clientEmail.toLowerCase()
+    );
+    if (!targetQuote) {
+      targetQuote = buildAutonomous404020Quote({
+        opportunityId: opp.id,
+        clientName: opp.clientName,
+        clientEmail: opp.clientEmail,
+        companyName: opp.company,
+        serviceCategory: opp.serviceCategory,
+        title: opp.title,
+        totalAmount: opp.value || 4200,
+        currency: opp.currency || 'USD',
+      });
+      cachedQuotes.unshift(targetQuote);
+    }
+    targetQuote.status = 'accepted';
+    opp.stage = 'won';
+    opp.probability = 100;
+    opp.linkedQuoteId = targetQuote.quoteNumber;
+    opp.updatedAt = new Date().toISOString();
+
+    kickoffProject = await autoProvisionKickoffProject({
+      clientName: targetQuote.clientName,
+      clientEmail: targetQuote.clientEmail,
+      clientPhone: opp.clientPhone,
+      companyName: targetQuote.clientCompany,
+      projectTitle: targetQuote.title,
+      serviceCategory: targetQuote.serviceCategory,
+      totalAmount: targetQuote.total,
+      currency: targetQuote.currency,
+      quoteNumber: targetQuote.quoteNumber,
+    });
+    createdQuote = targetQuote;
+    actionsExecuted.push(
+      `Presupuesto ${targetQuote.quoteNumber} aprobado y Proyecto 40/40/20 "${kickoffProject.projectName}" activado en el Portal.`
+    );
+  } else {
+    opp.updatedAt = new Date().toISOString();
+    actionsExecuted.push(
+      `Seguimiento autónomo registrado y notificado para ${opp.clientName} (${opp.company || 'Contacto Individual'}).`
+    );
+  }
+
+  return res.json({
+    success: true,
+    actionsExecuted,
+    opportunity: opp,
+    quote: createdQuote,
+    project: kickoffProject,
+    data: {
+      opportunities: cachedOpportunities,
+      companies: cachedCrmCompanies,
+      contacts: cachedCrmContacts,
+      quotes: cachedQuotes,
+      payments: cachedPayments,
+    },
+  });
+});
+
+// 13C. Client Zero-Form Conversational Intake (/api/arn/intake)
+app.post('/api/arn/intake', async (req, res) => {
+  const { message, contactChannel } = req.body || {};
+  if (!message && !contactChannel) {
+    return res
+      .status(400)
+      .json({ error: 'Contanos brevemente qué necesitás junto con tu correo o WhatsApp.' });
+  }
+
+  const parsed = await resolveArnCommandWithAi(
+    String(message || 'Evaluación de arquitectura y propuesta 40/40/20'),
+    String(contactChannel || '')
+  );
+
+  // 1. Auto-create/update Company & Contact with active Portal credentials
+  const { companyId, contactId } = syncContactAndCompanyFromOpportunity({
+    clientName: parsed.clientName,
+    clientEmail: parsed.clientEmail,
+    clientPhone: parsed.phone,
+    company: parsed.companyName,
+    stage: 'proposal_sent',
+  });
+
+  // 2. Create Opportunity in ARN Pipeline
+  const oppId = `opp-arn-intake-${Date.now()}`;
+  const newOpp: any = {
+    id: oppId,
+    title: parsed.summaryTitle,
+    clientName: parsed.clientName,
+    clientEmail: parsed.clientEmail,
+    clientPhone: parsed.phone,
+    company: parsed.companyName,
+    companyId,
+    contactId,
+    serviceCategory: parsed.serviceCategory,
+    stage: 'proposal_sent' as const,
+    value: parsed.estimatedValue,
+    currency: parsed.currency,
+    probability: 70,
+    notes: `[Auto-Perfilado ARN sin formularios]: ${parsed.extractedNotes}`,
+    source: 'portal_registration' as const,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+
+  // 3. Auto-build tailored 40/40/20 Quote so the client has an actionable proposal immediately
+  const autoQuote = buildAutonomous404020Quote({
+    opportunityId: oppId,
+    clientName: parsed.clientName,
+    clientEmail: parsed.clientEmail,
+    companyName: parsed.companyName,
+    serviceCategory: parsed.serviceCategory,
+    title: parsed.summaryTitle,
+    totalAmount: parsed.estimatedValue,
+    currency: parsed.currency,
+    notes: parsed.extractedNotes,
+  });
+
+  newOpp.linkedQuoteId = autoQuote.quoteNumber;
+  cachedOpportunities.unshift(newOpp);
+  cachedQuotes.unshift(autoQuote);
+
+  // 4. Create instant Client Portal session token
+  const token = `gb_cli_arn_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  const clientSessionObj = {
+    id: contactId,
+    email: parsed.clientEmail,
+    username: parsed.clientEmail.split('@')[0],
+    name: parsed.clientName,
+    company: parsed.companyName,
+    companyId,
+    role: 'Ejecutivo ARN',
+    contactType:
+      parsed.companyName && parsed.companyName !== 'Contacto Individual'
+        ? ('corporate_member' as const)
+        : ('individual' as const),
+    hasActiveService: false,
+  };
+  activeClientSessions.set(token, {
+    ...clientSessionObj,
+    expiresAt: Date.now() + 1000 * 60 * 60 * 24 * 7,
+  });
+
+  // 5. Notify Gastón at notificaciones@gastonbarea.com
+  sendContactAutomation({
+    name: parsed.clientName,
+    email: parsed.clientEmail,
+    serviceArea: parsed.summaryTitle,
+    requirements: `[INGRESO AUTÓNOMO ARN CERO-FORMULARIOS]\nEmpresa detectada: ${parsed.companyName}\nWhatsApp/Tel: ${
+      parsed.phone || 'No especificado'
+    }\nPropuesta 40/40/20 auto-emitida: ${autoQuote.quoteNumber} (${
+      autoQuote.currency
+    } $${autoQuote.total.toLocaleString()})\nMensaje original: ${parsed.extractedNotes}`,
+  }).catch(() => {});
+
+  return res.json({
+    success: true,
+    token,
+    client: clientSessionObj,
+    opportunity: newOpp,
+    quote: autoQuote,
+    parsed,
+    message: `¡Bienvenido/a ${parsed.clientName}! Perfilamos tu nodo ARN para ${parsed.companyName} y generamos tu propuesta 40/40/20 (${autoQuote.quoteNumber}) sin formularios.`,
+  });
 });
 
 async function startServer() {

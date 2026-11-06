@@ -377,6 +377,62 @@ describe('8. Integración WhatsApp Business API & Automatizaciones CRM (whatsapp
   });
 });
 
+// ============================================================================
+// 9. MOTOR ARN (AUTOMATED RELATIONSHIP NETWORK — CERO FORMULARIOS & AUTOPILOTO)
+// ============================================================================
+import {
+  parseNaturalArnCommand,
+  buildAutonomous404020Quote,
+  computeArnRelationshipNodes,
+} from '../utils/arnEngine.ts';
+
+describe('9. Motor ARN (Automated Relationship Network — Cero Formularios)', () => {
+  it('debe extraer cliente, empresa, email, vertical y monto desde una instrucción natural sin formularios', () => {
+    const parsed = parseNaturalArnCommand(
+      'Hablé con Valeria de Bodega Austral, correo valeria@bodegaaustral.com, necesitan Odoo v18 ERP e inventario por USD 5400, armar propuesta 40/40/20'
+    );
+    assert.equal(parsed.clientName, 'Valeria');
+    assert.equal(parsed.clientEmail, 'valeria@bodegaaustral.com');
+    assert.equal(parsed.companyName, 'Bodega Austral');
+    assert.equal(parsed.serviceCategory, 'odoo_erp');
+    assert.equal(parsed.estimatedValue, 5400);
+    assert.equal(parsed.currency, 'USD');
+    assert.equal(parsed.shouldGenerateQuote, true);
+  });
+
+  it('debe generar una cotización formal 40/40/20 exacta sin intervención manual', () => {
+    const quote = buildAutonomous404020Quote({
+      opportunityId: 'opp-test-arn',
+      clientName: 'Valeria',
+      clientEmail: 'valeria@bodegaaustral.com',
+      companyName: 'Bodega Austral',
+      serviceCategory: 'odoo_erp',
+      title: 'Implementación Odoo v18 · Bodega Austral',
+      totalAmount: 5000,
+      currency: 'USD',
+    });
+    assert.equal(quote.total, 5000);
+    assert.equal(quote.milestones.length, 3);
+    assert.equal(quote.milestones[0].amount, 2000);
+    assert.equal(quote.milestones[1].amount, 2000);
+    assert.equal(quote.milestones[2].amount, 1000);
+  });
+
+  it('debe calcular nodos de relación ARN ordenados por impulso y sugerir acción autónoma en 1 clic', () => {
+    const nodes = computeArnRelationshipNodes({
+      opportunities: INITIAL_CRM_OPPORTUNITIES,
+      companies: INITIAL_CRM_COMPANIES,
+      contacts: INITIAL_CRM_CONTACTS,
+      quotes: INITIAL_CRM_QUOTES,
+      projects: INITIAL_CLIENT_PROJECTS,
+    });
+    assert.ok(nodes.length > 0);
+    assert.ok(nodes[0].momentumScore >= nodes[nodes.length - 1].momentumScore);
+    assert.ok(nodes[0].autonomousAction.buttonLabel.length > 5);
+  });
+});
+
+
 
 
 

@@ -190,6 +190,11 @@ export const ClientPortalModal: React.FC<ClientPortalModalProps> = ({ isOpen = t
   const [isApprovingQuoteId, setIsApprovingQuoteId] = useState<string | null>(null);
   const [quoteApprovalFeedback, setQuoteApprovalFeedback] = useState<string>('');
 
+  // Zero-Form Conversational ARN Intake state
+  const [arnIntakeMessage, setArnIntakeMessage] = useState<string>('');
+  const [arnIntakeChannel, setArnIntakeChannel] = useState<string>('');
+  const [isSubmittingArnIntake, setIsSubmittingArnIntake] = useState<boolean>(false);
+
   // Check existing session and load booking availability
   useEffect(() => {
     if (!isOpen) return;
@@ -911,6 +916,54 @@ export const ClientPortalModal: React.FC<ClientPortalModalProps> = ({ isOpen = t
     }
   };
 
+  // Zero-Form Conversational ARN Intake -> Profiles user, creates 40/40/20 Quote & logs into Portal in 1 click
+  const handleArnConversationalIntake = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if ((!arnIntakeMessage.trim() && !arnIntakeChannel.trim()) || isSubmittingArnIntake) return;
+    setIsSubmittingArnIntake(true);
+    setAuthError('');
+
+    try {
+      const res = await fetch('/api/arn/intake', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: arnIntakeMessage.trim(),
+          contactChannel: arnIntakeChannel.trim() || clientSession?.email || emailInput,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        if (data.token && data.client && !token) {
+          setToken(data.token);
+          setClientSession(data.client);
+          localStorage.setItem('gb_client_token', data.token);
+          localStorage.setItem('gb_client_user', JSON.stringify(data.client));
+        }
+        if (data.opportunity) {
+          setRelatedOpportunities((prev) => [data.opportunity, ...prev]);
+        }
+        if (data.quote) {
+          setRelatedQuotes((prev) => [data.quote, ...prev]);
+        }
+        if (data.message) {
+          setQuoteApprovalFeedback(data.message);
+        }
+        setArnIntakeMessage('');
+        setActiveTab('project');
+        if (data.token && data.client) {
+          loadDashboardData(data.token, data.client);
+        }
+      } else if (data.error) {
+        setAuthError(data.error);
+      }
+    } catch (err) {
+      console.error('Error in ARN conversational intake:', err);
+    } finally {
+      setIsSubmittingArnIntake(false);
+    }
+  };
+
   const getUpcomingBusinessDays = () => {
     const days: { iso: string; shortLabel: string; dayName: string }[] = [];
     const weekdayNames = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
@@ -1236,9 +1289,58 @@ export const ClientPortalModal: React.FC<ClientPortalModalProps> = ({ isOpen = t
                 <p className="text-xs sm:text-sm text-[#515154]">
                   {loginMethod === 'register'
                     ? 'Registrate como miembro de una corporación o como contacto individual. Todos los contactos pasan a ser usuarios del Portal Clientes sin necesidad de tener un servicio contratado activo.'
-                    : 'Ingresá con tu usuario de la Agenda CRM o creá tu cuenta gratuita para consultar propuestas, agendar sesiones 1-on-1 o supervisar proyectos activos.'}
+                    : 'Ingresá con tu usuario de la Agenda ARN o usá el Ingreso Conversacional en 1 clic sin llenar formularios.'}
                 </p>
               </div>
+
+              {/* ZERO-FORM ARN CONVERSATIONAL INTAKE CARD */}
+              <form
+                onSubmit={handleArnConversationalIntake}
+                className="p-4 bg-[#0F172A] text-white border border-slate-800 space-y-3"
+              >
+                <div className="flex items-center justify-between gap-2 text-xs">
+                  <span className="font-bold text-emerald-400 flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5" />
+                    <span>Ingreso Rápido ARN · Cero Formularios (1-Clic)</span>
+                  </span>
+                  <span className="text-[10px] font-mono text-slate-400">Auto-Perfilado con IA</span>
+                </div>
+                <p className="text-xs text-slate-300 leading-relaxed">
+                  Escribí en una línea quién sos, tu empresa y qué necesitás junto con tu correo o WhatsApp. El motor ARN crea tu cuenta y estructura tu propuesta 40/40/20 automáticamente:
+                </p>
+                <div className="space-y-2">
+                  <input
+                    type="text"
+                    required
+                    value={arnIntakeMessage}
+                    onChange={(e) => setArnIntakeMessage(e.target.value)}
+                    placeholder='Ej: "Soy Martín de AgroSur, buscamos implementar Odoo v18 e IoT"...'
+                    className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-700 text-xs text-white placeholder:text-slate-400 focus:outline-none focus:border-emerald-400"
+                  />
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <input
+                      type="text"
+                      required
+                      value={arnIntakeChannel}
+                      onChange={(e) => setArnIntakeChannel(e.target.value)}
+                      placeholder="Tu Email o WhatsApp (ej: martin@agrosur.com)"
+                      className="flex-1 px-3.5 py-2 bg-slate-900 border border-slate-700 text-xs font-mono text-white placeholder:text-slate-400 focus:outline-none focus:border-emerald-400"
+                    />
+                    <button
+                      type="submit"
+                      disabled={isSubmittingArnIntake || !arnIntakeMessage.trim()}
+                      className="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 whitespace-nowrap"
+                    >
+                      {isSubmittingArnIntake ? (
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <ArrowRight className="w-3.5 h-3.5" />
+                      )}
+                      <span>Entrar y Cotizar 40/40/20</span>
+                    </button>
+                  </div>
+                </div>
+              </form>
 
               {/* Login / Register Method Switcher */}
               <div className="grid grid-cols-3 border border-black/10 bg-[#F5F5F7] p-1">
