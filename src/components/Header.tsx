@@ -502,7 +502,7 @@ export const Header: React.FC<HeaderProps> = ({
           </nav>
 
           {/* Zone 3: Client Portal + Admin Dashboard + Primary Action */}
-          <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
+          <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
             {onClientPortalClick && (
               <button
                 type="button"
@@ -511,7 +511,7 @@ export const Header: React.FC<HeaderProps> = ({
                   setSolucionesDropdownOpen(false);
                   onClientPortalClick();
                 }}
-                className={`px-3 sm:px-3.5 py-2 text-[12.5px] sm:text-[13px] font-sans font-semibold tracking-[-0.01em] transition-all inline-flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer border ${
+                className={`min-h-[40px] px-2.5 sm:px-3.5 py-2 text-xs sm:text-[13px] font-sans font-semibold tracking-[-0.01em] transition-all inline-flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer border ${
                   activePage === 'portal-clientes'
                     ? 'bg-[#291B64] text-white border-[#291B64]'
                     : isOverDarkStage
@@ -522,7 +522,7 @@ export const Header: React.FC<HeaderProps> = ({
               >
                 <UserCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
                 <span className="hidden md:inline">Portal Clientes</span>
-                <span className="md:hidden">Clientes</span>
+                <span className="md:hidden">Portal</span>
               </button>
             )}
 
@@ -534,18 +534,18 @@ export const Header: React.FC<HeaderProps> = ({
                   setSolucionesDropdownOpen(false);
                   onAdminClick();
                 }}
-                className={`px-2.5 sm:px-3 py-2 text-[12.5px] sm:text-[13px] font-sans font-semibold tracking-[-0.01em] transition-all inline-flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer border ${
+                className={`min-h-[40px] px-2.5 sm:px-3 py-2 text-xs sm:text-[13px] font-sans font-semibold tracking-[-0.01em] transition-all inline-flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer border ${
                   activePage === 'admin'
                     ? 'bg-emerald-600 text-white border-emerald-600'
                     : isOverDarkStage
                     ? 'bg-white/[0.04] text-neutral-300 border-white/10 hover:text-white hover:bg-white/[0.12]'
                     : 'bg-white text-[#515154] border-black/10 hover:text-[#1D1D1F] hover:border-black/25'
                 }`}
-                title="Panel de Control & Dashboard CRM"
-                aria-label="Ir al Panel de Control y Dashboard"
+                title="Centro Autónomo ARN & Dashboard"
+                aria-label="Ir al Centro Autónomo ARN"
               >
                 <LayoutDashboard className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                <span className="hidden xl:inline">Dashboard</span>
+                <span className="hidden xl:inline">Centro ARN</span>
               </button>
             )}
 
@@ -556,11 +556,10 @@ export const Header: React.FC<HeaderProps> = ({
                 setSolucionesDropdownOpen(false);
                 onScheduleClick();
               }}
-              className="px-3.5 sm:px-4 py-2 text-[12.5px] sm:text-[13px] font-sans font-semibold tracking-[-0.01em] text-white bg-[#291B64] hover:bg-[#382586] transition-colors inline-flex items-center gap-2 whitespace-nowrap shrink-0 cursor-pointer border border-[#291B64]"
+              className="hidden sm:inline-flex min-h-[40px] px-3.5 sm:px-4 py-2 text-[12.5px] sm:text-[13px] font-sans font-semibold tracking-[-0.01em] text-white bg-[#291B64] hover:bg-[#382586] transition-colors items-center gap-2 whitespace-nowrap shrink-0 cursor-pointer border border-[#291B64]"
             >
-              <Video className="w-3.5 h-3.5 hidden sm:inline shrink-0" />
-              <span className="hidden sm:inline">¡Hablemos! Agendar Meet</span>
-              <span className="sm:hidden">¡Hablemos! Meet</span>
+              <Video className="w-3.5 h-3.5 shrink-0" />
+              <span>¡Hablemos! Agendar Meet</span>
             </button>
           </div>
         </div>

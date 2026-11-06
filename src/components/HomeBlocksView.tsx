@@ -17,6 +17,7 @@ import { PROJECTS_CATALOG } from '../data/projectsData';
 import { ArticleReaderModal } from './blog/ArticleReaderModal';
 import { PostEditorModal } from './blog/PostEditorModal';
 import { PageSectionId } from './Header';
+import { ArnClientIntakeWidget } from './ArnClientIntakeWidget';
 
 interface HomeBlocksViewProps {
   onNavigatePage: (page: PageSectionId, serviceCode?: string) => void;
@@ -680,23 +681,23 @@ export const HomeBlocksView: React.FC<HomeBlocksViewProps> = ({
       </section>
 
       {/* =====================================================================
-          BLOQUE 6: CONTACTO EJECUTIVO DIRECTO
+          BLOQUE 6: CONTACTO EJECUTIVO DIRECTO & RED AUTÓNOMA ARN (CERO FORMULARIOS)
          ===================================================================== */}
-      <section className="w-full py-20 md:py-24 bg-[#0A0A0E] text-white">
-        <div className="w-full px-4 sm:px-8 lg:px-12 xl:px-16">
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-10 text-left">
-            <div className="space-y-3 max-w-2xl">
+      <section className="w-full py-14 md:py-24 bg-[#0A0A0E] text-white">
+        <div className="w-full px-4 sm:px-8 lg:px-12 xl:px-16 space-y-8">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 text-left">
+            <div className="space-y-2.5 max-w-2xl">
               <div className="text-xs font-mono text-emerald-400 font-semibold">
-                BLOQUE 05 · CONTACTO DIRECTO & PROTOCOLO NDA
+                BLOQUE 05 · INICIO DE RELACIÓN ARN (CERO FORMULARIOS) & PROTOCOLO NDA
               </div>
               <h2
-                className="font-display text-3xl sm:text-4xl font-bold tracking-tight text-white leading-tight"
+                className="font-display text-2xl sm:text-4xl font-bold tracking-tight text-white leading-tight"
                 style={{ textWrap: 'balance' }}
               >
-                ¿Listo para evaluar su proyecto tecnológico, de IA Services o bioeconomía?
+                ¿Listo para evaluar tu proyecto tecnológico, de IA Services o bioeconomía?
               </h2>
               <p className="text-sm text-neutral-300 leading-relaxed">
-                Coordine una videollamada ejecutiva de 30 minutos por Google Meet Pro o abra la página de Contacto para enviar los requerimientos bajo acuerdo de confidencialidad.
+                Escribí o dictá en una línea tu necesidad abajo para generar al instante tu propuesta 40/40/20 y abrir tu Portal de Clientes, o agendá directamente una sesión en Google Meet Pro.
               </p>
             </div>
 
@@ -704,7 +705,7 @@ export const HomeBlocksView: React.FC<HomeBlocksViewProps> = ({
               <button
                 type="button"
                 onClick={() => onScheduleClick('Sesión Ejecutiva desde Bloque de Cierre Home')}
-                className="px-6 py-4 text-xs sm:text-sm font-mono font-bold text-white bg-[#291B64] hover:bg-[#382586] rounded-none transition-colors inline-flex items-center gap-2 cursor-pointer"
+                className="min-h-[46px] px-5 py-3 text-xs sm:text-sm font-mono font-bold text-white bg-[#291B64] hover:bg-[#382586] rounded-none transition-colors inline-flex items-center gap-2 cursor-pointer"
               >
                 <Video className="w-4 h-4 text-emerald-300" />
                 <span>Agendar Google Meet Pro (30m)</span>
@@ -712,23 +713,21 @@ export const HomeBlocksView: React.FC<HomeBlocksViewProps> = ({
 
               <button
                 type="button"
-                onClick={() => onNavigatePage('contacto')}
-                className="px-6 py-4 text-xs sm:text-sm font-mono font-bold text-white bg-white/10 hover:bg-white/20 rounded-none transition-colors inline-flex items-center gap-2 cursor-pointer"
-              >
-                <span>Abrir Página de Contacto & Formulario</span>
-                <ArrowRight className="w-4 h-4" />
-              </button>
-
-              <button
-                type="button"
                 onClick={() => onWhatsAppClick()}
-                className="px-5 py-4 text-xs font-mono font-semibold text-neutral-300 hover:text-white underline underline-offset-4 inline-flex items-center gap-1.5 cursor-pointer"
+                className="min-h-[46px] px-5 py-3 text-xs font-mono font-semibold text-emerald-950 bg-emerald-400 hover:bg-emerald-300 rounded-none transition-colors inline-flex items-center gap-1.5 cursor-pointer"
               >
-                <MessageSquare className="w-4 h-4 text-emerald-400" />
+                <MessageSquare className="w-4 h-4" />
                 <span>WhatsApp Directo</span>
               </button>
             </div>
           </div>
+
+          <ArnClientIntakeWidget
+            variant="hero-dark"
+            onOpenPortalWithSession={onClientPortalClick}
+            onScheduleClick={onScheduleClick}
+            onWhatsAppClick={onWhatsAppClick}
+          />
         </div>
       </section>
 

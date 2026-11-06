@@ -12,6 +12,7 @@ import {
 import { SITE_CONFIG } from '../data/siteConfig';
 import { saveContactInquiry } from '../lib/supabase';
 import { validateContactForm } from '../lib/domainLogic';
+import { ArnClientIntakeWidget } from './ArnClientIntakeWidget';
 
 interface ContactSectionProps {
   initialService?: string;
@@ -104,10 +105,26 @@ export const ContactSection: React.FC<ContactSectionProps> = ({
       </div>
 
       {/* Main Content Split (Frameless Tonal Surfaces) */}
-      <div className="w-full px-4 sm:px-8 lg:px-12 xl:px-16 py-16 md:py-20 text-left">
+      <div className="w-full px-4 sm:px-8 lg:px-12 xl:px-16 py-10 md:py-16 space-y-12 text-left">
+        {/* ARN Zero-Form Instant Intake Banner */}
+        <div className="space-y-3">
+          <div className="text-xs font-mono font-bold text-[#291B64] uppercase tracking-wider">
+            OPCIÓN RECOMENDADA · INGRESO CONVERSACIONAL ARN (SIN LLENAR FORMULARIOS)
+          </div>
+          <ArnClientIntakeWidget
+            variant="home-light"
+            initialMessage={initialMessage}
+            onOpenPortalWithSession={() => {
+              window.location.hash = '#portal';
+            }}
+            onScheduleClick={onScheduleClick ? () => onScheduleClick() : undefined}
+            onWhatsAppClick={onWhatsAppClick}
+          />
+        </div>
+
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-start">
           {/* Left Column (7 cols): Validated Lead Capture Form */}
-          <div className="lg:col-span-7 p-8 sm:p-10 rounded-none bg-[#F6F6F9]">
+          <div className="lg:col-span-7 p-6 sm:p-10 rounded-none bg-[#F6F6F9]">
             {submitted ? (
               <div className="py-12 text-center space-y-4">
                 <div className="w-12 h-12 rounded-none bg-[#291B64] text-white mx-auto flex items-center justify-center">

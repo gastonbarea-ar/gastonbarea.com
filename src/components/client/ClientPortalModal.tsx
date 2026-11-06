@@ -1763,12 +1763,12 @@ export const ClientPortalModal: React.FC<ClientPortalModalProps> = ({ isOpen = t
            AUTHENTICATED FULL-PAGE SAAS CLIENT WORKSPACE (NO POP-UP)
         ============================================================== */
         <div className="flex-1 flex flex-col lg:flex-row min-h-[calc(100vh-4rem)]">
-          {/* LEFT WORKSPACE SIDEBAR */}
-          <aside className="w-full lg:w-72 bg-[#0A0A0F] text-white border-b lg:border-b-0 lg:border-r border-white/10 p-5 sm:p-6 flex flex-col justify-between shrink-0">
-            <div className="space-y-6">
+          {/* LEFT WORKSPACE SIDEBAR (Compact + Horizontal Swipe Tabs on Mobile, Full Sidebar on Desktop) */}
+          <aside className="w-full lg:w-72 bg-[#0A0A0F] text-white border-b lg:border-b-0 lg:border-r border-white/10 p-4 sm:p-6 flex flex-col justify-between shrink-0">
+            <div className="space-y-4 lg:space-y-6">
               {/* Client Session Profile Card */}
-              <div className="p-4 bg-white/[0.04] border border-white/10 space-y-2">
-                <div className="flex items-center justify-between">
+              <div className="p-3.5 sm:p-4 bg-white/[0.04] border border-white/10 space-y-1.5">
+                <div className="flex items-center justify-between gap-2">
                   <span
                     className={`text-[10px] font-mono uppercase tracking-wider px-2 py-0.5 border font-semibold ${
                       project
@@ -1776,156 +1776,151 @@ export const ClientPortalModal: React.FC<ClientPortalModalProps> = ({ isOpen = t
                         : 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30'
                     }`}
                   >
-                    {project ? 'Servicio Activo' : 'Usuario Registrado'}
+                    {project ? 'Servicio Activo' : 'Miembro Red ARN'}
                   </span>
                   <span className="text-[11px] font-mono text-neutral-400">
                     {project?.quoteNumber ||
-                      (clientSession?.contactType === 'individual' ? 'INDIVIDUAL' : 'CORP-CRM')}
+                      (clientSession?.contactType === 'individual' ? 'INDIVIDUAL' : 'CORP-ARN')}
                   </span>
                 </div>
-                <div>
-                  <div className="font-display text-sm font-bold text-white">
-                    {clientSession?.name}
-                  </div>
-                  <div className="text-xs text-emerald-400 font-medium">
-                    {clientSession?.company}
-                  </div>
-                  {clientSession?.role && (
-                    <div className="text-[11px] text-neutral-300">
-                      {clientSession.role}
+                <div className="flex flex-wrap items-baseline justify-between gap-2">
+                  <div>
+                    <div className="font-display text-sm font-bold text-white">
+                      {clientSession?.name}
                     </div>
-                  )}
-                  <div className="text-[11px] font-mono text-neutral-400 truncate mt-0.5">
+                    <div className="text-xs text-emerald-400 font-medium">
+                      {clientSession?.company}
+                    </div>
+                  </div>
+                  <div className="text-[11px] font-mono text-neutral-400 truncate">
                     {clientSession?.email}
                   </div>
                 </div>
               </div>
 
-              {/* Workspace Navigation */}
-              <nav className="space-y-1.5" aria-label="Menú del Portal de Clientes">
-                <div className="text-[11px] font-sans font-semibold uppercase tracking-wider text-neutral-400 px-2 pb-1">
+              {/* Workspace Navigation (Horizontal scroll on mobile, vertical stack on desktop) */}
+              <nav aria-label="Menú del Portal de Clientes" className="space-y-1.5">
+                <div className="hidden lg:block text-[11px] font-sans font-semibold uppercase tracking-wider text-neutral-400 px-2 pb-1">
                   Espacio de Trabajo
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('project')}
-                  className={`w-full px-3.5 py-2.5 text-xs font-sans font-semibold transition-all flex items-center justify-between cursor-pointer ${
-                    activeTab === 'project'
-                      ? 'bg-[#291B64] text-white border-l-2 border-emerald-400'
-                      : 'text-neutral-300 hover:bg-white/[0.06] hover:text-white'
-                  }`}
-                >
-                  <span className="inline-flex items-center gap-2.5">
-                    <FolderGit2 className="w-4 h-4 text-emerald-400" />
-                    <span>{project ? 'Estado & Hitos del Proyecto' : 'Mi Espacio & Propuestas'}</span>
-                  </span>
-                  {project ? (
-                    <span className="text-[11px] font-mono text-emerald-300">
-                      {project.progressPercent}%
+                <div className="flex lg:flex-col gap-1.5 overflow-x-auto pb-1 lg:pb-0 snap-x">
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('project')}
+                    className={`snap-start shrink-0 lg:w-full min-h-[42px] px-3.5 py-2.5 text-xs font-sans font-semibold transition-all flex items-center justify-between gap-2 cursor-pointer ${
+                      activeTab === 'project'
+                        ? 'bg-[#291B64] text-white border-b-2 lg:border-b-0 lg:border-l-2 border-emerald-400'
+                        : 'bg-white/[0.03] lg:bg-transparent text-neutral-300 hover:bg-white/[0.06] hover:text-white'
+                    }`}
+                  >
+                    <span className="inline-flex items-center gap-2 whitespace-nowrap">
+                      <FolderGit2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                      <span>{project ? 'Proyecto 40/40/20' : 'Propuestas & ARN'}</span>
                     </span>
-                  ) : (
-                    <span className="text-[10px] font-mono px-1.5 py-0.5 bg-white/10 text-neutral-300">
-                      CRM
+                    {project ? (
+                      <span className="text-[11px] font-mono text-emerald-300">
+                        {project.progressPercent}%
+                      </span>
+                    ) : (
+                      <span className="text-[10px] font-mono px-1.5 py-0.5 bg-white/10 text-neutral-300">
+                        {relatedQuotes.length || 'ARN'}
+                      </span>
+                    )}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('directory')}
+                    className={`snap-start shrink-0 lg:w-full min-h-[42px] px-3.5 py-2.5 text-xs font-sans font-semibold transition-all flex items-center justify-between gap-2 cursor-pointer ${
+                      activeTab === 'directory'
+                        ? 'bg-[#291B64] text-white border-b-2 lg:border-b-0 lg:border-l-2 border-emerald-400'
+                        : 'bg-white/[0.03] lg:bg-transparent text-neutral-300 hover:bg-white/[0.06] hover:text-white'
+                    }`}
+                  >
+                    <span className="inline-flex items-center gap-2 whitespace-nowrap">
+                      <Users className="w-4 h-4 text-emerald-400 shrink-0" />
+                      <span>Mi Corporación</span>
                     </span>
-                  )}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('directory')}
-                  className={`w-full px-3.5 py-2.5 text-xs font-sans font-semibold transition-all flex items-center justify-between cursor-pointer ${
-                    activeTab === 'directory'
-                      ? 'bg-[#291B64] text-white border-l-2 border-emerald-400'
-                      : 'text-neutral-300 hover:bg-white/[0.06] hover:text-white'
-                  }`}
-                >
-                  <span className="inline-flex items-center gap-2.5">
-                    <Users className="w-4 h-4 text-emerald-400" />
-                    <span>
-                      {clientSession?.contactType === 'individual'
-                        ? 'Mi Ficha en Agenda CRM'
-                        : 'Mi Corporación & Contactos'}
+                    <span className="text-[11px] font-mono px-1.5 py-0.5 bg-white/10 text-white">
+                      {corporateColleagues.length || 1}
                     </span>
-                  </span>
-                  <span className="text-[11px] font-mono px-1.5 py-0.5 bg-white/10 text-white">
-                    {corporateColleagues.length || 1}
-                  </span>
-                </button>
+                  </button>
 
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('inquiries')}
-                  className={`w-full px-3.5 py-2.5 text-xs font-sans font-semibold transition-all flex items-center justify-between cursor-pointer ${
-                    activeTab === 'inquiries'
-                      ? 'bg-[#291B64] text-white border-l-2 border-emerald-400'
-                      : 'text-neutral-300 hover:bg-white/[0.06] hover:text-white'
-                  }`}
-                >
-                  <span className="inline-flex items-center gap-2.5">
-                    <HelpCircle className="w-4 h-4 text-emerald-400" />
-                    <span>Consultas de Asesoramiento</span>
-                  </span>
-                  <span className="text-[11px] font-mono px-1.5 py-0.5 bg-white/10 text-white">
-                    {inquiries.length}
-                  </span>
-                </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('inquiries')}
+                    className={`snap-start shrink-0 lg:w-full min-h-[42px] px-3.5 py-2.5 text-xs font-sans font-semibold transition-all flex items-center justify-between gap-2 cursor-pointer ${
+                      activeTab === 'inquiries'
+                        ? 'bg-[#291B64] text-white border-b-2 lg:border-b-0 lg:border-l-2 border-emerald-400'
+                        : 'bg-white/[0.03] lg:bg-transparent text-neutral-300 hover:bg-white/[0.06] hover:text-white'
+                    }`}
+                  >
+                    <span className="inline-flex items-center gap-2 whitespace-nowrap">
+                      <HelpCircle className="w-4 h-4 text-emerald-400 shrink-0" />
+                      <span>Consultas</span>
+                    </span>
+                    <span className="text-[11px] font-mono px-1.5 py-0.5 bg-white/10 text-white">
+                      {inquiries.length}
+                    </span>
+                  </button>
 
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('bookings')}
-                  className={`w-full px-3.5 py-2.5 text-xs font-sans font-semibold transition-all flex items-center justify-between cursor-pointer ${
-                    activeTab === 'bookings'
-                      ? 'bg-[#291B64] text-white border-l-2 border-emerald-400'
-                      : 'text-neutral-300 hover:bg-white/[0.06] hover:text-white'
-                  }`}
-                >
-                  <span className="inline-flex items-center gap-2.5">
-                    <Calendar className="w-4 h-4 text-emerald-400" />
-                    <span>Agenda & Sprint Reviews</span>
-                  </span>
-                  <span className="text-[11px] font-mono px-1.5 py-0.5 bg-white/10 text-white">
-                    {bookings.length}
-                  </span>
-                </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('bookings')}
+                    className={`snap-start shrink-0 lg:w-full min-h-[42px] px-3.5 py-2.5 text-xs font-sans font-semibold transition-all flex items-center justify-between gap-2 cursor-pointer ${
+                      activeTab === 'bookings'
+                        ? 'bg-[#291B64] text-white border-b-2 lg:border-b-0 lg:border-l-2 border-emerald-400'
+                        : 'bg-white/[0.03] lg:bg-transparent text-neutral-300 hover:bg-white/[0.06] hover:text-white'
+                    }`}
+                  >
+                    <span className="inline-flex items-center gap-2 whitespace-nowrap">
+                      <Calendar className="w-4 h-4 text-emerald-400 shrink-0" />
+                      <span>Agenda Meet</span>
+                    </span>
+                    <span className="text-[11px] font-mono px-1.5 py-0.5 bg-white/10 text-white">
+                      {bookings.length}
+                    </span>
+                  </button>
 
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('tickets')}
-                  className={`w-full px-3.5 py-2.5 text-xs font-sans font-semibold transition-all flex items-center justify-between cursor-pointer ${
-                    activeTab === 'tickets'
-                      ? 'bg-[#291B64] text-white border-l-2 border-emerald-400'
-                      : 'text-neutral-300 hover:bg-white/[0.06] hover:text-white'
-                  }`}
-                >
-                  <span className="inline-flex items-center gap-2.5">
-                    <ShieldCheck className="w-4 h-4 text-emerald-400" />
-                    <span>Soporte Técnico & SLA</span>
-                  </span>
-                  <span className="text-[11px] font-mono px-1.5 py-0.5 bg-white/10 text-white">
-                    {tickets.length}
-                  </span>
-                </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('tickets')}
+                    className={`snap-start shrink-0 lg:w-full min-h-[42px] px-3.5 py-2.5 text-xs font-sans font-semibold transition-all flex items-center justify-between gap-2 cursor-pointer ${
+                      activeTab === 'tickets'
+                        ? 'bg-[#291B64] text-white border-b-2 lg:border-b-0 lg:border-l-2 border-emerald-400'
+                        : 'bg-white/[0.03] lg:bg-transparent text-neutral-300 hover:bg-white/[0.06] hover:text-white'
+                    }`}
+                  >
+                    <span className="inline-flex items-center gap-2 whitespace-nowrap">
+                      <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
+                      <span>Soporte SLA</span>
+                    </span>
+                    <span className="text-[11px] font-mono px-1.5 py-0.5 bg-white/10 text-white">
+                      {tickets.length}
+                    </span>
+                  </button>
+                </div>
               </nav>
             </div>
 
-            {/* Sidebar Footer Actions */}
-            <div className="pt-6 mt-6 border-t border-white/10 space-y-2">
+            {/* Sidebar Footer Actions (Single compact row on mobile, stacked on desktop) */}
+            <div className="pt-3 mt-3 lg:pt-6 lg:mt-6 border-t border-white/10 grid grid-cols-2 lg:grid-cols-1 gap-2">
               <button
                 type="button"
                 onClick={onClose}
-                className="w-full px-3.5 py-2.5 text-xs font-sans font-medium text-neutral-300 hover:text-white hover:bg-white/[0.06] transition-colors flex items-center gap-2 cursor-pointer"
+                className="w-full min-h-[40px] px-3 py-2 text-xs font-sans font-medium text-neutral-300 hover:text-white bg-white/[0.04] hover:bg-white/[0.08] transition-colors flex items-center justify-center lg:justify-start gap-2 cursor-pointer"
               >
-                <ArrowLeft className="w-4 h-4 text-emerald-400" />
-                <span>Volver al Sitio Web</span>
+                <ArrowLeft className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span>Volver al Inicio</span>
               </button>
 
               <button
                 type="button"
                 onClick={handleLogout}
-                className="w-full px-3.5 py-2.5 text-xs font-sans font-semibold text-rose-300 hover:text-white hover:bg-rose-600/30 border border-rose-500/20 transition-colors flex items-center gap-2 cursor-pointer"
+                className="w-full min-h-[40px] px-3 py-2 text-xs font-sans font-semibold text-rose-300 hover:text-white hover:bg-rose-600/30 border border-rose-500/20 transition-colors flex items-center justify-center lg:justify-start gap-2 cursor-pointer"
               >
-                <LogOut className="w-4 h-4" />
-                <span>Cerrar Sesión Segura</span>
+                <LogOut className="w-4 h-4 shrink-0" />
+                <span>Cerrar Sesión</span>
               </button>
             </div>
           </aside>
@@ -1933,10 +1928,10 @@ export const ClientPortalModal: React.FC<ClientPortalModalProps> = ({ isOpen = t
           {/* MAIN WORKSPACE CONTENT AREA */}
           <div className="flex-1 flex flex-col min-w-0 bg-[#F5F5F7]">
             {/* Top Contextual Workspace Bar */}
-            <div className="bg-white border-b border-black/[0.07] px-6 sm:px-8 py-4 flex flex-wrap items-center justify-between gap-4">
+            <div className="bg-white border-b border-black/[0.07] px-4 sm:px-8 py-4 flex flex-wrap items-center justify-between gap-3">
               <div>
-                <div className="text-xs font-sans text-[#515154] flex items-center gap-2">
-                  <span>Portal Clientes</span>
+                <div className="text-xs font-sans text-[#515154] flex flex-wrap items-center gap-2">
+                  <span>Portal Clientes ARN</span>
                   <span>/</span>
                   <strong className="text-[#1D1D1F]">{clientSession?.company}</strong>
                   {clientSession?.contactType === 'individual' && (
@@ -1945,18 +1940,18 @@ export const ClientPortalModal: React.FC<ClientPortalModalProps> = ({ isOpen = t
                     </span>
                   )}
                 </div>
-                <h1 className="font-display text-lg sm:text-xl font-bold text-[#1D1D1F] tracking-tight mt-0.5">
+                <h1 className="font-display text-base sm:text-xl font-bold text-[#1D1D1F] tracking-tight mt-0.5">
                   {project?.projectName ||
-                    'Espacio de Usuario Registrado · Exploración, Propuestas & Consultoría'}
+                    'Espacio Autónomo ARN · Propuestas 40/40/20 & Consultoría'}
                 </h1>
               </div>
 
-              <div className="flex items-center gap-2.5">
+              <div className="flex items-center gap-2">
                 <button
                   type="button"
                   onClick={() => loadDashboardData(token)}
                   disabled={isLoadingDashboard}
-                  className="px-3 py-2 bg-[#F5F5F7] hover:bg-black/[0.06] border border-black/10 text-xs font-sans font-semibold text-[#1D1D1F] inline-flex items-center gap-1.5 transition-colors cursor-pointer"
+                  className="min-h-[38px] px-3 py-2 bg-[#F5F5F7] hover:bg-black/[0.06] border border-black/10 text-xs font-sans font-semibold text-[#1D1D1F] inline-flex items-center gap-1.5 transition-colors cursor-pointer"
                   title="Sincronizar datos del portal"
                 >
                   <RefreshCw className={`w-3.5 h-3.5 ${isLoadingDashboard ? 'animate-spin' : ''}`} />
@@ -1968,25 +1963,70 @@ export const ClientPortalModal: React.FC<ClientPortalModalProps> = ({ isOpen = t
                     href={project.stagingUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="px-3.5 py-2 bg-[#291B64] hover:bg-[#382586] text-white text-xs font-sans font-semibold inline-flex items-center gap-1.5 transition-colors"
+                    className="min-h-[38px] px-3.5 py-2 bg-[#291B64] hover:bg-[#382586] text-white text-xs font-sans font-semibold inline-flex items-center gap-1.5 transition-colors"
                   >
                     <ExternalLink className="w-3.5 h-3.5" />
-                    <span>Abrir Staging UAT</span>
+                    <span>Staging UAT</span>
                   </a>
                 )}
               </div>
             </div>
 
             {/* Workspace Body */}
-            <div className="flex-1 p-6 sm:p-8 lg:p-10 max-w-6xl w-full mx-auto space-y-6">
+            <div className="flex-1 p-4 sm:p-8 lg:p-10 max-w-6xl w-full mx-auto space-y-6">
+              {/* ALWAYS-VISIBLE ARN CONVERSATIONAL BAR FOR LOGGED-IN CLIENTS */}
+              {activeTab === 'project' && (
+                <form
+                  onSubmit={handleArnConversationalIntake}
+                  className="bg-gradient-to-r from-[#130E2B] via-[#1B143D] to-[#0D261E] text-white p-4 sm:p-5 border border-emerald-400/30 shadow-md space-y-3"
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="inline-flex items-center gap-2 text-xs font-mono font-bold text-emerald-400 uppercase tracking-wider">
+                      <Sparkles className="w-4 h-4" />
+                      <span>Autopiloto Cliente ARN · Cotizar Nueva Necesidad en 1 Línea (Cero Formularios)</span>
+                    </div>
+                    <span className="text-[11px] font-mono text-neutral-300">
+                      Impacta en tiempo real en tu Portal y en el Centro ARN de Gastón
+                    </span>
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row items-stretch gap-2.5">
+                    <input
+                      type="text"
+                      value={arnIntakeMessage}
+                      onChange={(e) => setArnIntakeMessage(e.target.value)}
+                      placeholder="Ej: Necesitamos sumar módulo E-Commerce B2B2C o trazabilidad IoT por USD 4800..."
+                      className="flex-1 min-h-[46px] px-3.5 py-2.5 bg-black/40 border border-white/20 text-base sm:text-sm text-white placeholder:text-neutral-400 focus:outline-none focus:border-emerald-400"
+                    />
+                    <button
+                      type="submit"
+                      disabled={isSubmittingArnIntake || !arnIntakeMessage.trim()}
+                      className="min-h-[46px] px-5 py-2.5 bg-emerald-400 hover:bg-emerald-300 text-emerald-950 font-mono font-bold text-xs uppercase tracking-wider transition-colors flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 shrink-0"
+                    >
+                      {isSubmittingArnIntake ? (
+                        <>
+                          <RefreshCw className="w-4 h-4 animate-spin" />
+                          <span>Generando 40/40/20...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="w-4 h-4" />
+                          <span>Generar Propuesta 40/40/20 (1-Clic)</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </form>
+              )}
+
               {/* TAB 1A: USUARIO REGISTRADO SIN PROYECTO ACTIVO CONTRATADO */}
               {activeTab === 'project' && !project && (
                 <div className="space-y-6">
-                  <div className="bg-white p-6 sm:p-8 border border-black/[0.08] space-y-5">
+                  <div className="bg-white p-5 sm:p-8 border border-black/[0.08] space-y-5">
                     <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-black/[0.08] pb-5">
                       <div className="space-y-1.5">
                         <div className="inline-flex items-center gap-2 text-[11px] font-mono font-bold uppercase px-2.5 py-0.5 bg-indigo-50 text-[#291B64] border border-indigo-200">
-                          Cuenta Activa en Portal Clientes & Agenda CRM · Sin Servicio Contratado Activo
+                          Cuenta Activa en Portal Clientes & Red ARN · Sin Servicio Contratado Activo
                         </div>
                         <h2 className="font-display text-xl sm:text-2xl font-bold text-[#1D1D1F]">
                           Bienvenido/a, {clientSession?.name}

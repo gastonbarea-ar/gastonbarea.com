@@ -389,10 +389,12 @@ export default function App() {
         onClientPortalClick={() => handleNavigatePage('portal-clientes')}
       />
 
-      {/* Persistent AI Solution Guide Dock */}
+      {/* Persistent AI Solution Guide & ARN 1-Click Dock */}
       <AiWebNavigatorDock
         onNavigateToSolution={handleNavigateToSolution}
         onScheduleClick={openScheduleModal}
+        onClientPortalClick={() => handleNavigatePage('portal-clientes')}
+        onWhatsAppClick={handleOpenWhatsApp}
       />
 
       {/* Interactive Schedule Modal */}

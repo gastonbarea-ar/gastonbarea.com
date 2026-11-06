@@ -17,6 +17,7 @@ import {
   Download,
   Mail,
   CheckCircle2,
+  Zap,
 } from 'lucide-react';
 import { SITE_CONFIG, SiteConfig } from '../data/siteConfig';
 import {
@@ -25,6 +26,7 @@ import {
   buildCustomSolutionBlueprint,
   downloadAiStudyDossier,
 } from '../lib/domainLogic';
+import { ArnClientIntakeWidget } from './ArnClientIntakeWidget';
 
 interface MatchedSolution {
   serviceCode: string;
@@ -416,8 +418,8 @@ export const Hero: React.FC<HeroProps> = ({
                 </div>
               )}
 
-              {/* Floating Action Overlay Inside Video Frame: Schedule Video Call + Direct Audio/WhatsApp */}
-              <div className="absolute top-3.5 right-3.5 z-20 flex flex-wrap items-center justify-end gap-2 pointer-events-auto">
+              {/* Floating Action Overlay Inside Video Frame (Hidden on small mobile screens to prevent covering video controls) */}
+              <div className="hidden sm:flex absolute top-3.5 right-3.5 z-20 flex-wrap items-center justify-end gap-2 pointer-events-auto">
                 <button
                   type="button"
                   onClick={() =>
@@ -441,15 +443,15 @@ export const Hero: React.FC<HeroProps> = ({
                   title="Escribir por WhatsApp Directo"
                 >
                   <MessageSquare className="w-3.5 h-3.5 shrink-0" />
-                  <span className="hidden sm:inline">WhatsApp</span>
+                  <span>WhatsApp</span>
                 </button>
               </div>
             </div>
 
             {/* Clean Non-Overlapping Video Control & Episode Bar Below Player */}
-            <div className="relative z-10 w-full bg-[#0B0B10] px-4 sm:px-6 lg:px-8 py-4 border-t border-white/10 flex flex-col gap-3.5 text-left">
+            <div className="relative z-10 w-full bg-[#0B0B10] px-4 sm:px-6 lg:px-8 py-3.5 sm:py-4 border-t border-white/10 flex flex-col gap-3 text-left">
               {/* Row 1: Active Episode Title + Sound & Stage Controls */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
                 <div className="min-w-0 space-y-0.5">
                   <div className="flex flex-wrap items-center gap-2 text-[11px] font-mono text-emerald-400">
                     <span className="font-semibold">
@@ -463,14 +465,14 @@ export const Hero: React.FC<HeroProps> = ({
                   </h2>
                 </div>
 
-                <div className="flex flex-wrap items-center gap-2 shrink-0">
+                <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0 shrink-0">
                   <button
                     type="button"
                     onClick={() => {
                       setIsImmersionActive(true);
                       setIsMuted(!isMuted);
                     }}
-                    className="px-3.5 py-2 text-xs font-mono font-bold text-white bg-[#291B64] hover:bg-[#382586] rounded-none transition-colors inline-flex items-center gap-1.5 cursor-pointer"
+                    className="min-h-[38px] px-3.5 py-2 text-xs font-mono font-bold text-white bg-[#291B64] hover:bg-[#382586] rounded-none transition-colors inline-flex items-center gap-1.5 cursor-pointer shrink-0"
                   >
                     {isMuted ? (
                       <>
@@ -490,7 +492,7 @@ export const Hero: React.FC<HeroProps> = ({
                     onClick={() =>
                       setVideoFitMode(videoFitMode === 'cover' ? 'contain' : 'cover')
                     }
-                    className="px-3 py-2 text-xs font-mono text-neutral-300 hover:text-white bg-white/[0.06] hover:bg-white/[0.12] transition-colors inline-flex items-center gap-1.5 cursor-pointer"
+                    className="hidden sm:inline-flex min-h-[38px] px-3 py-2 text-xs font-mono text-neutral-300 hover:text-white bg-white/[0.06] hover:bg-white/[0.12] transition-colors items-center gap-1.5 cursor-pointer shrink-0"
                     title="Alternar entre Llenar Frame (Cover) o Proporción 16:9 Completa"
                   >
                     <Maximize2 className="w-3.5 h-3.5 text-emerald-400" />
@@ -502,7 +504,7 @@ export const Hero: React.FC<HeroProps> = ({
                   <button
                     type="button"
                     onClick={() => setShowVideoSelector(!showVideoSelector)}
-                    className="px-3 py-2 text-xs font-mono text-neutral-300 hover:text-white bg-white/[0.06] hover:bg-white/[0.12] transition-colors inline-flex items-center gap-1.5 cursor-pointer"
+                    className="min-h-[38px] px-3 py-2 text-xs font-mono text-neutral-300 hover:text-white bg-white/[0.06] hover:bg-white/[0.12] transition-colors inline-flex items-center gap-1.5 cursor-pointer shrink-0"
                   >
                     <SlidersHorizontal className="w-3.5 h-3.5" />
                     <span>Cambiar Video</span>
@@ -511,7 +513,7 @@ export const Hero: React.FC<HeroProps> = ({
                   <button
                     type="button"
                     onClick={() => setIsCinemaExpanded(!isCinemaExpanded)}
-                    className="hidden lg:inline-flex px-3 py-2 text-xs font-mono text-neutral-300 hover:text-white bg-white/[0.06] hover:bg-white/[0.12] transition-colors items-center gap-1.5 cursor-pointer"
+                    className="hidden lg:inline-flex min-h-[38px] px-3 py-2 text-xs font-mono text-neutral-300 hover:text-white bg-white/[0.06] hover:bg-white/[0.12] transition-colors items-center gap-1.5 cursor-pointer shrink-0"
                   >
                     {isCinemaExpanded ? (
                       <>
@@ -530,7 +532,7 @@ export const Hero: React.FC<HeroProps> = ({
                     href={youtubeChannelUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="px-3 py-2 text-xs font-mono text-neutral-300 hover:text-white bg-white/[0.06] hover:bg-white/[0.12] transition-colors inline-flex items-center gap-1.5"
+                    className="min-h-[38px] px-3 py-2 text-xs font-mono text-neutral-300 hover:text-white bg-white/[0.06] hover:bg-white/[0.12] transition-colors inline-flex items-center gap-1.5 shrink-0"
                   >
                     <span>@gastonbarea</span>
                     <ExternalLink className="w-3 h-3" />
@@ -538,8 +540,8 @@ export const Hero: React.FC<HeroProps> = ({
                 </div>
               </div>
 
-              {/* Row 2: Episode Selector Tabs (Clean grid on mobile, inline on desktop) */}
-              <div className="pt-2.5 border-t border-white/10 grid grid-cols-1 sm:grid-cols-3 gap-2">
+              {/* Row 2: Episode Selector Tabs (Horizontal swipe on mobile, 3-col grid on desktop) */}
+              <div className="pt-2.5 border-t border-white/10 flex sm:grid sm:grid-cols-3 gap-2 overflow-x-auto pb-1 sm:pb-0 snap-x">
                 {channelPlaylist.map((vid, idx) => {
                   const active = selectedVideoIndex === idx;
                   return (
@@ -547,7 +549,7 @@ export const Hero: React.FC<HeroProps> = ({
                       key={vid.id}
                       type="button"
                       onClick={() => setSelectedVideoIndex(idx)}
-                      className={`px-3 py-2 text-left transition-colors cursor-pointer flex items-center justify-between gap-2 ${
+                      className={`snap-start shrink-0 min-w-[210px] sm:min-w-0 px-3 py-2.5 text-left transition-colors cursor-pointer flex items-center justify-between gap-2 ${
                         active
                           ? 'bg-[#291B64] text-white'
                           : 'bg-white/[0.04] text-neutral-400 hover:text-white hover:bg-white/[0.08]'
@@ -569,9 +571,9 @@ export const Hero: React.FC<HeroProps> = ({
             </div>
           </div>
 
-          {/* RIGHT EXECUTIVE BIO & DIRECT ACCESS COLUMN (Reorganized to fill vertical height cleanly without empty gaps) */}
+          {/* RIGHT EXECUTIVE BIO & DIRECT ACCESS COLUMN */}
           {!isCinemaExpanded && (
-            <div className="lg:col-span-4 p-5 sm:p-7 lg:p-8 flex flex-col justify-between gap-5 text-left bg-[#0E0E14] border-t lg:border-t-0 lg:border-l border-white/10">
+            <div className="lg:col-span-4 p-4 sm:p-7 lg:p-8 flex flex-col justify-between gap-5 text-left bg-[#0E0E14] border-t lg:border-t-0 lg:border-l border-white/10">
               {/* Top: Identity Badge + Executive Title */}
               <div className="space-y-3">
                 <div className="inline-flex flex-wrap items-center gap-2 px-2.5 py-1 bg-white/[0.05] border border-white/10 text-[11px] font-mono text-neutral-300">
@@ -590,13 +592,39 @@ export const Hero: React.FC<HeroProps> = ({
                 </h1>
 
                 <p className="text-xs sm:text-[13px] text-neutral-300 leading-relaxed">
-                  Esta plataforma opera como mi{' '}
-                  <strong className="text-white font-semibold">Gemelo Digital</strong>. Consultá tu desafío para recibir un estudio técnico a medida con hoja de ruta <strong className="text-emerald-400">40% · 40% · 20%</strong>.
+                  Operamos con <strong className="text-emerald-400">ARN (Automated Relationship Network)</strong>: escribí o dictá en una línea qué necesitás abajo y recibí al instante tu propuesta <strong className="text-white">40% · 40% · 20%</strong> con acceso directo a tu Portal de Clientes sin llenar formularios.
                 </p>
               </div>
 
-              {/* Middle: Vertical Pillars (Fills the space next to the video frame with actionable executive value) */}
-              <div className="space-y-2 py-3 border-y border-white/10">
+              {/* Primary Highlight: Jump to ARN Zero-Form Client Console */}
+              <div className="p-3.5 bg-emerald-400/10 border border-emerald-400/40 space-y-2.5">
+                <div className="flex items-center justify-between gap-2 text-[11px] font-mono text-emerald-300 font-bold">
+                  <span className="inline-flex items-center gap-1.5">
+                    <Zap className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>NUEVO · EXPERIENCIA CLIENTE ARN</span>
+                  </span>
+                  <span>CERO FORMULARIOS</span>
+                </div>
+                <p className="text-xs text-neutral-200 leading-relaxed">
+                  Cotizá tu proyecto en 1 clic con lenguaje natural o voz y entrá directo a tu Portal de Clientes (#portal).
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const el = document.getElementById('arn-home-client-intake');
+                    if (el) {
+                      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }
+                  }}
+                  className="w-full min-h-[44px] px-4 py-2.5 text-xs font-mono font-bold text-emerald-950 bg-emerald-400 hover:bg-emerald-300 transition-colors flex items-center justify-between gap-2 cursor-pointer"
+                >
+                  <span>Probar Interacción Cliente ARN (1-Clic)</span>
+                  <ArrowRight className="w-4 h-4 shrink-0" />
+                </button>
+              </div>
+
+              {/* Middle: Vertical Pillars */}
+              <div className="space-y-2 py-2 border-y border-white/10">
                 <div className="text-[10px] font-mono text-emerald-400 uppercase tracking-wider font-semibold">
                   EJES ESTRATÉGICOS DE EJECUCIÓN DIRECTA:
                 </div>
@@ -652,9 +680,9 @@ export const Hero: React.FC<HeroProps> = ({
                 </div>
               </div>
 
-              {/* Bottom: Direct Contact & Action Priorities (WhatsApp + Email + Video Call + Portal) */}
+              {/* Bottom: Direct Contact & Action Priorities */}
               <div className="space-y-2">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <div className="grid grid-cols-2 gap-2">
                   <button
                     type="button"
                     onClick={() =>
@@ -662,39 +690,21 @@ export const Hero: React.FC<HeroProps> = ({
                         'Hola Gastón, estuve viendo tu presentación en gastonbarea.com y quiero consultarte por un proyecto.'
                       )
                     }
-                    className="w-full px-3.5 py-3 text-xs font-semibold text-emerald-950 bg-emerald-400 hover:bg-emerald-300 rounded-none transition-colors flex items-center justify-center gap-2 cursor-pointer"
+                    className="w-full min-h-[44px] px-3 py-2.5 text-xs font-semibold text-emerald-950 bg-emerald-400 hover:bg-emerald-300 rounded-none transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
                   >
                     <MessageSquare className="w-4 h-4 shrink-0" />
-                    <span>WhatsApp Directo</span>
+                    <span>WhatsApp</span>
                   </button>
 
                   <button
                     type="button"
                     onClick={() => onScheduleClick('Sesión Ejecutiva Google Meet Pro desde Portada')}
-                    className="w-full px-3.5 py-3 text-xs font-semibold text-white bg-[#291B64] hover:bg-[#382586] rounded-none transition-colors flex items-center justify-center gap-2 cursor-pointer"
+                    className="w-full min-h-[44px] px-3 py-2.5 text-xs font-semibold text-white bg-[#291B64] hover:bg-[#382586] rounded-none transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
                   >
                     <Video className="w-4 h-4 text-emerald-300 shrink-0" />
-                    <span>¡Hablemos! Agendar Meet</span>
+                    <span>Agendar Meet</span>
                   </button>
                 </div>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (onOpenCustomSolution) {
-                      onOpenCustomSolution(lastBlueprint);
-                    } else {
-                      onDiagnosticoClick();
-                    }
-                  }}
-                  className="w-full px-4 py-2.5 text-xs font-semibold text-white bg-white/[0.07] hover:bg-white/[0.14] rounded-none transition-colors flex items-center justify-between gap-2 cursor-pointer"
-                >
-                  <span className="inline-flex items-center gap-2">
-                    <Mail className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                    <span>Consultar con IA & Recibir Estudio por Email</span>
-                  </span>
-                  <ArrowRight className="w-3.5 h-3.5 shrink-0" />
-                </button>
 
                 <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] font-mono text-neutral-400 pt-1">
                   <span>notificaciones@gastonbarea.com</span>
@@ -716,23 +726,58 @@ export const Hero: React.FC<HeroProps> = ({
         </div>
       </div>
 
+      {/* =====================================================================
+          BLOQUE 1.5 (NUEVO EN HOME): INTERACCIÓN DIRECTA DEL CLIENTE CON ARN
+          Cero Formularios · Voz o Texto Natural · Propuesta 40/40/20 + Portal en 1 Clic
+         ===================================================================== */}
+      <div
+        id="arn-home-client-intake"
+        className="w-full px-4 sm:px-8 lg:px-12 py-10 sm:py-14 bg-[#0B0D17] border-b border-white/10 scroll-mt-20"
+      >
+        <div className="w-full space-y-5 text-left">
+          <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4">
+            <div className="space-y-1.5 max-w-3xl">
+              <div className="text-xs font-mono text-emerald-400 font-bold uppercase tracking-wider">
+                INTERACCIÓN DIRECTA DEL USUARIO-CLIENTE · RED AUTÓNOMA ARN (CERO FORMULARIOS)
+              </div>
+              <h2
+                className="font-display text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight text-white"
+                style={{ textWrap: 'balance' }}
+              >
+                Iniciá tu relación, generá tu presupuesto 40/40/20 y abrí tu Portal en 1 solo paso.
+              </h2>
+            </div>
+            <p className="text-xs sm:text-sm text-neutral-300 max-w-md leading-relaxed">
+              Sin formularios eternos: contanos en una línea (o dictá con el micrófono) quién sos y qué necesitás. El sistema crea tu nodo corporativo, estructura tu propuesta 40/40/20 y te conecta directo a tu Portal de Clientes.
+            </p>
+          </div>
+
+          <ArnClientIntakeWidget
+            variant="hero-dark"
+            onOpenPortalWithSession={onClientPortalClick}
+            onScheduleClick={onScheduleClick}
+            onWhatsAppClick={onWhatsAppClick}
+          />
+        </div>
+      </div>
+
       {/* BLOQUE 2: BUSCADOR Y ESTRUCTURADOR DE SOLUCIONES CON IA */}
-      <div className="w-full px-4 sm:px-8 lg:px-12 xl:px-12 py-16 md:py-20 bg-[#F7F7FA]">
-        <div className="w-full space-y-10 text-left">
-          <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6">
+      <div className="w-full px-4 sm:px-8 lg:px-12 xl:px-12 py-14 md:py-20 bg-[#F7F7FA]">
+        <div className="w-full space-y-8 sm:space-y-10 text-left">
+          <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4 sm:gap-6">
             <div className="space-y-2 max-w-2xl">
               <div className="text-xs font-mono text-[#291B64] font-semibold">
-                BLOQUE INTERACTIVO · REORGANIZADOR DE SOLUCIONES CON IA EN VIVO
+                BLOQUE INTERACTIVO · ESTUDIO TÉCNICO Y ARQUITECTURA CON IA EN VIVO
               </div>
               <h2
                 className="font-display text-2xl sm:text-4xl font-bold tracking-tight text-[#1D1D1F]"
                 style={{ textWrap: 'balance' }}
               >
-                ¿Qué proyecto o desafío querés resolver hoy?
+                ¿Querés explorar un estudio técnico profundo por vertical?
               </h2>
             </div>
             <p className="text-xs sm:text-sm text-[#515154] max-w-md leading-relaxed">
-              Escribí tu consulta en la barra o elegí un eje estratégico. La IA generará un estudio técnico descargable, te lo enviará por Email y podrás continuar por WhatsApp Directo.
+              Elegí un eje estratégico o escribí tu consulta técnica para descargar un dossier de arquitectura (.HTML / PDF).
             </p>
           </div>
 
