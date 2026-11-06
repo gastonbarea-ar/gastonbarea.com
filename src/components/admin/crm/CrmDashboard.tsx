@@ -44,6 +44,7 @@ import {
   ServiceCategory,
   CrmCompany,
   CrmContact,
+  ArnServiceStockItem,
 } from '../../../types/crm';
 import {
   DEFAULT_PAYMENT_CONFIG,
@@ -52,6 +53,7 @@ import {
   INITIAL_CRM_PAYMENTS,
   INITIAL_CRM_COMPANIES,
   INITIAL_CRM_CONTACTS,
+  INITIAL_ARN_SERVICE_STOCK,
   DEFAULT_QUOTE_TEMPLATES,
 } from '../../../data/crmTemplates';
 import { OpportunityModal } from './OpportunityModal';
@@ -60,6 +62,7 @@ import { QuotePreviewModal } from './QuotePreviewModal';
 import { FastReplyModal } from './FastReplyModal';
 import { PaymentConfigModal } from './PaymentConfigModal';
 import { PaymentRecordModal } from './PaymentRecordModal';
+import { ArnServiceStockManager } from './ArnServiceStockManager';
 import {
   DEFAULT_BOOKING_AVAILABILITY,
   BookingAvailabilityConfig,
@@ -69,6 +72,8 @@ import { computeArnRelationshipNodes } from '../../../utils/arnEngine';
 interface CrmDashboardProps {
   passkey?: string;
   onClose?: () => void;
+  initialTab?: 'kanban' | 'service_stock' | 'directory' | 'quotes' | 'payments' | 'leads' | 'whatsapp_automations';
+  onTabChange?: (tab: 'kanban' | 'service_stock' | 'directory' | 'quotes' | 'payments' | 'leads' | 'whatsapp_automations') => void;
 }
 
 const STAGES: { id: OpportunityStage; label: string; color: string; border: string; bg: string }[] = [
@@ -91,11 +96,29 @@ const SERVICE_LABELS: Record<ServiceCategory, { label: string; badge: string }> 
   custom: { label: 'Consultoría Especial', badge: 'bg-slate-100 text-slate-800 border-slate-200' },
 };
 
-export const CrmDashboard: React.FC<CrmDashboardProps> = ({ passkey = 'gaston2026', onClose }) => {
-  // Navigation tabs: 'kanban' | 'directory' | 'quotes' | 'payments' | 'leads' | 'whatsapp_automations'
-  const [activeTab, setActiveTab] = useState<
-    'kanban' | 'directory' | 'quotes' | 'payments' | 'leads' | 'whatsapp_automations'
-  >('kanban');
+export const CrmDashboard: React.FC<CrmDashboardProps> = ({
+  passkey = 'gaston2026',
+  onClose,
+  initialTab = 'kanban',
+  onTabChange,
+}) => {
+  // Navigation tabs: 'kanban' | 'service_stock' | 'directory' | 'quotes' | 'payments' | 'leads' | 'whatsapp_automations'
+  const [activeTab, setActiveTabState] = useState<
+    'kanban' | 'service_stock' | 'directory' | 'quotes' | 'payments' | 'leads' | 'whatsapp_automations'
+  >(initialTab);
+
+  useEffect(() => {
+    if (initialTab) {
+      setActiveTabState(initialTab);
+    }
+  }, [initialTab]);
+
+  const setActiveTab = (
+    tab: 'kanban' | 'service_stock' | 'directory' | 'quotes' | 'payments' | 'leads' | 'whatsapp_automations'
+  ) => {
+    setActiveTabState(tab);
+    if (onTabChange) onTabChange(tab);
+  };
 
   // Main data states
   const [opportunities, setOpportunities] = useState<Opportunity[]>(INITIAL_CRM_OPPORTUNITIES);
@@ -103,6 +126,7 @@ export const CrmDashboard: React.FC<CrmDashboardProps> = ({ passkey = 'gaston202
   const [contacts, setContacts] = useState<CrmContact[]>(INITIAL_CRM_CONTACTS);
   const [quotes, setQuotes] = useState<Quote[]>(INITIAL_CRM_QUOTES);
   const [payments, setPayments] = useState<PaymentRecord[]>(INITIAL_CRM_PAYMENTS);
+  const [serviceStock, setServiceStock] = useState<ArnServiceStockItem[]>(INITIAL_ARN_SERVICE_STOCK);
   const [paymentConfig, setPaymentConfig] = useState<PaymentGatewayConfig>(DEFAULT_PAYMENT_CONFIG);
   const [webLeads, setWebLeads] = useState<{ proposals: any[]; contactInquiries: any[] }>({
     proposals: [],
@@ -229,6 +253,9 @@ export const CrmDashboard: React.FC<CrmDashboardProps> = ({ passkey = 'gaston202
           if (json.data.quotes) setQuotes(json.data.quotes);
           if (json.data.payments) setPayments(json.data.payments);
           if (json.data.paymentConfig) setPaymentConfig(json.data.paymentConfig);
+          if (Array.isArray(json.data.serviceStock) && json.data.serviceStock.length > 0) {
+            setServiceStock(json.data.serviceStock);
+          }
         }
       }
 
@@ -998,8 +1025,8 @@ export const CrmDashboard: React.FC<CrmDashboardProps> = ({ passkey = 'gaston202
         </div>
       )}
 
-      {/* KPI Metrics Ribbon & Omnibarra Copiloto ARN */}
-      <div className="p-4 sm:p-6 border-b border-slate-200/90 bg-white space-y-5">
+      {/* Header & Top-Level ARN Navigation Tabs */}
+      <div className="p-4 sm:p-6 border-b border-slate-200/90 bg-white space-y-4">
         <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2 text-xs font-mono text-slate-500">
@@ -1015,6 +1042,18 @@ export const CrmDashboard: React.FC<CrmDashboardProps> = ({ passkey = 'gaston202
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setActiveTab('service_stock')}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-colors ${
+                activeTab === 'service_stock'
+                  ? 'bg-emerald-600 text-white shadow-2xs'
+                  : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-900 border border-emerald-300'
+              }`}
+            >
+              <Layers className="w-3.5 h-3.5 text-emerald-600" />
+              <span>Stock de Servicios ARN (Micro / PyME / Grande)</span>
+            </button>
             <button
               type="button"
               onClick={loadCrmData}
@@ -1060,309 +1099,326 @@ export const CrmDashboard: React.FC<CrmDashboardProps> = ({ passkey = 'gaston202
           </div>
         </div>
 
-        {/* 5-Card Metrics Grid */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-          <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/90 space-y-1">
-            <span className="text-[10px] font-mono uppercase tracking-wider text-slate-500 block">
-              Pipeline Activo (USD)
-            </span>
-            <div className="text-lg font-bold text-blue-900 font-mono">
-              USD ${pipelineValueUsd.toLocaleString()}
-            </div>
-            <div className="text-[11px] text-slate-500">{activeOpps.length} tratativas en curso</div>
+        {/* Main ARN Navigation Tabs (Always at the top for instant visibility) */}
+        <div className="pt-2 border-t border-slate-200 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => setActiveTab('kanban')}
+              className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-2 cursor-pointer transition-all whitespace-nowrap ${
+                activeTab === 'kanban'
+                  ? 'bg-[#291B64] text-white shadow-2xs'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+              }`}
+            >
+              <TrendingUp className="w-4 h-4" />
+              <span>Radar ARN & Pipeline ({opportunities.length})</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveTab('service_stock')}
+              className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-2 cursor-pointer transition-all whitespace-nowrap ${
+                activeTab === 'service_stock'
+                  ? 'bg-emerald-600 text-white shadow-2xs'
+                  : 'text-emerald-900 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300'
+              }`}
+            >
+              <Layers className="w-4 h-4" />
+              <span>Stock de Servicios ARN · Micro / PyME / Grande ({serviceStock.length})</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveTab('directory')}
+              className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-2 cursor-pointer transition-all whitespace-nowrap ${
+                activeTab === 'directory'
+                  ? 'bg-[#291B64] text-white shadow-2xs'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+              }`}
+            >
+              <Building2 className="w-4 h-4" />
+              <span>Red de Nodos: Empresas ({companies.length}) & Contactos ({contacts.length})</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveTab('quotes')}
+              className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-2 cursor-pointer transition-all ${
+                activeTab === 'quotes'
+                  ? 'bg-blue-600 text-white shadow-2xs'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+              }`}
+            >
+              <FileText className="w-4 h-4" />
+              <span>Presupuestos & Plantillas ({quotes.length})</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveTab('payments')}
+              className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-2 cursor-pointer transition-all ${
+                activeTab === 'payments'
+                  ? 'bg-blue-600 text-white shadow-2xs'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+              }`}
+            >
+              <CreditCard className="w-4 h-4" />
+              <span>Medios de Pago & Cobranzas ({payments.length})</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveTab('leads')}
+              className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-2 cursor-pointer transition-all ${
+                activeTab === 'leads'
+                  ? 'bg-blue-600 text-white shadow-2xs'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+              }`}
+            >
+              <Users className="w-4 h-4" />
+              <span>Leads Web ({webLeads.proposals.length + webLeads.contactInquiries.length})</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveTab('whatsapp_automations')}
+              className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-2 cursor-pointer transition-all ${
+                activeTab === 'whatsapp_automations'
+                  ? 'bg-emerald-600 text-white shadow-2xs'
+                  : 'text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200'
+              }`}
+            >
+              <MessageSquare className="w-4 h-4" />
+              <span>WhatsApp Business & Automatizaciones</span>
+            </button>
           </div>
 
-          <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/90 space-y-1">
-            <span className="text-[10px] font-mono uppercase tracking-wider text-slate-500 block">
-              Pipeline Local (ARS)
-            </span>
-            <div className="text-lg font-bold text-slate-900 font-mono">
-              ARS ${pipelineValueArs.toLocaleString()}
+          {/* Global Filter & Search */}
+          <div className="flex items-center gap-2">
+            <div className="relative">
+              <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Buscar cliente o proyecto..."
+                className="pl-8 pr-3 py-1.5 bg-white border border-slate-300 rounded-xl text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 w-48 sm:w-64"
+              />
             </div>
-            <div className="text-[11px] text-slate-500">Mercado Pago / Factura A</div>
-          </div>
 
-          <div className="p-3.5 rounded-2xl bg-emerald-50/70 border border-emerald-200/80 space-y-1">
-            <span className="text-[10px] font-mono uppercase tracking-wider text-emerald-800 block">
-              Proyectos Ganados (Won)
-            </span>
-            <div className="text-lg font-bold text-emerald-700 font-mono">
-              USD ${wonValueUsd.toLocaleString()}
-            </div>
-            <div className="text-[11px] text-emerald-600">{wonOpps.length} contratos cerrados</div>
-          </div>
-
-          <div className="p-3.5 rounded-2xl bg-indigo-50/70 border border-indigo-200/80 space-y-1">
-            <span className="text-[10px] font-mono uppercase tracking-wider text-indigo-800 block">
-              Presupuestos Emitidos
-            </span>
-            <div className="text-lg font-bold text-indigo-700 font-mono">
-              {quotes.length} Cotizaciones
-            </div>
-            <div className="text-[11px] text-indigo-600">
-              {quotes.filter((q) => q.status === 'sent').length} en evaluación
-            </div>
-          </div>
-
-          <div className="p-3.5 rounded-2xl bg-slate-900 text-white space-y-1 col-span-2 sm:col-span-1">
-            <span className="text-[10px] font-mono uppercase tracking-wider text-slate-400 block">
-              Cobranzas Acreditadas
-            </span>
-            <div className="text-lg font-bold text-emerald-400 font-mono">
-              USD ${totalCollectedUsd.toLocaleString()}
-            </div>
-            <div className="text-[11px] text-slate-300">
-              {payments.filter((p) => p.status === 'confirmed').length} pagos confirmados
-            </div>
+            <select
+              value={categoryFilter}
+              onChange={(e) => setCategoryFilter(e.target.value)}
+              className="px-2.5 py-1.5 bg-white border border-slate-300 rounded-xl text-xs text-slate-700 cursor-pointer"
+            >
+              <option value="all">Todos los Servicios</option>
+              <option value="odoo_erp">Odoo v18 ERP</option>
+              <option value="ecommerce_b2b2c">E-Commerce B2B2C</option>
+              <option value="software_architecture">Arquitectura & Resiliencia</option>
+              <option value="fractional_cto">Fractional CTO</option>
+              <option value="linux_docker">Linux & Docker</option>
+              <option value="bi_analytics">Business Intelligence</option>
+            </select>
           </div>
         </div>
 
-        {/* OMNIBARRA COPILOTO ARN: VOZ, TEXTO NATURAL & INGESTA WHATSAPP SIN FORMULARIOS */}
-        <div className="p-4 sm:p-5 bg-[#0F172A] text-white border border-slate-800 space-y-3">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-            <div className="flex items-center gap-2 text-xs">
-              <Sparkles className="w-4 h-4 text-emerald-400 shrink-0" />
-              <span className="font-bold text-white">
-                Omnibarra Copiloto ARN (Cero Formularios)
-              </span>
-              <span className="text-slate-400 hidden md:inline">
-                · Escribí, dictá por voz o pegá un mensaje de WhatsApp para crear/actualizar empresa, contacto, propuesta 40/40/20 y proyecto automáticamente
-              </span>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-mono">
-              <button
-                type="button"
-                onClick={() =>
-                  handleExecuteArnCommand(
-                    undefined,
-                    'Hablé con Valeria de Bodega Austral, correo valeria@bodegaaustral.com, necesitan Odoo v18 ERP e inventario por USD 5400, armar propuesta 40/40/20'
-                  )
-                }
-                className="px-2.5 py-1 bg-white/10 hover:bg-white/20 text-slate-200 transition-colors cursor-pointer whitespace-nowrap"
-              >
-                Ej. 1: Cotizar Odoo 40/40/20
-              </button>
-              <button
-                type="button"
-                onClick={() =>
-                  handleExecuteArnCommand(
-                    undefined,
-                    'Hablé con Lucas de Frigorífico Patagonia, correo lucas@frigopatagonia.com.ar, aprobar e iniciar proyecto kickoff de trazabilidad IoT por USD 6800'
-                  )
-                }
-                className="px-2.5 py-1 bg-white/10 hover:bg-white/20 text-slate-200 transition-colors cursor-pointer whitespace-nowrap"
-              >
-                Ej. 2: Kickoff Directo 40/40/20
-              </button>
-            </div>
-          </div>
-
-          <form onSubmit={handleExecuteArnCommand} className="flex flex-col sm:flex-row items-stretch gap-2">
-            <input
-              type="text"
-              value={arnCommandInput}
-              onChange={(e) => setArnCommandInput(e.target.value)}
-              placeholder='Ej: "Hablé con Martín de AgroSur (martin@agrosur.com), quieren trazabilidad IoT y Odoo por USD 6200, armale propuesta 40/40/20"...'
-              className="flex-1 px-4 py-2.5 bg-slate-900 border border-slate-700 text-xs sm:text-sm text-white placeholder:text-slate-400 focus:outline-none focus:border-emerald-400"
-            />
-            <div className="flex items-center gap-2 shrink-0">
-              <button
-                type="button"
-                onClick={handleToggleVoiceDictation}
-                className={`px-3.5 py-2.5 text-xs font-bold border transition-colors flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
-                  isListeningVoice
-                    ? 'bg-rose-600 text-white border-rose-500'
-                    : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700'
-                }`}
-                title="Dictar instrucción por voz"
-              >
-                <span>{isListeningVoice ? 'Escuchando Voz...' : 'Dictar por Voz'}</span>
-              </button>
-
-              <button
-                type="submit"
-                disabled={isExecutingArnCommand || !arnCommandInput.trim()}
-                className="px-5 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50 whitespace-nowrap"
-              >
-                {isExecutingArnCommand ? (
-                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                ) : (
-                  <Sparkles className="w-3.5 h-3.5" />
-                )}
-                <span>Ejecutar en ARN</span>
-              </button>
-            </div>
-          </form>
-
-          {arnExecutionLog && (
-            <div className="p-3.5 bg-slate-900 border border-emerald-500/40 text-xs space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="font-mono font-bold text-emerald-400 uppercase text-[11px]">
-                  ✓ Ejecución Autónoma ARN Completada (Cero Formularios)
+        {activeTab === 'kanban' && (
+          <>
+            {/* 5-Card Metrics Grid */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 pt-1">
+              <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/90 space-y-1">
+                <span className="text-[10px] font-mono uppercase tracking-wider text-slate-500 block">
+                  Pipeline Activo (USD)
                 </span>
-                <button
-                  type="button"
-                  onClick={() => setArnExecutionLog(null)}
-                  className="text-slate-400 hover:text-white text-[11px] cursor-pointer"
-                >
-                  Ocultar ×
-                </button>
+                <div className="text-lg font-bold text-blue-900 font-mono">
+                  USD ${pipelineValueUsd.toLocaleString()}
+                </div>
+                <div className="text-[11px] text-slate-500">{activeOpps.length} tratativas en curso</div>
               </div>
-              <div className="space-y-1 text-slate-200">
-                {arnExecutionLog.actionsExecuted.map((act, idx) => (
-                  <div key={idx} className="flex items-start gap-2">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
-                    <span>{act}</span>
-                  </div>
-                ))}
+
+              <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/90 space-y-1">
+                <span className="text-[10px] font-mono uppercase tracking-wider text-slate-500 block">
+                  Pipeline Local (ARS)
+                </span>
+                <div className="text-lg font-bold text-slate-900 font-mono">
+                  ARS ${pipelineValueArs.toLocaleString()}
+                </div>
+                <div className="text-[11px] text-slate-500">Mercado Pago / Factura A</div>
               </div>
-              {arnExecutionLog.quote && (
-                <div className="pt-2 border-t border-slate-800 flex flex-wrap items-center justify-between gap-2">
-                  <span className="font-mono text-[11px] text-slate-300">
-                    Propuesta lista en Portal Cliente (#portal):{' '}
-                    <strong className="text-white">{arnExecutionLog.quote.quoteNumber}</strong> (
-                    {arnExecutionLog.quote.currency} $
-                    {arnExecutionLog.quote.total.toLocaleString()})
+
+              <div className="p-3.5 rounded-2xl bg-emerald-50/70 border border-emerald-200/80 space-y-1">
+                <span className="text-[10px] font-mono uppercase tracking-wider text-emerald-800 block">
+                  Proyectos Ganados (Won)
+                </span>
+                <div className="text-lg font-bold text-emerald-700 font-mono">
+                  USD ${wonValueUsd.toLocaleString()}
+                </div>
+                <div className="text-[11px] text-emerald-600">{wonOpps.length} contratos cerrados</div>
+              </div>
+
+              <div className="p-3.5 rounded-2xl bg-indigo-50/70 border border-indigo-200/80 space-y-1">
+                <span className="text-[10px] font-mono uppercase tracking-wider text-indigo-800 block">
+                  Presupuestos Emitidos
+                </span>
+                <div className="text-lg font-bold text-indigo-700 font-mono">
+                  {quotes.length} Cotizaciones
+                </div>
+                <div className="text-[11px] text-indigo-600">
+                  {quotes.filter((q) => q.status === 'sent').length} en evaluación
+                </div>
+              </div>
+
+              <div className="p-3.5 rounded-2xl bg-slate-900 text-white space-y-1 col-span-2 sm:col-span-1">
+                <span className="text-[10px] font-mono uppercase tracking-wider text-slate-400 block">
+                  Cobranzas Acreditadas
+                </span>
+                <div className="text-lg font-bold text-emerald-400 font-mono">
+                  USD ${totalCollectedUsd.toLocaleString()}
+                </div>
+                <div className="text-[11px] text-slate-300">
+                  {payments.filter((p) => p.status === 'confirmed').length} pagos confirmados
+                </div>
+              </div>
+            </div>
+
+            {/* OMNIBARRA COPILOTO ARN: VOZ, TEXTO NATURAL & INGESTA WHATSAPP SIN FORMULARIOS */}
+            <div className="p-4 sm:p-5 bg-[#0F172A] text-white border border-slate-800 space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div className="flex items-center gap-2 text-xs">
+                  <Sparkles className="w-4 h-4 text-emerald-400 shrink-0" />
+                  <span className="font-bold text-white">
+                    Omnibarra Copiloto ARN (Cero Formularios)
                   </span>
-                  <div className="flex items-center gap-2">
+                  <span className="text-slate-400 hidden md:inline">
+                    · Escribí, dictá por voz o pegá un mensaje de WhatsApp para crear/actualizar empresa, contacto, propuesta 40/40/20 y proyecto automáticamente
+                  </span>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-mono">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      handleExecuteArnCommand(
+                        undefined,
+                        'Hablé con Valeria de Bodega Austral, correo valeria@bodegaaustral.com, necesitan Odoo v18 ERP e inventario por USD 5400, armar propuesta 40/40/20'
+                      )
+                    }
+                    className="px-2.5 py-1 bg-white/10 hover:bg-white/20 text-slate-200 transition-colors cursor-pointer whitespace-nowrap"
+                  >
+                    Ej. 1: Cotizar Odoo 40/40/20
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      handleExecuteArnCommand(
+                        undefined,
+                        'Hablé con Lucas de Frigorífico Patagonia, correo lucas@frigopatagonia.com.ar, aprobar e iniciar proyecto kickoff de trazabilidad IoT por USD 6800'
+                      )
+                    }
+                    className="px-2.5 py-1 bg-white/10 hover:bg-white/20 text-slate-200 transition-colors cursor-pointer whitespace-nowrap"
+                  >
+                    Ej. 2: Kickoff Directo 40/40/20
+                  </button>
+                </div>
+              </div>
+
+              <form onSubmit={handleExecuteArnCommand} className="flex flex-col sm:flex-row items-stretch gap-2">
+                <input
+                  type="text"
+                  value={arnCommandInput}
+                  onChange={(e) => setArnCommandInput(e.target.value)}
+                  placeholder='Ej: "Hablé con Martín de AgroSur (martin@agrosur.com), quieren trazabilidad IoT y Odoo por USD 6200, armale propuesta 40/40/20"...'
+                  className="flex-1 px-4 py-2.5 bg-slate-900 border border-slate-700 text-xs sm:text-sm text-white placeholder:text-slate-400 focus:outline-none focus:border-emerald-400"
+                />
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={handleToggleVoiceDictation}
+                    className={`px-3.5 py-2.5 text-xs font-bold border transition-colors flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
+                      isListeningVoice
+                        ? 'bg-rose-600 text-white border-rose-500'
+                        : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700'
+                    }`}
+                    title="Dictar instrucción por voz"
+                  >
+                    <span>{isListeningVoice ? 'Escuchando Voz...' : 'Dictar por Voz'}</span>
+                  </button>
+
+                  <button
+                    type="submit"
+                    disabled={isExecutingArnCommand || !arnCommandInput.trim()}
+                    className="px-5 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50 whitespace-nowrap"
+                  >
+                    {isExecutingArnCommand ? (
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <Sparkles className="w-3.5 h-3.5" />
+                    )}
+                    <span>Ejecutar en ARN</span>
+                  </button>
+                </div>
+              </form>
+
+              {arnExecutionLog && (
+                <div className="p-3.5 bg-slate-900 border border-emerald-500/40 text-xs space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="font-mono font-bold text-emerald-400 uppercase text-[11px]">
+                      ✓ Ejecución Autónoma ARN Completada (Cero Formularios)
+                    </span>
                     <button
                       type="button"
-                      onClick={() => {
-                        setPreviewQuote(arnExecutionLog.quote!);
-                        setIsQuotePreviewOpen(true);
-                      }}
-                      className="px-3 py-1 bg-white/10 hover:bg-white/20 text-white font-semibold text-[11px] cursor-pointer"
+                      onClick={() => setArnExecutionLog(null)}
+                      className="text-slate-400 hover:text-white text-[11px] cursor-pointer"
                     >
-                      Ver / PDF 40/40/20
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setFastReplyQuote(arnExecutionLog.quote!);
-                        setIsFastReplyOpen(true);
-                      }}
-                      className="px-3 py-1 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-[11px] cursor-pointer"
-                    >
-                      Enviar por WhatsApp / Email
+                      Ocultar ×
                     </button>
                   </div>
+                  <div className="space-y-1 text-slate-200">
+                    {arnExecutionLog.actionsExecuted.map((act, idx) => (
+                      <div key={idx} className="flex items-start gap-2">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
+                        <span>{act}</span>
+                      </div>
+                    ))}
+                  </div>
+                  {arnExecutionLog.quote && (
+                    <div className="pt-2 border-t border-slate-800 flex flex-wrap items-center justify-between gap-2">
+                      <span className="font-mono text-[11px] text-slate-300">
+                        Propuesta lista en Portal Cliente (#portal):{' '}
+                        <strong className="text-white">{arnExecutionLog.quote.quoteNumber}</strong> (
+                        {arnExecutionLog.quote.currency} $
+                        {arnExecutionLog.quote.total.toLocaleString()})
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setPreviewQuote(arnExecutionLog.quote!);
+                            setIsQuotePreviewOpen(true);
+                          }}
+                          className="px-3 py-1 bg-white/10 hover:bg-white/20 text-white font-semibold text-[11px] cursor-pointer"
+                        >
+                          Ver / PDF 40/40/20
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setFastReplyQuote(arnExecutionLog.quote!);
+                            setIsFastReplyOpen(true);
+                          }}
+                          className="px-3 py-1 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-[11px] cursor-pointer"
+                        >
+                          Enviar por WhatsApp / Email
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
-          )}
-        </div>
-      </div>
-
-      {/* Main ARN Navigation Tabs */}
-      <div className="px-6 py-2 border-b border-slate-200 bg-slate-50 flex items-center justify-between gap-4 overflow-x-auto">
-        <div className="flex items-center gap-1.5">
-          <button
-            type="button"
-            onClick={() => setActiveTab('kanban')}
-            className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-2 cursor-pointer transition-all whitespace-nowrap ${
-              activeTab === 'kanban'
-                ? 'bg-[#291B64] text-white shadow-2xs'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
-            }`}
-          >
-            <TrendingUp className="w-4 h-4" />
-            <span>Radar ARN & Pipeline ({opportunities.length})</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab('directory')}
-            className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-2 cursor-pointer transition-all whitespace-nowrap ${
-              activeTab === 'directory'
-                ? 'bg-[#291B64] text-white shadow-2xs'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
-            }`}
-          >
-            <Building2 className="w-4 h-4" />
-            <span>Red de Nodos: Empresas ({companies.length}) & Contactos ({contacts.length})</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab('quotes')}
-            className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-2 cursor-pointer transition-all ${
-              activeTab === 'quotes'
-                ? 'bg-blue-600 text-white shadow-2xs'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
-            }`}
-          >
-            <FileText className="w-4 h-4" />
-            <span>Presupuestos & Plantillas ({quotes.length})</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab('payments')}
-            className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-2 cursor-pointer transition-all ${
-              activeTab === 'payments'
-                ? 'bg-blue-600 text-white shadow-2xs'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
-            }`}
-          >
-            <CreditCard className="w-4 h-4" />
-            <span>Medios de Pago & Cobranzas ({payments.length})</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab('leads')}
-            className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-2 cursor-pointer transition-all ${
-              activeTab === 'leads'
-                ? 'bg-blue-600 text-white shadow-2xs'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
-            }`}
-          >
-            <Users className="w-4 h-4" />
-            <span>Leads Web ({webLeads.proposals.length + webLeads.contactInquiries.length})</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab('whatsapp_automations')}
-            className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-2 cursor-pointer transition-all ${
-              activeTab === 'whatsapp_automations'
-                ? 'bg-emerald-600 text-white shadow-2xs'
-                : 'text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200'
-            }`}
-          >
-            <MessageSquare className="w-4 h-4" />
-            <span>WhatsApp Business & Automatizaciones</span>
-          </button>
-        </div>
-
-        {/* Global Filter & Search */}
-        <div className="flex items-center gap-2">
-          <div className="relative">
-            <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Buscar cliente o proyecto..."
-              className="pl-8 pr-3 py-1.5 bg-white border border-slate-300 rounded-xl text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 w-48 sm:w-64"
-            />
-          </div>
-
-          <select
-            value={categoryFilter}
-            onChange={(e) => setCategoryFilter(e.target.value)}
-            className="px-2.5 py-1.5 bg-white border border-slate-300 rounded-xl text-xs text-slate-700 cursor-pointer"
-          >
-            <option value="all">Todos los Servicios</option>
-            <option value="odoo_erp">Odoo v18 ERP</option>
-            <option value="ecommerce_b2b2c">E-Commerce B2B2C</option>
-            <option value="software_architecture">Arquitectura & Resiliencia</option>
-            <option value="fractional_cto">Fractional CTO</option>
-            <option value="linux_docker">Linux & Docker</option>
-            <option value="bi_analytics">Business Intelligence</option>
-          </select>
-        </div>
+          </>
+        )}
       </div>
 
       {/* Main Work Area */}
@@ -3474,6 +3530,32 @@ export const CrmDashboard: React.FC<CrmDashboardProps> = ({ passkey = 'gaston202
               </div>
             </form>
           </div>
+        )}
+
+        {/* ============================================================
+            TAB 7: STOCK DE SERVICIOS ARN & ESCALAS (MICRO · PYME · GRANDE)
+        ============================================================ */}
+        {activeTab === 'service_stock' && (
+          <ArnServiceStockManager
+            serviceStock={serviceStock}
+            passkey={passkey}
+            onUpdateStock={(next) => setServiceStock(next)}
+            onEmitSimulatedQuote={async ({
+              stockServiceId,
+              employeeCount,
+              clientName,
+              companyName,
+              clientEmail,
+            }) => {
+              const stk = serviceStock.find((s) => s.id === stockServiceId);
+              await handleExecuteArnCommand(
+                undefined,
+                `Hablé con ${clientName} de ${companyName}, correo ${clientEmail}, somos ${employeeCount} empleados y necesitan ${
+                  stk?.name || 'implementación ARN'
+                }, armar propuesta 40/40/20`
+              );
+            }}
+          />
         )}
       </div>
 

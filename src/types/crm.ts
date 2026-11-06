@@ -16,6 +16,40 @@ export type ServiceCategory =
   | 'bi_analytics'
   | 'custom';
 
+export type CompanyScaleTier = 'micro' | 'pyme' | 'grande';
+
+export interface ServiceScaleTierConfig {
+  tier: CompanyScaleTier;
+  label: string;
+  minEmployees: number;
+  maxEmployees: number;
+  includedEmployees: number;
+  baseImplementationPrice: number;
+  monthlySupportPrice: number;
+  estimatedTimeline: string;
+}
+
+export interface ArnServiceStockItem {
+  id: string;
+  code: string;
+  serviceCategory: ServiceCategory;
+  name: string;
+  valueProposition: string;
+  deliverables: string[];
+  keywords: string[];
+  currency: 'USD' | 'ARS';
+  active: boolean;
+  scales: {
+    micro: ServiceScaleTierConfig;
+    pyme: ServiceScaleTierConfig;
+    grande: ServiceScaleTierConfig;
+  };
+  employeeBlockSize: number; // default 5 employees
+  pricePerEmployeeBlock: number; // extra implementation cost per block of 5 employees above includedEmployees
+  monthlySupportPerEmployeeBlock: number; // extra monthly SLA cost per block of 5 employees
+  updatedAt: string;
+}
+
 export interface CrmCompany {
   id: string;
   name: string;
@@ -27,6 +61,7 @@ export interface CrmCompany {
   location?: string;
   employeeCount?: number;
   employeeRangeLabel?: string;
+  companyScale?: CompanyScaleTier;
   tier: 'enterprise' | 'pyme' | 'startup' | 'institution' | 'prospect';
   notes?: string;
   createdAt: string;
@@ -63,6 +98,12 @@ export interface Opportunity {
   contactId?: string;
   employeeCount?: number;
   employeeRangeLabel?: string;
+  companyScale?: CompanyScaleTier;
+  stockServiceId?: string;
+  stockServiceCode?: string;
+  valueProposition?: string;
+  baseImplementationCost?: number;
+  scaleIncrementCost?: number;
   monthlySupportFee?: number;
   serviceCategory: ServiceCategory;
   stage: OpportunityStage;
@@ -109,6 +150,10 @@ export interface Quote {
   clientTaxId?: string; // CUIT / RFC / Tax ID
   employeeCount?: number;
   employeeRangeLabel?: string;
+  companyScale?: CompanyScaleTier;
+  stockServiceId?: string;
+  stockServiceCode?: string;
+  valueProposition?: string;
   baseImplementationCost?: number;
   scaleIncrementCost?: number;
   monthlySupportFee?: number;

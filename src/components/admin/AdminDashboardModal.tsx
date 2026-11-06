@@ -33,6 +33,7 @@ import {
   Linkedin,
   Github,
   Image as ImageIcon,
+  Layers,
 } from 'lucide-react';
 import { BlogPost } from '../../types/blog';
 import { SiteConfig, SITE_CONFIG } from '../../data/siteConfig';
@@ -64,8 +65,8 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
       return null;
     }
   });
-  // Active Tab: 'crm' | 'client_portal' | 'settings' | 'blog' | 'infrastructure'
-  const [activeTab, setActiveTab] = useState<'crm' | 'client_portal' | 'settings' | 'blog' | 'infrastructure'>('crm');
+  // Active Tab: 'crm' | 'service_stock' | 'client_portal' | 'settings' | 'blog' | 'infrastructure'
+  const [activeTab, setActiveTab] = useState<'crm' | 'service_stock' | 'client_portal' | 'settings' | 'blog' | 'infrastructure'>('crm');
   const [infraStatus, setInfraStatus] = useState<any>(null);
   const [isLoadingInfra, setIsLoadingInfra] = useState<boolean>(false);
   const [testEmailTarget, setTestEmailTarget] = useState<string>('notificaciones@gastonbarea.com');
@@ -502,6 +503,24 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
 
                 <button
                   type="button"
+                  onClick={() => setActiveTab('service_stock')}
+                  className={`w-full px-3.5 py-2.5 text-xs font-sans font-semibold transition-all flex items-center justify-between cursor-pointer ${
+                    activeTab === 'service_stock'
+                      ? 'bg-emerald-600 text-white border-l-2 border-emerald-300'
+                      : 'text-emerald-300 bg-emerald-500/10 hover:bg-emerald-500/20 hover:text-white border border-emerald-500/20'
+                  }`}
+                >
+                  <span className="inline-flex items-center gap-2.5">
+                    <Layers className="w-4 h-4 text-emerald-300 shrink-0" />
+                    <span className="text-left">Stock de Servicios ARN</span>
+                  </span>
+                  <span className="text-[10px] font-mono px-1.5 py-0.5 bg-white/15 text-white shrink-0">
+                    3 Escalas
+                  </span>
+                </button>
+
+                <button
+                  type="button"
                   onClick={() => setActiveTab('client_portal')}
                   className={`w-full px-3.5 py-2.5 text-xs font-sans font-semibold transition-all flex items-center gap-2.5 cursor-pointer ${
                     activeTab === 'client_portal'
@@ -582,11 +601,22 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
           </aside>
 
           {/* Main Content Area */}
-          <div className={`flex-1 min-w-0 ${activeTab === 'crm' ? 'p-0' : 'p-6 sm:p-8 lg:p-10'} bg-white flex flex-col`}>
-            {/* TAB 0: CRM OPERATIVO */}
-            {activeTab === 'crm' && (
+          <div className={`flex-1 min-w-0 ${activeTab === 'crm' || activeTab === 'service_stock' ? 'p-0' : 'p-6 sm:p-8 lg:p-10'} bg-white flex flex-col`}>
+            {/* TAB 0: CRM OPERATIVO & STOCK DE SERVICIOS ARN */}
+            {(activeTab === 'crm' || activeTab === 'service_stock') && (
               <div className="flex-1 h-full">
-                <CrmDashboard passkey={localStorage.getItem('gb_master_passkey') || 'gaston2026'} onClose={onClose} />
+                <CrmDashboard
+                  passkey={localStorage.getItem('gb_master_passkey') || 'gaston2026'}
+                  onClose={onClose}
+                  initialTab={activeTab === 'service_stock' ? 'service_stock' : 'kanban'}
+                  onTabChange={(tab) => {
+                    if (tab === 'service_stock') {
+                      setActiveTab('service_stock');
+                    } else if (activeTab === 'service_stock') {
+                      setActiveTab('crm');
+                    }
+                  }}
+                />
               </div>
             )}
 

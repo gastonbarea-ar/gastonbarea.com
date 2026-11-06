@@ -1,20 +1,28 @@
 import {
+  ArnServiceStockItem,
+  CompanyScaleTier,
   CrmCompany,
   CrmContact,
   Opportunity,
   Quote,
   ServiceCategory,
 } from '../types/crm.ts';
+import { INITIAL_ARN_SERVICE_STOCK } from '../data/crmTemplates.ts';
 
 export interface EmployeePricingBreakdown {
   employeeCount: number;
+  companyScale: CompanyScaleTier;
+  companyScaleLabel: string;
   employeeRangeLabel: string;
+  includedEmployeesInScale: number;
   extraBlocksOf5: number;
   baseImplementationCost: number;
   scaleIncrementCost: number;
   totalImplementationCost: number;
   monthlySupportFee: number;
   monthlySupportDetails: string;
+  estimatedTimeline: string;
+  stockService: ArnServiceStockItem;
   currency: 'USD' | 'ARS';
 }
 
@@ -29,7 +37,11 @@ export interface ParsedArnCommand {
   companyName: string;
   phone?: string;
   employeeCount: number;
+  companyScale: CompanyScaleTier;
   employeeRangeLabel: string;
+  stockServiceId: string;
+  stockServiceCode: string;
+  valueProposition: string;
   baseImplementationCost: number;
   scaleIncrementCost: number;
   monthlySupportFee: number;
@@ -61,7 +73,9 @@ export interface ArnRelationshipNode {
   clientPhone?: string;
   companyName: string;
   employeeCount?: number;
+  companyScale?: CompanyScaleTier;
   employeeRangeLabel?: string;
+  stockServiceCode?: string;
   monthlySupportFee?: number;
   serviceCategory: ServiceCategory;
   stage: Opportunity['stage'];
@@ -80,90 +94,167 @@ export interface ArnRelationshipNode {
 export const EMPLOYEE_SCALE_OPTIONS = [
   {
     count: 5,
-    shortLabel: 'Hasta 5 empleados (Base)',
-    rangeLabel: 'Implementación Base · 1 a 5 empleados',
+    scale: 'micro' as CompanyScaleTier,
+    shortLabel: 'Hasta 5 emp. (Micro Base)',
+    rangeLabel: 'Tamaño MICRO · 1 a 5 empleados',
   },
   {
     count: 10,
-    shortLabel: '6 a 10 empleados (+5)',
-    rangeLabel: 'Escala Tramo 2 · 6 a 10 empleados',
+    scale: 'micro' as CompanyScaleTier,
+    shortLabel: '6 a 10 emp. (Micro +5)',
+    rangeLabel: 'Tamaño MICRO · 6 a 10 empleados',
   },
   {
     count: 15,
-    shortLabel: '11 a 15 empleados (+10)',
-    rangeLabel: 'Escala Tramo 3 · 11 a 15 empleados',
+    scale: 'pyme' as CompanyScaleTier,
+    shortLabel: '11 a 15 emp. (PyME Base)',
+    rangeLabel: 'Tamaño PyME · 11 a 15 empleados',
   },
   {
     count: 25,
-    shortLabel: '16 a 25 empleados (PyME)',
-    rangeLabel: 'Escala PyME · 16 a 25 empleados',
+    scale: 'pyme' as CompanyScaleTier,
+    shortLabel: '16 a 25 emp. (PyME +10)',
+    rangeLabel: 'Tamaño PyME · 16 a 25 empleados',
   },
   {
     count: 50,
-    shortLabel: '26 a 50 empleados (Corp)',
-    rangeLabel: 'Escala Corporativa · 26 a 50 empleados',
+    scale: 'pyme' as CompanyScaleTier,
+    shortLabel: '26 a 50 emp. (PyME Corp)',
+    rangeLabel: 'Tamaño PyME · 26 a 50 empleados',
   },
   {
     count: 100,
-    shortLabel: '+50 empleados (Industrial)',
-    rangeLabel: 'Escala Industrial · +50 empleados',
+    scale: 'grande' as CompanyScaleTier,
+    shortLabel: '+50 emp. (Escala Grande)',
+    rangeLabel: 'Tamaño GRANDE · +50 empleados',
   },
 ];
 
+export function resolveCompanyScaleTier(employeeCount: number): CompanyScaleTier {
+  if (employeeCount <= 10) return 'micro';
+  if (employeeCount <= 50) return 'pyme';
+  return 'grande';
+}
+
+export function resolveCompanyScaleLabel(scale: CompanyScaleTier): string {
+  switch (scale) {
+    case 'micro':
+      return 'Escala MICRO (1 a 10 empleados)';
+    case 'pyme':
+      return 'Escala PyME (11 a 50 empleados)';
+    case 'grande':
+      return 'Escala GRANDE (+50 empleados)';
+  }
+}
+
 export function resolveEmployeeRangeLabel(employeeCount: number): string {
-  if (employeeCount <= 5) return 'Implementación Base · Hasta 5 empleados';
-  if (employeeCount <= 10) return `Escala Tramo 2 · 6 a 10 empleados (${employeeCount} pers.)`;
-  if (employeeCount <= 15) return `Escala Tramo 3 · 11 a 15 empleados (${employeeCount} pers.)`;
-  if (employeeCount <= 25) return `Escala PyME · 16 a 25 empleados (${employeeCount} pers.)`;
-  if (employeeCount <= 50) return `Escala Corporativa · 26 a 50 empleados (${employeeCount} pers.)`;
-  return `Escala Industrial · +50 empleados (${employeeCount} pers.)`;
+  const scale = resolveCompanyScaleTier(employeeCount);
+  if (scale === 'micro') {
+    if (employeeCount <= 5) {
+      return `Tamaño MICRO · Base hasta 5 empleados (${employeeCount} pers.)`;
+    }
+    return `Tamaño MICRO · Tramo 6 a 10 empleados (${employeeCount} pers.)`;
+  }
+  if (scale === 'pyme') {
+    if (employeeCount <= 15) {
+      return `Tamaño PyME · Base 11 a 15 empleados (${employeeCount} pers.)`;
+    }
+    if (employeeCount <= 25) {
+      return `Tamaño PyME · Tramo 16 a 25 empleados (${employeeCount} pers.)`;
+    }
+    return `Tamaño PyME · Tramo 26 a 50 empleados (${employeeCount} pers.)`;
+  }
+  return `Tamaño GRANDE / Corporativa · +50 empleados (${employeeCount} pers.)`;
 }
 
 /**
- * Calculates Base Implementation Cost (up to 5 staff) + Incremental Scaling in blocks of 5 staff (5 -> 10 -> 15 -> 25 -> 50+)
- * + Monthly Service with Support Included (Abono Mensual + SLA).
+ * Matches a service from the controllable ARN Service Stock by ID, category, or natural language query
+ */
+export function matchServiceFromStock(params: {
+  query?: string;
+  serviceCategory?: ServiceCategory;
+  preferredStockId?: string;
+  serviceStock?: ArnServiceStockItem[];
+}): ArnServiceStockItem {
+  const catalog =
+    params.serviceStock && params.serviceStock.length > 0
+      ? params.serviceStock
+      : INITIAL_ARN_SERVICE_STOCK;
+  const activeCatalog = catalog.filter((s) => s.active !== false);
+  const pool = activeCatalog.length > 0 ? activeCatalog : catalog;
+
+  if (params.preferredStockId) {
+    const byId = pool.find(
+      (s) => s.id === params.preferredStockId || s.code === params.preferredStockId
+    );
+    if (byId) return byId;
+  }
+
+  if (params.query) {
+    const lower = params.query.toLowerCase();
+    let bestItem: ArnServiceStockItem | null = null;
+    let bestScore = 0;
+
+    for (const item of pool) {
+      let score = 0;
+      for (const kw of item.keywords || []) {
+        if (lower.includes(kw.toLowerCase())) {
+          score += 3;
+        }
+      }
+      if (lower.includes(item.code.toLowerCase())) score += 10;
+      if (score > bestScore) {
+        bestScore = score;
+        bestItem = item;
+      }
+    }
+    if (bestItem && bestScore > 0) {
+      return bestItem;
+    }
+  }
+
+  if (params.serviceCategory) {
+    const byCategory = pool.find((s) => s.serviceCategory === params.serviceCategory);
+    if (byCategory) return byCategory;
+  }
+
+  return pool[0] || INITIAL_ARN_SERVICE_STOCK[0];
+}
+
+/**
+ * Queries the ARN Service Stock to calculate the exact pricing for the company's scale (Micro, PyME, Grande)
+ * and employee headcount (base + 5-employee block increments + monthly SLA support).
  */
 export function calculateEmployeeTierPricing(params: {
   employeeCount?: number;
   serviceCategory: ServiceCategory;
   currency?: 'USD' | 'ARS';
   explicitTotalOverride?: number;
+  preferredStockId?: string;
+  serviceStock?: ArnServiceStockItem[];
 }): EmployeePricingBreakdown {
   const currency: 'USD' | 'ARS' = params.currency === 'ARS' ? 'ARS' : 'USD';
   const fx = currency === 'ARS' ? 1100 : 1;
   const rawCount = Math.max(1, Math.round(Number(params.employeeCount) || 5));
 
-  // Base cost for up to 5 employees by vertical (in USD)
-  let baseUsd = 2400;
-  switch (params.serviceCategory) {
-    case 'odoo_erp':
-      baseUsd = 2500;
-      break;
-    case 'ecommerce_b2b2c':
-      baseUsd = 2300;
-      break;
-    case 'bi_analytics':
-      baseUsd = 2600;
-      break;
-    case 'linux_docker':
-      baseUsd = 1900;
-      break;
-    case 'fractional_cto':
-      baseUsd = 2200;
-      break;
-    default:
-      baseUsd = 2500;
-      break;
-  }
+  const stockService = matchServiceFromStock({
+    serviceCategory: params.serviceCategory,
+    preferredStockId: params.preferredStockId,
+    serviceStock: params.serviceStock,
+  });
 
-  // Incremental blocks of 5 employees above the base 5 (e.g. 6..10 = +1 block, 11..15 = +2 blocks, etc.)
-  const extraStaff = Math.max(0, rawCount - 5);
-  const extraBlocksOf5 = Math.ceil(extraStaff / 5);
+  const companyScale = resolveCompanyScaleTier(rawCount);
+  const scaleConfig = stockService.scales[companyScale] || stockService.scales.micro;
 
-  // Each additional block of 5 employees adds USD $450 for role setup, permissions, training & concurrent load
-  const incrementPerBlockUsd = 450;
-  const rawBaseCost = Math.round(baseUsd * fx);
-  const rawScaleIncrement = Math.round(extraBlocksOf5 * incrementPerBlockUsd * fx);
+  const blockSize = Math.max(1, stockService.employeeBlockSize || 5);
+  const includedInScale = Math.max(5, scaleConfig.includedEmployees || 5);
+  const extraStaffAboveScaleBase = Math.max(0, rawCount - includedInScale);
+  const extraBlocksOf5 = Math.ceil(extraStaffAboveScaleBase / blockSize);
+
+  const rawBaseCost = Math.round(scaleConfig.baseImplementationPrice * fx);
+  const rawScaleIncrement = Math.round(
+    extraBlocksOf5 * (stockService.pricePerEmployeeBlock || 450) * fx
+  );
   const computedTotal = rawBaseCost + rawScaleIncrement;
 
   const totalImplementationCost =
@@ -171,7 +262,6 @@ export function calculateEmployeeTierPricing(params: {
       ? Math.round(params.explicitTotalOverride)
       : computedTotal;
 
-  // If explicitTotalOverride was passed, keep base + increment consistent with total
   const baseImplementationCost =
     params.explicitTotalOverride && params.explicitTotalOverride >= 100
       ? extraBlocksOf5 > 0
@@ -180,26 +270,33 @@ export function calculateEmployeeTierPricing(params: {
       : rawBaseCost;
   const scaleIncrementCost = Math.max(0, totalImplementationCost - baseImplementationCost);
 
-  // Monthly Service + Included Support SLA scaled by employee headcount
-  // Base (up to 5 staff): USD $250/mo + USD $70/mo per additional block of 5 employees
-  const monthlySupportUsd = 250 + extraBlocksOf5 * 70;
-  const monthlySupportFee = Math.round(monthlySupportUsd * fx);
+  // Monthly Service + Included Support SLA from the Stock scale + extra blocks
+  const monthlySupportRaw =
+    scaleConfig.monthlySupportPrice +
+    extraBlocksOf5 * (stockService.monthlySupportPerEmployeeBlock || 70);
+  const monthlySupportFee = Math.round(monthlySupportRaw * fx);
   const employeeRangeLabel = resolveEmployeeRangeLabel(rawCount);
+  const companyScaleLabel = resolveCompanyScaleLabel(companyScale);
 
-  const monthlySupportDetails = `Servicio Mensual Operativo + Soporte Técnico SLA Incluido (${employeeRangeLabel}): incluye mesa de ayuda para hasta ${Math.max(
+  const monthlySupportDetails = `Servicio Mensual Operativo + Soporte Técnico SLA Incluido [${stockService.code} · ${companyScaleLabel} · ${rawCount} empleados]: incluye mesa de ayuda para hasta ${Math.max(
     5,
     rawCount
-  )} usuarios, monitoreo de servidor Cloud/Docker 24/7, copias de seguridad automatizadas y mantenimiento evolutivo.`;
+  )} usuarios, monitoreo Cloud/Docker 24/7, copias de seguridad automatizadas y mantenimiento evolutivo.`;
 
   return {
     employeeCount: rawCount,
+    companyScale,
+    companyScaleLabel,
     employeeRangeLabel,
+    includedEmployeesInScale: includedInScale,
     extraBlocksOf5,
     baseImplementationCost,
     scaleIncrementCost,
     totalImplementationCost,
     monthlySupportFee,
     monthlySupportDetails,
+    estimatedTimeline: scaleConfig.estimatedTimeline || '4 a 6 semanas (Sprints Ágiles)',
+    stockService,
     currency,
   };
 }
@@ -245,7 +342,9 @@ export function getServiceCategoryDefaultTitle(category: ServiceCategory, compan
 export function parseNaturalArnCommand(
   rawInput: string,
   overrideContactChannel?: string,
-  overrideEmployeeCount?: number
+  overrideEmployeeCount?: number,
+  serviceStock?: ArnServiceStockItem[],
+  preferredStockId?: string
 ): ParsedArnCommand {
   const clean = (rawInput || '').trim();
   const combined = `${clean} ${overrideContactChannel || ''}`.trim();
@@ -284,7 +383,7 @@ export function parseNaturalArnCommand(
     }
   }
 
-  // 5. Extract Company Name (e.g., "de Bodega Austral", "de AgroSur", "empresa X")
+  // 5. Extract Company Name
   let companyName = 'Contacto Individual';
   const companyPatterns = [
     /\bde\s+([A-ZÁÉÍÓÚÑ][A-Za-zÁÉÍÓÚÑáéíóúñ0-9&.\s]{2,28}?)(?:,|;|\.|\s+somos|\s+tenemos|\s+con|\s+necesita|\s+quiere|\s+buscan|\s+por|\s+correo|\s+mail|\s+usd|\s+\$|$)/,
@@ -358,14 +457,24 @@ export function parseNaturalArnCommand(
     }
   }
 
-  const serviceCategory = inferServiceCategoryFromText(clean);
+  // 7. Match Service from ARN Stock
+  const inferredCategory = inferServiceCategoryFromText(clean);
+  const matchedStock = matchServiceFromStock({
+    query: clean,
+    serviceCategory: inferredCategory,
+    preferredStockId,
+    serviceStock,
+  });
+  const serviceCategory = matchedStock.serviceCategory || inferredCategory;
 
-  // Calculate employee-tiered implementation + monthly support pricing
+  // 8. Calculate Stock-driven pricing (Micro / PyME / Grande + employee headcount blocks)
   const pricing = calculateEmployeeTierPricing({
     employeeCount: detectedEmployees,
     serviceCategory,
     currency,
     explicitTotalOverride: explicitAmountOverride,
+    preferredStockId: matchedStock.id,
+    serviceStock,
   });
 
   const shouldActivateKickoff =
@@ -395,7 +504,8 @@ export function parseNaturalArnCommand(
     intent = 'schedule_meet';
   }
 
-  const summaryTitle = getServiceCategoryDefaultTitle(serviceCategory, companyName);
+  const suffix = companyName && companyName !== 'Contacto Individual' ? ` · ${companyName}` : '';
+  const summaryTitle = `${matchedStock.name}${suffix}`;
 
   return {
     intent,
@@ -404,7 +514,11 @@ export function parseNaturalArnCommand(
     companyName,
     phone,
     employeeCount: pricing.employeeCount,
+    companyScale: pricing.companyScale,
     employeeRangeLabel: pricing.employeeRangeLabel,
+    stockServiceId: matchedStock.id,
+    stockServiceCode: matchedStock.code,
+    valueProposition: matchedStock.valueProposition,
     baseImplementationCost: pricing.baseImplementationCost,
     scaleIncrementCost: pricing.scaleIncrementCost,
     monthlySupportFee: pricing.monthlySupportFee,
@@ -431,14 +545,19 @@ export function buildAutonomous404020Quote(params: {
   totalAmount?: number;
   currency: 'USD' | 'ARS';
   notes?: string;
+  preferredStockId?: string;
+  serviceStock?: ArnServiceStockItem[];
 }): Quote {
   const pricing = calculateEmployeeTierPricing({
     employeeCount: params.employeeCount || 5,
     serviceCategory: params.serviceCategory,
     currency: params.currency,
     explicitTotalOverride: params.totalAmount,
+    preferredStockId: params.preferredStockId,
+    serviceStock: params.serviceStock,
   });
 
+  const stock = pricing.stockService;
   const total = pricing.totalImplementationCost;
   const m1 = Math.round(total * 0.4);
   const m2 = Math.round(total * 0.4);
@@ -449,30 +568,31 @@ export function buildAutonomous404020Quote(params: {
 
   const quoteNum = `COT-ARN-${new Date().getFullYear()}-${String(Math.floor(100 + Math.random() * 899))}`;
 
+  // Item 1: Base Service from ARN Service Stock according to Company Scale (Micro / PyME / Grande)
+  // Item 2: Explicit Employee Headcount Sizing Item (determines company size & scale)
   const items: Quote['items'] = [
     {
-      id: `item-base-${Date.now()}`,
-      description: `1. Implementación Base (Dotación inicial hasta 5 empleados) — ${params.title}`,
-      deliverable:
-        'Arquitectura Base, Aprovisionamiento Cloud/Docker, Configuración Core, Staging UAT y Puesta en Producción para hasta 5 usuarios',
-      hours: 45,
+      id: `item-stock-base-${Date.now()}`,
+      description: `1. [${stock.code}] ${stock.name} — Valor Base ${pricing.companyScaleLabel.toUpperCase()}`,
+      deliverable: `${stock.valueProposition} Entregables incluidos: ${(stock.deliverables || []).join(' · ')}`,
+      hours: pricing.companyScale === 'grande' ? 95 : pricing.companyScale === 'pyme' ? 65 : 45,
       unitPrice: pricing.baseImplementationCost,
       quantity: 1,
       total: pricing.baseImplementationCost,
     },
-  ];
-
-  if (pricing.scaleIncrementCost > 0) {
-    items.push({
-      id: `item-scale-${Date.now() + 1}`,
-      description: `2. Escalamiento por Dotación de Personal (${pricing.employeeRangeLabel})`,
-      deliverable: `Parametrización de roles adicionales, permisos multi-área, licenciamiento operativo y capacitación para ${pricing.employeeCount} empleados (+${pricing.extraBlocksOf5} bloque(s) de 5 personas)`,
-      hours: pricing.extraBlocksOf5 * 10,
+    {
+      id: `item-employee-scale-${Date.now() + 1}`,
+      description: `2. Condición de Dotación Relevada: ${pricing.employeeCount} Empleados (Determina ${pricing.companyScaleLabel})`,
+      deliverable:
+        pricing.scaleIncrementCost > 0
+          ? `Dimensionamiento operativo para ${pricing.employeeCount} empleados: incluye base de ${pricing.includedEmployeesInScale} usuarios de ${pricing.companyScaleLabel} + ${pricing.extraBlocksOf5} bloque(s) adicional(es) de ${stock.employeeBlockSize} empleados (roles, licencias operativas, permisos y capacitación).`
+          : `Dotación de ${pricing.employeeCount} empleados cubierta íntegramente dentro del tramo base de ${pricing.companyScaleLabel} (hasta ${pricing.includedEmployeesInScale} empleados incluidos sin recargo adicional).`,
+      hours: pricing.extraBlocksOf5 > 0 ? pricing.extraBlocksOf5 * 10 : 0,
       unitPrice: pricing.scaleIncrementCost,
       quantity: 1,
       total: pricing.scaleIncrementCost,
-    });
-  }
+    },
+  ];
 
   return {
     id: `qt-arn-${Date.now()}`,
@@ -482,7 +602,11 @@ export function buildAutonomous404020Quote(params: {
     clientEmail: params.clientEmail,
     clientCompany: params.companyName,
     employeeCount: pricing.employeeCount,
+    companyScale: pricing.companyScale,
     employeeRangeLabel: pricing.employeeRangeLabel,
+    stockServiceId: stock.id,
+    stockServiceCode: stock.code,
+    valueProposition: stock.valueProposition,
     baseImplementationCost: pricing.baseImplementationCost,
     scaleIncrementCost: pricing.scaleIncrementCost,
     monthlySupportFee: pricing.monthlySupportFee,
@@ -494,7 +618,7 @@ export function buildAutonomous404020Quote(params: {
     subtotal: total,
     taxPercent: 0,
     total,
-    timeline: pricing.employeeCount > 15 ? '5 a 8 semanas (Sprints Ágiles)' : '4 a 6 semanas (Sprints Ágiles)',
+    timeline: pricing.estimatedTimeline,
     milestones: [
       {
         id: `ms-1-${Date.now()}`,
@@ -509,7 +633,7 @@ export function buildAutonomous404020Quote(params: {
         name: 'Hito 2 · Entrega en Staging UAT & Homologación (40%)',
         percentage: 40,
         amount: m2,
-        condition: `Contra entrega funcional en servidor Staging UAT para ${pricing.employeeCount} usuarios`,
+        condition: `Contra entrega funcional en servidor Staging UAT para ${pricing.employeeCount} usuarios (${pricing.companyScaleLabel})`,
         status: 'pending',
       },
       {
@@ -522,10 +646,10 @@ export function buildAutonomous404020Quote(params: {
       },
     ],
     termsAndConditions: [
-      `Condición de Dotación Relevada: ${pricing.employeeRangeLabel} (Base 5 empleados incrementándose en tramos de 5).`,
+      `Servicio del Stock ARN: [${stock.code}] ${stock.name} — ${stock.valueProposition}`,
+      `Tamaño de Empresa determinado por Dotación: ${pricing.employeeCount} empleados → ${pricing.companyScaleLabel} (${pricing.employeeRangeLabel}).`,
       `Servicio Mensual con Soporte SLA Incluido (post Go-Live): ${pricing.currency} $${pricing.monthlySupportFee.toLocaleString()} / mes (${pricing.monthlySupportDetails}).`,
       'Esquema de inversión de implementación por hitos verificables 40% / 40% / 20%.',
-      'Aprobación instantánea en 1 clic desde el Portal Clientes ARN (#portal).',
     ],
     status: 'sent',
     validUntil: validDate.toISOString().split('T')[0],
@@ -573,7 +697,7 @@ export function computeArnRelationshipNodes(params: {
       let autonomousAction: ArnAutonomousAction = {
         actionType: 'auto_quote_40_40_20',
         buttonLabel: 'Auto-Generar Propuesta 40/40/20 (1-Clic)',
-        description: 'Estructura presupuesto formal 40/40/20 y lo publica en el Portal del cliente.',
+        description: 'Consulta el Stock ARN y publica presupuesto formal 40/40/20 en el Portal del cliente.',
       };
 
       if (activeProject || opp.stage === 'won') {
@@ -610,6 +734,8 @@ export function computeArnRelationshipNodes(params: {
       }
 
       const cleanPhone = (opp.clientPhone || '').replace(/[^\d]/g, '') || '5492804697193';
+      const empCount = opp.employeeCount || linkedQuote?.employeeCount || 5;
+      const compScale = opp.companyScale || linkedQuote?.companyScale || resolveCompanyScaleTier(empCount);
       const waText = linkedQuote
         ? `Hola ${opp.clientName}, te escribo desde gastonbarea.com. Ya dejé disponible en tu Portal ARN la propuesta formal ${linkedQuote.quoteNumber} con esquema 40/40/20 para "${opp.title}". Podés aprobarla en 1 clic desde https://www.gastonbarea.com/#portal`
         : `Hola ${opp.clientName}, te escribo desde gastonbarea.com por la iniciativa "${opp.title}". Ya habilitamos tu nodo en nuestro Portal ARN.`;
@@ -621,11 +747,13 @@ export function computeArnRelationshipNodes(params: {
         clientEmail: opp.clientEmail,
         clientPhone: opp.clientPhone,
         companyName: opp.company || 'Contacto Individual',
-        employeeCount: opp.employeeCount || linkedQuote?.employeeCount || 5,
+        employeeCount: empCount,
+        companyScale: compScale,
         employeeRangeLabel:
           opp.employeeRangeLabel ||
           linkedQuote?.employeeRangeLabel ||
-          'Implementación Base · Hasta 5 empleados',
+          resolveEmployeeRangeLabel(empCount),
+        stockServiceCode: opp.stockServiceCode || linkedQuote?.stockServiceCode,
         monthlySupportFee: opp.monthlySupportFee || linkedQuote?.monthlySupportFee || 250,
         serviceCategory: opp.serviceCategory,
         stage: opp.stage,

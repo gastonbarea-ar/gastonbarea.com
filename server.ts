@@ -36,6 +36,7 @@ import {
   INITIAL_CRM_PAYMENTS,
   INITIAL_CRM_COMPANIES,
   INITIAL_CRM_CONTACTS,
+  INITIAL_ARN_SERVICE_STOCK,
 } from './src/data/crmTemplates.ts';
 import {
   CLIENT_ACCOUNTS,
@@ -56,6 +57,7 @@ import {
   computeArnRelationshipNodes,
   getServiceCategoryDefaultTitle,
   calculateEmployeeTierPricing,
+  matchServiceFromStock,
   ParsedArnCommand,
 } from './src/utils/arnEngine.ts';
 
@@ -205,6 +207,7 @@ let cachedPayments = [...INITIAL_CRM_PAYMENTS];
 let cachedPaymentConfig = { ...DEFAULT_PAYMENT_CONFIG };
 let cachedCrmCompanies = [...INITIAL_CRM_COMPANIES];
 let cachedCrmContacts = [...INITIAL_CRM_CONTACTS];
+let cachedServiceStock = [...INITIAL_ARN_SERVICE_STOCK];
 let cachedProposals: any[] = [];
 let cachedContacts: any[] = [];
 
@@ -1872,6 +1875,7 @@ app.get('/api/crm/overview', requireAdminAuth, async (_req, res) => {
       paymentConfig: cachedPaymentConfig,
       companies: cachedCrmCompanies,
       contacts: cachedCrmContacts,
+      serviceStock: cachedServiceStock,
       metrics: {
         totalOpportunities: cachedOpportunities.length,
         activeOpportunitiesCount: activeOpportunities.length,
@@ -4481,9 +4485,16 @@ app.post('/api/admin/test-email', requireAdminAuth, async (req, res) => {
 async function resolveArnCommandWithAi(
   rawInput: string,
   contactChannel?: string,
-  overrideEmployeeCount?: number
+  overrideEmployeeCount?: number,
+  preferredStockId?: string
 ): Promise<ParsedArnCommand> {
-  const deterministic = parseNaturalArnCommand(rawInput, contactChannel, overrideEmployeeCount);
+  const deterministic = parseNaturalArnCommand(
+    rawInput,
+    contactChannel,
+    overrideEmployeeCount,
+    cachedServiceStock,
+    preferredStockId
+  );
   if (!ai || !rawInput || rawInput.trim().length < 8) {
     return deterministic;
   }
@@ -4550,10 +4561,19 @@ async function resolveArnCommandWithAi(
         ? parsedJson.employeeCount
         : deterministic.employeeCount;
 
+    const matchedStock = matchServiceFromStock({
+      query: rawInput,
+      serviceCategory: resolvedCategory,
+      preferredStockId,
+      serviceStock: cachedServiceStock,
+    });
+
     const tierPricing = calculateEmployeeTierPricing({
       employeeCount: resolvedEmployeeCount,
-      serviceCategory: resolvedCategory,
+      serviceCategory: matchedStock.serviceCategory,
       currency: resolvedCurrency,
+      preferredStockId: matchedStock.id,
+      serviceStock: cachedServiceStock,
     });
 
     return {
@@ -4568,9 +4588,13 @@ async function resolveArnCommandWithAi(
           : deterministic.clientEmail,
       companyName: resolvedCompany,
       phone: parsedJson.phone || deterministic.phone,
-      serviceCategory: resolvedCategory,
+      serviceCategory: matchedStock.serviceCategory,
       employeeCount: tierPricing.employeeCount,
+      companyScale: tierPricing.companyScale,
       employeeRangeLabel: tierPricing.employeeRangeLabel,
+      stockServiceId: matchedStock.id,
+      stockServiceCode: matchedStock.code,
+      valueProposition: matchedStock.valueProposition,
       baseImplementationCost: tierPricing.baseImplementationCost,
       scaleIncrementCost: tierPricing.scaleIncrementCost,
       monthlySupportFee: tierPricing.monthlySupportFee,
@@ -4586,9 +4610,9 @@ async function resolveArnCommandWithAi(
           ? parsedJson.shouldActivateKickoff
           : deterministic.shouldActivateKickoff,
       summaryTitle:
-        parsedJson.summaryTitle && parsedJson.summaryTitle.trim().length >= 5
-          ? parsedJson.summaryTitle.trim()
-          : getServiceCategoryDefaultTitle(resolvedCategory, resolvedCompany),
+        resolvedCompany && resolvedCompany !== 'Contacto Individual'
+          ? `${matchedStock.name} · ${resolvedCompany}`
+          : matchedStock.name,
     };
   } catch (err) {
     console.warn('[ARN AI Parser Fallback]:', err);
@@ -4596,9 +4620,86 @@ async function resolveArnCommandWithAi(
   }
 }
 
+// 13.0 ARN Service Stock Catalog Endpoints (Micro / PyME / Grande controllable pricing)
+app.get('/api/arn/service-stock', (_req, res) => {
+  return res.json({
+    success: true,
+    serviceStock: cachedServiceStock,
+  });
+});
+
+app.post('/api/arn/service-stock', requireAdminAuth, (req, res) => {
+  const payload = req.body || {};
+  if (!payload.name || !payload.scales) {
+    return res
+      .status(400)
+      .json({ error: 'Completá el nombre del servicio y sus 3 escalas (Micro, PyME, Grande).' });
+  }
+
+  const newStockItem = {
+    ...payload,
+    id: payload.id || `stk-custom-${Date.now()}`,
+    code: payload.code || `ARN-STK-0${cachedServiceStock.length + 1}`,
+    active: payload.active !== false,
+    updatedAt: new Date().toISOString(),
+  };
+
+  cachedServiceStock.unshift(newStockItem);
+  return res.json({
+    success: true,
+    item: newStockItem,
+    serviceStock: cachedServiceStock,
+  });
+});
+
+app.put('/api/arn/service-stock/:id', requireAdminAuth, (req, res) => {
+  const { id } = req.params;
+  const idx = cachedServiceStock.findIndex((s) => s.id === id);
+  if (idx === -1) {
+    return res.status(404).json({ error: 'Servicio no encontrado en el Stock ARN.' });
+  }
+
+  const updated = {
+    ...cachedServiceStock[idx],
+    ...req.body,
+    id,
+    scales: {
+      micro: {
+        ...cachedServiceStock[idx].scales.micro,
+        ...(req.body?.scales?.micro || {}),
+      },
+      pyme: {
+        ...cachedServiceStock[idx].scales.pyme,
+        ...(req.body?.scales?.pyme || {}),
+      },
+      grande: {
+        ...cachedServiceStock[idx].scales.grande,
+        ...(req.body?.scales?.grande || {}),
+      },
+    },
+    updatedAt: new Date().toISOString(),
+  };
+
+  cachedServiceStock[idx] = updated;
+  return res.json({
+    success: true,
+    item: updated,
+    serviceStock: cachedServiceStock,
+  });
+});
+
+app.delete('/api/arn/service-stock/:id', requireAdminAuth, (req, res) => {
+  const { id } = req.params;
+  cachedServiceStock = cachedServiceStock.filter((s) => s.id !== id);
+  return res.json({
+    success: true,
+    serviceStock: cachedServiceStock,
+  });
+});
+
 // 13A. Admin Omnibar: Natural Language / Voice / WhatsApp Command Execution
 app.post('/api/arn/command', requireAdminAuth, async (req, res) => {
-  const { commandText, employeeCount } = req.body || {};
+  const { commandText, employeeCount, stockServiceId } = req.body || {};
   if (!commandText || !String(commandText).trim()) {
     return res.status(400).json({ error: 'Ingresá o dictá una instrucción en lenguaje natural.' });
   }
@@ -4606,7 +4707,8 @@ app.post('/api/arn/command', requireAdminAuth, async (req, res) => {
   const parsed = await resolveArnCommandWithAi(
     String(commandText),
     undefined,
-    employeeCount ? Number(employeeCount) : undefined
+    employeeCount ? Number(employeeCount) : undefined,
+    stockServiceId ? String(stockServiceId) : undefined
   );
   const actionsExecuted: string[] = [];
 
@@ -4621,7 +4723,7 @@ app.post('/api/arn/command', requireAdminAuth, async (req, res) => {
     employeeRangeLabel: parsed.employeeRangeLabel,
   });
   actionsExecuted.push(
-    `Nodo de Relación sincronizado: ${parsed.clientName} (${parsed.companyName} · ${parsed.employeeRangeLabel}) · Portal habilitado (${parsed.clientEmail})`
+    `Nodo ARN sincronizado: ${parsed.clientName} (${parsed.companyName} · ${parsed.employeeRangeLabel}) · Servicio Stock [${parsed.stockServiceCode}]`
   );
 
   // 2. Create or update Opportunity
@@ -4653,12 +4755,16 @@ app.post('/api/arn/command', requireAdminAuth, async (req, res) => {
     value: parsed.estimatedValue,
     currency: parsed.currency,
     employeeCount: parsed.employeeCount,
+    companyScale: parsed.companyScale,
     employeeRangeLabel: parsed.employeeRangeLabel,
+    stockServiceId: parsed.stockServiceId,
+    stockServiceCode: parsed.stockServiceCode,
+    valueProposition: parsed.valueProposition,
     baseImplementationCost: parsed.baseImplementationCost,
     scaleIncrementCost: parsed.scaleIncrementCost,
     monthlySupportFee: parsed.monthlySupportFee,
     probability: targetStage === 'won' ? 100 : targetStage === 'proposal_sent' ? 75 : 55,
-    notes: `[Comando ARN · ${parsed.employeeRangeLabel}]: ${parsed.extractedNotes}`,
+    notes: `[Comando ARN · ${parsed.stockServiceCode} · ${parsed.employeeRangeLabel}]: ${parsed.extractedNotes}`,
     source: 'manual' as const,
     createdAt: existingOpp?.createdAt || new Date().toISOString(),
     updatedAt: new Date().toISOString(),
@@ -4673,7 +4779,7 @@ app.post('/api/arn/command', requireAdminAuth, async (req, res) => {
     `Oportunidad ARN "${oppPayload.title}" (${oppPayload.currency} $${oppPayload.value.toLocaleString()} + Abono Mensual $${parsed.monthlySupportFee.toLocaleString()}/mes) en etapa ${oppPayload.stage.toUpperCase()}`
   );
 
-  // 3. Auto-generate 40/40/20 Quote if requested
+  // 3. Auto-generate 40/40/20 Quote from ARN Service Stock if requested
   let createdQuote: any = null;
   let emailResult: any = null;
   if (parsed.shouldGenerateQuote || parsed.shouldActivateKickoff) {
@@ -4687,6 +4793,8 @@ app.post('/api/arn/command', requireAdminAuth, async (req, res) => {
       totalAmount: parsed.estimatedValue,
       currency: parsed.currency,
       employeeCount: parsed.employeeCount,
+      preferredStockId: parsed.stockServiceId,
+      serviceStock: cachedServiceStock,
       notes: parsed.extractedNotes,
     });
     if (parsed.shouldActivateKickoff) {
@@ -4697,7 +4805,7 @@ app.post('/api/arn/command', requireAdminAuth, async (req, res) => {
       o.id === oppId ? { ...o, linkedQuoteId: createdQuote.quoteNumber } : o
     );
     actionsExecuted.push(
-      `Cotización 40/40/20 ${createdQuote.quoteNumber} generada automáticamente (${createdQuote.currency} $${createdQuote.total.toLocaleString()} + Soporte Mensual $${createdQuote.monthlySupportFee.toLocaleString()}/mes)`
+      `Cotización 40/40/20 ${createdQuote.quoteNumber} emitida desde Stock [${parsed.stockServiceCode}] (${createdQuote.currency} $${createdQuote.total.toLocaleString()} + Soporte Mensual $${(createdQuote.monthlySupportFee || 250).toLocaleString()}/mes)`
     );
 
     emailResult = await sendOfficialQuoteEmail({
@@ -4770,6 +4878,7 @@ app.post('/api/arn/command', requireAdminAuth, async (req, res) => {
       contacts: cachedCrmContacts,
       quotes: cachedQuotes,
       payments: cachedPayments,
+      serviceStock: cachedServiceStock,
     },
   });
 });
@@ -4798,6 +4907,8 @@ app.post('/api/arn/autopilot', requireAdminAuth, async (req, res) => {
       totalAmount: opp.value,
       currency: opp.currency || 'USD',
       employeeCount: (opp as any).employeeCount || 5,
+      preferredStockId: (opp as any).stockServiceId,
+      serviceStock: cachedServiceStock,
       notes: opp.notes,
     });
     cachedQuotes.unshift(createdQuote);
@@ -4807,7 +4918,7 @@ app.post('/api/arn/autopilot', requireAdminAuth, async (req, res) => {
     opp.updatedAt = new Date().toISOString();
 
     actionsExecuted.push(
-      `Propuesta 40/40/20 (${createdQuote.quoteNumber}) emitida y publicada automáticamente en el Portal del cliente.`
+      `Propuesta 40/40/20 (${createdQuote.quoteNumber}) emitida desde Stock ARN y publicada en el Portal del cliente.`
     );
 
     emailResult = await sendOfficialQuoteEmail({
@@ -4832,6 +4943,8 @@ app.post('/api/arn/autopilot', requireAdminAuth, async (req, res) => {
         totalAmount: opp.value,
         currency: opp.currency || 'USD',
         employeeCount: (opp as any).employeeCount || 5,
+        preferredStockId: (opp as any).stockServiceId,
+        serviceStock: cachedServiceStock,
       });
       cachedQuotes.unshift(targetQuote);
     }
@@ -4876,13 +4989,14 @@ app.post('/api/arn/autopilot', requireAdminAuth, async (req, res) => {
       contacts: cachedCrmContacts,
       quotes: cachedQuotes,
       payments: cachedPayments,
+      serviceStock: cachedServiceStock,
     },
   });
 });
 
 // 13C. Client Zero-Form Conversational Intake (/api/arn/intake)
 app.post('/api/arn/intake', async (req, res) => {
-  const { message, contactChannel, employeeCount } = req.body || {};
+  const { message, contactChannel, employeeCount, stockServiceId } = req.body || {};
   if (!message && !contactChannel) {
     return res
       .status(400)
@@ -4892,7 +5006,8 @@ app.post('/api/arn/intake', async (req, res) => {
   const parsed = await resolveArnCommandWithAi(
     String(message || 'Evaluación de arquitectura y propuesta 40/40/20'),
     String(contactChannel || ''),
-    employeeCount ? Number(employeeCount) : undefined
+    employeeCount ? Number(employeeCount) : undefined,
+    stockServiceId ? String(stockServiceId) : undefined
   );
 
   // 1. Auto-create/update Company & Contact with active Portal credentials
@@ -4922,18 +5037,22 @@ app.post('/api/arn/intake', async (req, res) => {
     value: parsed.estimatedValue,
     currency: parsed.currency,
     employeeCount: parsed.employeeCount,
+    companyScale: parsed.companyScale,
     employeeRangeLabel: parsed.employeeRangeLabel,
+    stockServiceId: parsed.stockServiceId,
+    stockServiceCode: parsed.stockServiceCode,
+    valueProposition: parsed.valueProposition,
     baseImplementationCost: parsed.baseImplementationCost,
     scaleIncrementCost: parsed.scaleIncrementCost,
     monthlySupportFee: parsed.monthlySupportFee,
     probability: 70,
-    notes: `[Auto-Perfilado ARN · ${parsed.employeeRangeLabel}]: ${parsed.extractedNotes}`,
+    notes: `[Auto-Perfilado ARN · Stock ${parsed.stockServiceCode} · ${parsed.employeeRangeLabel}]: ${parsed.extractedNotes}`,
     source: 'portal_registration' as const,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
 
-  // 3. Auto-build tailored 40/40/20 Quote so the client has an actionable proposal immediately
+  // 3. Auto-build tailored 40/40/20 Quote querying the ARN Service Stock
   const autoQuote = buildAutonomous404020Quote({
     opportunityId: oppId,
     clientName: parsed.clientName,
@@ -4944,6 +5063,8 @@ app.post('/api/arn/intake', async (req, res) => {
     totalAmount: parsed.estimatedValue,
     currency: parsed.currency,
     employeeCount: parsed.employeeCount,
+    preferredStockId: parsed.stockServiceId,
+    serviceStock: cachedServiceStock,
     notes: parsed.extractedNotes,
   });
 
@@ -4973,11 +5094,10 @@ app.post('/api/arn/intake', async (req, res) => {
   });
 
   // 5. AWAIT Transactional Quote Email to Client + Gastón (notificaciones@gastonbarea.com)
-  // Crucial for Vercel Serverless so the container does not freeze before Resend HTTP completes
   const emailResult = await sendOfficialQuoteEmail({
     quote: autoQuote,
     paymentConfig: cachedPaymentConfig,
-    customSubject: `📄 Presupuesto 40/40/20 #${autoQuote.quoteNumber} (${parsed.employeeRangeLabel}) · ${autoQuote.title}`,
+    customSubject: `📄 Presupuesto 40/40/20 #${autoQuote.quoteNumber} [${parsed.stockServiceCode} · ${parsed.employeeRangeLabel}] · ${autoQuote.title}`,
   }).catch((err) => ({
     success: false,
     error: err?.message || 'Error al despachar presupuesto por correo.',
@@ -4991,7 +5111,7 @@ app.post('/api/arn/intake', async (req, res) => {
     quote: autoQuote,
     parsed,
     emailResult,
-    message: `¡Bienvenido/a ${parsed.clientName}! Perfilamos tu nodo ARN para ${parsed.companyName} (${parsed.employeeRangeLabel}) y enviamos tu presupuesto 40/40/20 (${autoQuote.quoteNumber}) + Soporte Mensual a ${parsed.clientEmail}.`,
+    message: `¡Bienvenido/a ${parsed.clientName}! El motor ARN consultó el Stock de Servicios [${parsed.stockServiceCode}] para ${parsed.companyName} (${parsed.employeeRangeLabel}) y envió tu propuesta de valor 40/40/20 (${autoQuote.quoteNumber}) a ${parsed.clientEmail}.`,
   });
 });
 

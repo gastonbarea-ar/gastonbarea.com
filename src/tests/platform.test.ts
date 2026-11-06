@@ -378,63 +378,144 @@ describe('8. Integración WhatsApp Business API & Automatizaciones CRM (whatsapp
 });
 
 // ============================================================================
-// 9. MOTOR ARN (AUTOMATED RELATIONSHIP NETWORK — CERO FORMULARIOS & AUTOPILOTO)
+// 9. MOTOR ARN & STOCK DE SERVICIOS (MICRO · PYME · GRANDE + ÍTEM DE EMPLEADOS)
 // ============================================================================
 import {
   parseNaturalArnCommand,
   buildAutonomous404020Quote,
   computeArnRelationshipNodes,
   calculateEmployeeTierPricing,
+  resolveCompanyScaleTier,
+  matchServiceFromStock,
 } from '../utils/arnEngine.ts';
+import { INITIAL_ARN_SERVICE_STOCK } from '../data/crmTemplates.ts';
 
-describe('9. Motor ARN (Automated Relationship Network — Cero Formularios & Escala por Dotación)', () => {
-  it('debe extraer cliente, empresa, email, vertical, dotación de personal y monto desde una instrucción natural sin formularios', () => {
+describe('9. Motor ARN & Stock de Servicios (Escalas Micro, PyME, Grande + Ítem de Dotación de Empleados)', () => {
+  it('debe mantener el Stock de Servicios ARN con 3 valores base en escala (Micro, PyME, Grande) y clasificar empresas por dotación', () => {
+    assert.ok(INITIAL_ARN_SERVICE_STOCK.length >= 6);
+    for (const item of INITIAL_ARN_SERVICE_STOCK) {
+      assert.ok(item.code.startsWith('ARN-STK-'));
+      assert.ok(item.scales.micro.baseImplementationPrice > 0);
+      assert.ok(item.scales.pyme.baseImplementationPrice > item.scales.micro.baseImplementationPrice);
+      assert.ok(item.scales.grande.baseImplementationPrice > item.scales.pyme.baseImplementationPrice);
+      assert.ok(item.deliverables.length >= 3);
+      assert.ok(item.valueProposition.length > 20);
+    }
+
+    assert.equal(resolveCompanyScaleTier(5), 'micro');
+    assert.equal(resolveCompanyScaleTier(10), 'micro');
+    assert.equal(resolveCompanyScaleTier(15), 'pyme');
+    assert.equal(resolveCompanyScaleTier(50), 'pyme');
+    assert.equal(resolveCompanyScaleTier(60), 'grande');
+  });
+
+  it('debe extraer cliente, empresa, email, servicio del stock, escala y dotación desde una instrucción natural sin formularios', () => {
     const parsed = parseNaturalArnCommand(
-      'Hablé con Valeria de Bodega Austral, correo valeria@bodegaaustral.com, somos 10 empleados y necesitan Odoo v18 ERP e inventario por USD 5400, armar propuesta 40/40/20'
+      'Hablé con Valeria de Bodega Austral, correo valeria@bodegaaustral.com, somos 10 empleados y necesitan Odoo v18 ERP e inventario por USD 5400, armar propuesta 40/40/20',
+      undefined,
+      undefined,
+      INITIAL_ARN_SERVICE_STOCK
     );
     assert.equal(parsed.clientName, 'Valeria');
     assert.equal(parsed.clientEmail, 'valeria@bodegaaustral.com');
     assert.equal(parsed.companyName, 'Bodega Austral');
     assert.equal(parsed.serviceCategory, 'odoo_erp');
+    assert.equal(parsed.stockServiceCode, 'ARN-STK-01');
     assert.equal(parsed.employeeCount, 10);
+    assert.equal(parsed.companyScale, 'micro');
     assert.equal(parsed.estimatedValue, 5400);
     assert.equal(parsed.currency, 'USD');
     assert.equal(parsed.shouldGenerateQuote, true);
     assert.ok(parsed.monthlySupportFee >= 250);
+    assert.ok(parsed.valueProposition.length > 20);
   });
 
-  it('debe calcular implementación base (hasta 5 personal) e incrementar progresivamente a 10, 15, 25+ junto con el abono mensual con soporte SLA incluido', () => {
-    const base5 = calculateEmployeeTierPricing({
+  it('debe consultar el Stock de Servicios ARN en escalas Micro (5 y 10 emp.), PyME (15 y 25 emp.) y Grande (60 emp.), permitiendo controlar valores', () => {
+    const micro5 = calculateEmployeeTierPricing({
       employeeCount: 5,
       serviceCategory: 'odoo_erp',
       currency: 'USD',
+      serviceStock: INITIAL_ARN_SERVICE_STOCK,
     });
-    const tier10 = calculateEmployeeTierPricing({
+    const micro10 = calculateEmployeeTierPricing({
       employeeCount: 10,
       serviceCategory: 'odoo_erp',
       currency: 'USD',
+      serviceStock: INITIAL_ARN_SERVICE_STOCK,
     });
-    const tier15 = calculateEmployeeTierPricing({
+    const pyme15 = calculateEmployeeTierPricing({
       employeeCount: 15,
       serviceCategory: 'odoo_erp',
       currency: 'USD',
+      serviceStock: INITIAL_ARN_SERVICE_STOCK,
+    });
+    const pyme25 = calculateEmployeeTierPricing({
+      employeeCount: 25,
+      serviceCategory: 'odoo_erp',
+      currency: 'USD',
+      serviceStock: INITIAL_ARN_SERVICE_STOCK,
+    });
+    const grande60 = calculateEmployeeTierPricing({
+      employeeCount: 60,
+      serviceCategory: 'odoo_erp',
+      currency: 'USD',
+      serviceStock: INITIAL_ARN_SERVICE_STOCK,
     });
 
-    assert.equal(base5.scaleIncrementCost, 0);
-    assert.equal(base5.totalImplementationCost, base5.baseImplementationCost);
-    assert.equal(base5.monthlySupportFee, 250);
+    // Escala Micro: 5 empleados incluidos en base (USD 2500), a 10 empleados suma +1 tramo de 5
+    assert.equal(micro5.companyScale, 'micro');
+    assert.equal(micro5.baseImplementationCost, 2500);
+    assert.equal(micro5.scaleIncrementCost, 0);
+    assert.equal(micro5.totalImplementationCost, 2500);
 
-    // Al pasar de 5 a 10 empleados (+1 tramo de 5 personal) incrementa el costo de implementación y soporte mensual
-    assert.ok(tier10.scaleIncrementCost > 0);
-    assert.equal(tier10.totalImplementationCost, tier10.baseImplementationCost + tier10.scaleIncrementCost);
-    assert.ok(tier10.monthlySupportFee > base5.monthlySupportFee);
+    assert.equal(micro10.companyScale, 'micro');
+    assert.ok(micro10.scaleIncrementCost > 0);
+    assert.equal(micro10.totalImplementationCost, micro10.baseImplementationCost + micro10.scaleIncrementCost);
 
-    // Al pasar a 15 empleados (+2 tramos de 5 personal) vuelve a escalar proporcionalmente
-    assert.equal(tier15.scaleIncrementCost, tier10.scaleIncrementCost * 2);
-    assert.ok(tier15.monthlySupportFee > tier10.monthlySupportFee);
+    // Escala PyME: 15 empleados incluidos en base PyME (USD 4200), a 25 empleados suma +2 tramos de 5
+    assert.equal(pyme15.companyScale, 'pyme');
+    assert.equal(pyme15.baseImplementationCost, 4200);
+    assert.equal(pyme15.scaleIncrementCost, 0);
+
+    assert.equal(pyme25.companyScale, 'pyme');
+    assert.equal(pyme25.baseImplementationCost, 4200);
+    assert.equal(pyme25.extraBlocksOf5, 2);
+    assert.ok(pyme25.scaleIncrementCost > 0);
+
+    // Escala Grande: +50 empleados (base USD 7800 con 50 incluidos; a 60 suma +2 tramos)
+    assert.equal(grande60.companyScale, 'grande');
+    assert.equal(grande60.baseImplementationCost, 7800);
+    assert.equal(grande60.extraBlocksOf5, 2);
+
+    // Control de valores del Stock: si el administrador ajusta el valor base Micro a USD 3100, el motor ARN refleja el cambio
+    const customStock = INITIAL_ARN_SERVICE_STOCK.map((s) =>
+      s.code === 'ARN-STK-01'
+        ? {
+            ...s,
+            scales: {
+              ...s.scales,
+              micro: { ...s.scales.micro, baseImplementationPrice: 3100 },
+            },
+          }
+        : s
+    );
+    const customMicro5 = calculateEmployeeTierPricing({
+      employeeCount: 5,
+      serviceCategory: 'odoo_erp',
+      currency: 'USD',
+      serviceStock: customStock,
+    });
+    assert.equal(customMicro5.baseImplementationCost, 3100);
+    assert.equal(customMicro5.totalImplementationCost, 3100);
   });
 
-  it('debe generar una cotización formal 40/40/20 con desglose de dotación y servicio mensual con soporte incluido', () => {
+  it('debe generar una cotización formal 40/40/20 consultando el Stock e incluyendo como 2do ítem explícito la cantidad de empleados que determina el tamaño', () => {
+    const matched = matchServiceFromStock({
+      serviceCategory: 'odoo_erp',
+      serviceStock: INITIAL_ARN_SERVICE_STOCK,
+    });
+    assert.equal(matched.code, 'ARN-STK-01');
+
     const quote = buildAutonomous404020Quote({
       opportunityId: 'opp-test-arn',
       clientName: 'Valeria',
@@ -444,10 +525,16 @@ describe('9. Motor ARN (Automated Relationship Network — Cero Formularios & Es
       title: 'Implementación Odoo v18 · Bodega Austral',
       employeeCount: 10,
       currency: 'USD',
+      serviceStock: INITIAL_ARN_SERVICE_STOCK,
     });
     assert.equal(quote.employeeCount, 10);
-    assert.ok((quote.scaleIncrementCost || 0) > 0);
-    assert.ok((quote.monthlySupportFee || 0) > 250);
+    assert.equal(quote.companyScale, 'micro');
+    assert.equal(quote.stockServiceCode, 'ARN-STK-01');
+    assert.ok((quote.valueProposition || '').length > 20);
+    assert.equal(quote.items.length, 2);
+    assert.ok(quote.items[0].description.includes('[ARN-STK-01]'));
+    assert.ok(quote.items[1].description.includes('Condición de Dotación Relevada: 10 Empleados'));
+    assert.equal(quote.items[0].total + quote.items[1].total, quote.total);
     assert.equal(quote.milestones.length, 3);
     assert.equal(
       quote.milestones[0].amount + quote.milestones[1].amount + quote.milestones[2].amount,
