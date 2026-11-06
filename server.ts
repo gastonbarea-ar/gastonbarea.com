@@ -4176,6 +4176,7 @@ app.post('/api/client/bookings', async (req, res) => {
         fullName: resolvedName,
         email: resolvedEmail,
         username: resolvedEmail.split('@')[0],
+        password: 'cliente2026',
         phone: resolvedPhone || undefined,
         roleTitle: 'Ejecutivo / Solicitante Meet',
         contactType:
@@ -4224,7 +4225,7 @@ app.post('/api/client/bookings', async (req, res) => {
   if (resolvedPhone) {
     dispatchWhatsAppMessage({
       toPhone: resolvedPhone,
-      contextType: 'booking_reminder',
+      contextType: 'lead_alert',
       message: `Hola ${resolvedName}, confirmamos tu videollamada Google Meet con Gastón Barea (${getBookingTypeLabel(
         resolvedType
       )}) para el día ${resolvedDate} a las ${resolvedSlot}.\n\n🎥 Sala Google Meet: ${baseMeetUrl}\n📅 Agregar a Google Calendar: ${googleCalendarUrl}`,

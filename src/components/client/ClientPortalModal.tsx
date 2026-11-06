@@ -2111,7 +2111,7 @@ export const ClientPortalModal: React.FC<ClientPortalModalProps> = ({ isOpen = t
                                 </div>
                                 <div className="text-sm font-bold text-[#1D1D1F] mt-1">{qt.title}</div>
                                 <p className="text-xs text-slate-600 mt-0.5">
-                                  {(qt as any).paymentTerms || qt.scopeSummary}
+                                  {(qt as any).paymentTerms || (qt as any).notes || 'Esquema de hitos 40% / 40% / 20%'}
                                 </p>
                               </div>
                               <button
