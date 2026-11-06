@@ -178,8 +178,17 @@ export const ClientPortalModal: React.FC<ClientPortalModalProps> = ({ isOpen = t
     whatsappConfirmUrl: string;
   } | null>(null);
 
-  // Milestone payment detail modal
+  // Milestone payment detail modal & receipt reporting
   const [selectedMilestoneForPayment, setSelectedMilestoneForPayment] = useState<ProjectMilestoneItem | null>(null);
+  const [paymentReportMethod, setPaymentReportMethod] = useState<string>('bank_transfer');
+  const [paymentReportRef, setPaymentReportRef] = useState<string>('');
+  const [paymentReportNotes, setPaymentReportNotes] = useState<string>('');
+  const [isReportingPayment, setIsReportingPayment] = useState<boolean>(false);
+  const [paymentReportFeedback, setPaymentReportFeedback] = useState<string>('');
+
+  // 1-Click Quote Approval state
+  const [isApprovingQuoteId, setIsApprovingQuoteId] = useState<string | null>(null);
+  const [quoteApprovalFeedback, setQuoteApprovalFeedback] = useState<string>('');
 
   // Check existing session and load booking availability
   useEffect(() => {
@@ -820,6 +829,86 @@ export const ClientPortalModal: React.FC<ClientPortalModalProps> = ({ isOpen = t
     setIsNewTicketOpen(false);
     setTicketSubject('');
     setTicketDescription('');
+  };
+
+  // 1-Click Quote Approval from Client Portal -> Auto-provisions 40/40/20 Project & CRM Won
+  const handleAcceptQuoteFromPortal = async (quote: Quote) => {
+    setIsApprovingQuoteId(quote.id);
+    setQuoteApprovalFeedback('');
+    try {
+      const res = await fetch(`/api/client/quotes/${quote.id}/accept`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-client-token': token,
+          'x-client-email': clientSession?.email || emailInput || '',
+        },
+        body: JSON.stringify({
+          clientEmail: clientSession?.email || quote.clientEmail,
+          clientName: clientSession?.name || quote.clientName,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setRelatedQuotes((prev) =>
+          prev.map((q) => (q.id === quote.id ? { ...q, status: 'accepted' } : q))
+        );
+        if (data.project) {
+          setProject(data.project);
+        }
+        setQuoteApprovalFeedback(
+          data.message ||
+            `¡Presupuesto ${quote.quoteNumber} aprobado! Tu Proyecto con esquema de hitos 40/40/20 ya está activo en tu Portal.`
+        );
+        setActiveTab('project');
+      }
+    } catch (err) {
+      console.error('Error approving quote from portal:', err);
+    } finally {
+      setIsApprovingQuoteId(null);
+    }
+  };
+
+  // Report Milestone Payment / Transfer Receipt -> Creates pending PaymentRecord in CRM Cobranzas
+  const handleReportMilestonePayment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!project || !selectedMilestoneForPayment || !paymentReportRef.trim()) return;
+    setIsReportingPayment(true);
+    setPaymentReportFeedback('');
+    try {
+      const res = await fetch(
+        `/api/client/projects/${project.id}/milestones/${selectedMilestoneForPayment.id}/report-payment`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-client-token': token,
+            'x-client-email': clientSession?.email || emailInput || '',
+          },
+          body: JSON.stringify({
+            method: paymentReportMethod,
+            transactionRef: paymentReportRef.trim(),
+            notes: paymentReportNotes.trim(),
+          }),
+        }
+      );
+      const data = await res.json();
+      if (res.ok && data.success) {
+        if (data.project) {
+          setProject(data.project);
+        }
+        setPaymentReportFeedback(
+          data.message ||
+            'Comprobante informado correctamente. Gastón Barea verificará la acreditación en Cobranzas CRM.'
+        );
+        setPaymentReportRef('');
+        setPaymentReportNotes('');
+      }
+    } catch (err) {
+      console.error('Error reporting milestone payment:', err);
+    } finally {
+      setIsReportingPayment(false);
+    }
   };
 
   const getUpcomingBusinessDays = () => {
@@ -1887,20 +1976,45 @@ export const ClientPortalModal: React.FC<ClientPortalModalProps> = ({ isOpen = t
                           {relatedQuotes.map((qt: any) => (
                             <div
                               key={qt.id}
-                              className="p-4 bg-emerald-50/50 border border-emerald-200 space-y-2"
+                              className="p-4 bg-emerald-50/50 border border-emerald-200 space-y-3 flex flex-col justify-between"
                             >
-                              <div className="flex items-center justify-between">
-                                <span className="text-[10px] font-mono font-bold uppercase px-2 py-0.5 bg-emerald-100 text-emerald-800">
-                                  Cotización {qt.quoteNumber} · {qt.status}
-                                </span>
-                                <span className="text-xs font-mono font-bold text-emerald-950">
-                                  {qt.currency} ${Number(qt.total || 0).toLocaleString()}
-                                </span>
+                              <div className="space-y-2">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-[10px] font-mono font-bold uppercase px-2 py-0.5 bg-emerald-100 text-emerald-800">
+                                    Cotización {qt.quoteNumber} · {qt.status}
+                                  </span>
+                                  <span className="text-xs font-mono font-bold text-emerald-950">
+                                    {qt.currency} ${Number(qt.total || 0).toLocaleString()}
+                                  </span>
+                                </div>
+                                <div className="text-sm font-bold text-[#1D1D1F]">
+                                  {qt.title || 'Propuesta Formal Emitida'}
+                                </div>
+                                <p className="text-xs text-slate-600">{qt.paymentTerms}</p>
                               </div>
-                              <div className="text-sm font-bold text-[#1D1D1F]">
-                                Propuesta Formal Emitida
+
+                              <div className="pt-2 border-t border-emerald-200/70 flex items-center justify-between gap-2">
+                                {qt.status === 'accepted' ? (
+                                  <span className="text-xs font-bold text-emerald-800 flex items-center gap-1.5">
+                                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                                    <span>Presupuesto Aprobado · Proyecto 40/40/20 Activo</span>
+                                  </span>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    disabled={isApprovingQuoteId === qt.id}
+                                    onClick={() => handleAcceptQuoteFromPortal(qt)}
+                                    className="w-full py-2.5 px-4 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold transition-colors flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                                  >
+                                    {isApprovingQuoteId === qt.id ? (
+                                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                                    ) : (
+                                      <CheckCircle2 className="w-4 h-4" />
+                                    )}
+                                    <span>Aprobar Presupuesto e Iniciar Proyecto 40/40/20 (1-Clic)</span>
+                                  </button>
+                                )}
                               </div>
-                              <p className="text-xs text-slate-600">{qt.paymentTerms}</p>
                             </div>
                           ))}
                         </div>
@@ -1967,6 +2081,54 @@ export const ClientPortalModal: React.FC<ClientPortalModalProps> = ({ isOpen = t
               {/* TAB 1B: ESTADO DEL PROYECTO ACTIVO */}
               {activeTab === 'project' && project && (
                 <div className="space-y-6">
+                  {quoteApprovalFeedback && (
+                    <div className="p-4 bg-emerald-50 border border-emerald-300 text-emerald-900 text-xs font-bold flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                      <span>{quoteApprovalFeedback}</span>
+                    </div>
+                  )}
+
+                  {/* Si existen cotizaciones adicionales pendientes de aprobación para este cliente */}
+                  {relatedQuotes.some((q) => q.status !== 'accepted') && (
+                    <div className="bg-emerald-50/70 p-5 border border-emerald-200 space-y-3">
+                      <div className="text-xs font-mono font-bold uppercase text-emerald-900">
+                        Propuestas Comerciales Pendientes de Aprobación
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {relatedQuotes
+                          .filter((q) => q.status !== 'accepted')
+                          .map((qt) => (
+                            <div
+                              key={qt.id}
+                              className="p-4 bg-white border border-emerald-200 flex flex-col justify-between gap-3"
+                            >
+                              <div>
+                                <div className="flex items-center justify-between text-xs font-mono font-bold">
+                                  <span className="text-emerald-800">{qt.quoteNumber}</span>
+                                  <span>
+                                    {qt.currency} ${Number(qt.total || 0).toLocaleString()}
+                                  </span>
+                                </div>
+                                <div className="text-sm font-bold text-[#1D1D1F] mt-1">{qt.title}</div>
+                                <p className="text-xs text-slate-600 mt-0.5">
+                                  {(qt as any).paymentTerms || qt.scopeSummary}
+                                </p>
+                              </div>
+                              <button
+                                type="button"
+                                disabled={isApprovingQuoteId === qt.id}
+                                onClick={() => handleAcceptQuoteFromPortal(qt)}
+                                className="w-full py-2 px-3 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                              >
+                                <CheckCircle2 className="w-3.5 h-3.5" />
+                                <span>Aprobar Propuesta 40/40/20 (1-Clic)</span>
+                              </button>
+                            </div>
+                          ))}
+                      </div>
+                    </div>
+                  )}
+
                   {/* Project Overview Card */}
                   <div className="bg-white p-6 border border-black/[0.08] space-y-5">
                     <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -2233,6 +2395,80 @@ export const ClientPortalModal: React.FC<ClientPortalModalProps> = ({ isOpen = t
                                   </div>
                                 </div>
                               </div>
+
+                              {/* FORMULARIO: INFORMAR COMPROBANTE DE PAGO / TRANSFERENCIA */}
+                              <form
+                                onSubmit={handleReportMilestonePayment}
+                                className="p-4 bg-[#F5F5F7] border border-black/15 space-y-3 text-xs"
+                              >
+                                <div className="font-bold text-[#1D1D1F] flex items-center justify-between">
+                                  <span>Informar Comprobante de Pago / Transferencia al CRM</span>
+                                  <span className="text-[10px] font-mono text-[#291B64] uppercase">
+                                    Impacto directo en Cobranzas
+                                  </span>
+                                </div>
+
+                                {paymentReportFeedback && (
+                                  <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-900 font-semibold flex items-center gap-2">
+                                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                                    <span>{paymentReportFeedback}</span>
+                                  </div>
+                                )}
+
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                  <div>
+                                    <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                                      Medio Utilizado
+                                    </label>
+                                    <select
+                                      value={paymentReportMethod}
+                                      onChange={(e) => setPaymentReportMethod(e.target.value)}
+                                      className="w-full px-3 py-2 bg-white border border-black/15 text-xs"
+                                    >
+                                      <option value="bank_transfer">Transferencia Bancaria CBU/Alias</option>
+                                      <option value="mercadopago">Mercado Pago Oficial</option>
+                                      <option value="stripe">Stripe Internacional (USD)</option>
+                                      <option value="usdt_crypto">USDT / Cripto</option>
+                                    </select>
+                                  </div>
+
+                                  <div className="sm:col-span-2">
+                                    <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                                      N° de Comprobante / Operación / Referencia *
+                                    </label>
+                                    <input
+                                      type="text"
+                                      required
+                                      value={paymentReportRef}
+                                      onChange={(e) => setPaymentReportRef(e.target.value)}
+                                      placeholder="Ej: Comprobante #00492817 o ID de operación Mercado Pago"
+                                      className="w-full px-3 py-2 bg-white border border-black/15 text-xs font-mono"
+                                    />
+                                  </div>
+                                </div>
+
+                                <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2">
+                                  <input
+                                    type="text"
+                                    value={paymentReportNotes}
+                                    onChange={(e) => setPaymentReportNotes(e.target.value)}
+                                    placeholder="Notas adicionales (ej: Requiere Factura A a nombre de la corporación)"
+                                    className="flex-1 px-3 py-2 bg-white border border-black/15 text-xs"
+                                  />
+                                  <button
+                                    type="submit"
+                                    disabled={isReportingPayment || !paymentReportRef.trim()}
+                                    className="px-4 py-2 bg-[#291B64] hover:bg-[#382586] text-white font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 shrink-0"
+                                  >
+                                    {isReportingPayment ? (
+                                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                                    ) : (
+                                      <Send className="w-3.5 h-3.5" />
+                                    )}
+                                    <span>Notificar Pago de Hito</span>
+                                  </button>
+                                </div>
+                              </form>
                             </div>
                           )}
                         </div>

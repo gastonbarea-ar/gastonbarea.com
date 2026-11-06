@@ -64,11 +64,8 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
       return null;
     }
   });
-  const [passkeyInput, setPasskeyInput] = useState<string>('');
-  const [authError, setAuthError] = useState<string>('');
-
-  // Active Tab: 'crm' | 'client_portal' | 'settings' | 'blog' | 'leads' | 'infrastructure'
-  const [activeTab, setActiveTab] = useState<'crm' | 'client_portal' | 'settings' | 'blog' | 'leads' | 'infrastructure'>('crm');
+  // Active Tab: 'crm' | 'client_portal' | 'settings' | 'blog' | 'infrastructure'
+  const [activeTab, setActiveTab] = useState<'crm' | 'client_portal' | 'settings' | 'blog' | 'infrastructure'>('crm');
   const [infraStatus, setInfraStatus] = useState<any>(null);
   const [isLoadingInfra, setIsLoadingInfra] = useState<boolean>(false);
   const [testEmailTarget, setTestEmailTarget] = useState<string>('notificaciones@gastonbarea.com');
@@ -84,6 +81,11 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
   }>({ projects: [], inquiries: [], tickets: [], bookings: [] });
   const [adminReplyTexts, setAdminReplyTexts] = useState<Record<string, string>>({});
   const [isReplyingInquiry, setIsReplyingInquiry] = useState<string | null>(null);
+  const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
+  const [projectDrafts, setProjectDrafts] = useState<Record<string, { activeSprint: string; stagingUrl: string; progressPercent: number; status: string }>>({});
+  const [newUpdateDrafts, setNewUpdateDrafts] = useState<Record<string, { title: string; summary: string }>>({});
+  const [isSavingProject, setIsSavingProject] = useState<string | null>(null);
+  const [portalAdminFeedback, setPortalAdminFeedback] = useState<string>('');
 
   // Site Config state
   const [siteConfig, setSiteConfig] = useState<SiteConfig>(SITE_CONFIG);
@@ -94,13 +96,7 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
   const [blogPosts, setBlogPosts] = useState<BlogPost[]>([]);
   const [isPostEditorOpen, setIsPostEditorOpen] = useState<boolean>(false);
   const [postToEdit, setPostToEdit] = useState<BlogPost | null>(null);
-
-  // Leads state
-  const [leads, setLeads] = useState<{ proposals: any[]; contactInquiries: any[] }>({
-    proposals: [],
-    contactInquiries: [],
-  });
-  const [isLoadingLeads, setIsLoadingLeads] = useState<boolean>(false);
+  const [confirmDeletePostId, setConfirmDeletePostId] = useState<string | null>(null);
 
   // Load current site config, blog posts, and verify session on mount/open
   useEffect(() => {
@@ -147,11 +143,9 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
       .catch((e) => console.warn('Could not fetch blog posts:', e));
   }, [isOpen]);
 
-  // Load leads, client portal, or infrastructure status when switching tabs
+  // Load client portal or infrastructure status when switching tabs
   useEffect(() => {
-    if (activeTab === 'leads' && isAuthenticated) {
-      loadLeads();
-    } else if (activeTab === 'client_portal' && isAuthenticated) {
+    if (activeTab === 'client_portal' && isAuthenticated) {
       loadClientPortalData();
     } else if (activeTab === 'infrastructure' && isAuthenticated) {
       loadInfraStatus();
@@ -290,27 +284,73 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
     }
   };
 
-  const loadLeads = () => {
-    setIsLoadingLeads(true);
+  const handlePatchClientProject = async (projectId: string, patchPayload: any, feedbackText?: string) => {
+    setIsSavingProject(projectId);
+    const token = localStorage.getItem('gb_admin_token') || sessionToken;
     const passkey = localStorage.getItem('gb_master_passkey') || 'gaston2026';
-    const token = localStorage.getItem('gb_admin_token') || '';
-    fetch('/api/admin/leads', {
-      headers: {
-        'x-admin-passkey': passkey,
-        'x-admin-token': token,
-      },
-    })
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.success) {
-          setLeads({
-            proposals: data.proposals || [],
-            contactInquiries: data.contactInquiries || [],
-          });
+
+    try {
+      const res = await fetch(`/api/admin/client-portal/projects/${projectId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-token': token,
+          'x-admin-passkey': passkey,
+        },
+        body: JSON.stringify(patchPayload),
+      });
+      const data = await res.json();
+      if (data.success && data.project) {
+        setClientPortalData((prev) => ({
+          ...prev,
+          projects: prev.projects.map((p) => (p.id === projectId ? data.project : p)),
+        }));
+        if (feedbackText) {
+          setPortalAdminFeedback(feedbackText);
+          setTimeout(() => setPortalAdminFeedback(''), 3500);
         }
-      })
-      .catch((e) => console.error(e))
-      .finally(() => setIsLoadingLeads(false));
+      }
+    } catch (err) {
+      console.error('Error patching client project:', err);
+    } finally {
+      setIsSavingProject(null);
+    }
+  };
+
+  const handlePatchBooking = async (bookingId: string, patchPayload: { status?: string; releaseSlot?: boolean; meetingUrl?: string }) => {
+    const token = localStorage.getItem('gb_admin_token') || sessionToken;
+    const passkey = localStorage.getItem('gb_master_passkey') || 'gaston2026';
+
+    try {
+      const res = await fetch(`/api/admin/client-portal/bookings/${bookingId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-token': token,
+          'x-admin-passkey': passkey,
+        },
+        body: JSON.stringify(patchPayload),
+      });
+      const data = await res.json();
+      if (data.success) {
+        if (patchPayload.releaseSlot) {
+          setClientPortalData((prev) => ({
+            ...prev,
+            bookings: prev.bookings.filter((b) => b.id !== bookingId),
+          }));
+          setPortalAdminFeedback('Turno liberado en el calendario y removido de reservas activas.');
+        } else if (data.booking) {
+          setClientPortalData((prev) => ({
+            ...prev,
+            bookings: prev.bookings.map((b) => (b.id === bookingId ? data.booking : b)),
+          }));
+          setPortalAdminFeedback(`Estado de sesión actualizado a ${data.booking.status.toUpperCase()}.`);
+        }
+        setTimeout(() => setPortalAdminFeedback(''), 3500);
+      }
+    } catch (err) {
+      console.error('Error updating booking:', err);
+    }
   };
 
   const handleVerifiedLogin = (token: string, user: any) => {
@@ -340,35 +380,6 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
   };
 
   if (!isOpen) return null;
-
-  const handleLogin = (e: React.FormEvent) => {
-    e.preventDefault();
-    const passkey = passkeyInput.trim();
-    fetch('/api/admin/auth', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ passkey }),
-    })
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.success) {
-          setIsAuthenticated(true);
-          localStorage.setItem('gb_blog_auth', 'true');
-          localStorage.setItem('gb_master_passkey', passkey);
-          setAuthError('');
-        } else {
-          setAuthError('Clave incorrecta. Prueba con gaston2026');
-        }
-      })
-      .catch(() => {
-        if (passkey === 'gaston2026' || passkey === 'admin') {
-          setIsAuthenticated(true);
-          localStorage.setItem('gb_blog_auth', 'true');
-        } else {
-          setAuthError('Clave incorrecta');
-        }
-      });
-  };
 
   const handleSaveSiteConfig = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -401,7 +412,12 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
   };
 
   const handleDeletePost = async (id: string) => {
-    if (!confirm('¿Seguro que deseas eliminar este artículo permanentemente?')) return;
+    if (confirmDeletePostId !== id) {
+      setConfirmDeletePostId(id);
+      setTimeout(() => setConfirmDeletePostId((prev) => (prev === id ? null : prev)), 4000);
+      return;
+    }
+    setConfirmDeletePostId(null);
     const passkey = localStorage.getItem('gb_master_passkey') || 'gaston2026';
 
     try {
@@ -517,19 +533,6 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
 
                 <button
                   type="button"
-                  onClick={() => setActiveTab('leads')}
-                  className={`w-full px-3.5 py-2.5 text-xs font-sans font-semibold transition-all flex items-center gap-2.5 cursor-pointer ${
-                    activeTab === 'leads'
-                      ? 'bg-[#291B64] text-white border-l-2 border-sky-400'
-                      : 'text-neutral-300 hover:bg-white/[0.06] hover:text-white'
-                  }`}
-                >
-                  <Users className="w-4 h-4 text-purple-400" />
-                  <span>Bandeja de Leads</span>
-                </button>
-
-                <button
-                  type="button"
                   onClick={() => setActiveTab('settings')}
                   className={`w-full px-3.5 py-2.5 text-xs font-sans font-semibold transition-all flex items-center gap-2.5 cursor-pointer ${
                     activeTab === 'settings'
@@ -583,7 +586,7 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
             {/* TAB 0: CRM OPERATIVO */}
             {activeTab === 'crm' && (
               <div className="flex-1 h-full">
-                <CrmDashboard passkey={passkeyInput || 'gaston2026'} onClose={onClose} />
+                <CrmDashboard passkey={localStorage.getItem('gb_master_passkey') || 'gaston2026'} onClose={onClose} />
               </div>
             )}
 
@@ -1251,100 +1254,19 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
                           <button
                             type="button"
                             onClick={() => handleDeletePost(post.id)}
-                            className="p-2 rounded-lg bg-white hover:bg-rose-50 text-slate-700 hover:text-rose-600 border border-slate-200 transition-colors cursor-pointer"
+                            className={`p-2 rounded-lg border transition-colors cursor-pointer flex items-center gap-1 text-xs font-bold ${
+                              confirmDeletePostId === post.id
+                                ? 'bg-rose-600 text-white border-rose-700'
+                                : 'bg-white hover:bg-rose-50 text-slate-700 hover:text-rose-600 border-slate-200'
+                            }`}
                             title="Eliminar post"
                           >
                             <Trash2 className="w-4 h-4" />
+                            {confirmDeletePostId === post.id && <span>Confirmar</span>}
                           </button>
                         </div>
                       </div>
                     ))}
-                  </div>
-                </div>
-              )}
-
-              {/* TAB 3: LEADS & INQUIRIES */}
-              {activeTab === 'leads' && (
-                <div className="space-y-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h4 className="text-base font-bold text-slate-900">
-                        Bandeja de Leads y Consultas
-                      </h4>
-                      <p className="text-xs text-slate-500">
-                        Prospectos calificados generados por el simulador de arquitectura y formulario de contacto.
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={loadLeads}
-                      className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-mono flex items-center gap-1.5 cursor-pointer"
-                    >
-                      <RefreshCw className={`w-3.5 h-3.5 ${isLoadingLeads ? 'animate-spin' : ''}`} />
-                      <span>Actualizar</span>
-                    </button>
-                  </div>
-
-                  <div className="space-y-4">
-                    <h5 className="text-xs font-mono font-bold uppercase tracking-wider text-blue-700">
-                      Propuestas de Arquitectura Generadas ({leads.proposals.length})
-                    </h5>
-                    {leads.proposals.length === 0 ? (
-                      <p className="text-xs text-slate-500 italic p-4 bg-slate-50 rounded-xl">
-                        Aún no se han recibido diagnósticos en la base de datos de producción.
-                      </p>
-                    ) : (
-                      <div className="space-y-3">
-                        {leads.proposals.map((lead: any) => (
-                          <div
-                            key={lead.id}
-                            className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-2 text-xs"
-                          >
-                            <div className="flex items-center justify-between font-mono">
-                              <span className="font-bold text-slate-900">
-                                {lead.company_name || lead.organization_type}
-                              </span>
-                              <span className="text-slate-500">{lead.created_at?.split('T')[0]}</span>
-                            </div>
-                            <div className="text-slate-800 font-semibold">{lead.architecture_title}</div>
-                            <div className="text-slate-600 line-clamp-2">{lead.diagnostic_summary}</div>
-                            <div className="text-slate-500 font-mono text-[11px]">
-                              Stack actual: {(lead.current_stack || []).join(', ')} · Urgencia:{' '}
-                              {lead.urgency}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-
-                    <h5 className="text-xs font-mono font-bold uppercase tracking-wider text-blue-700 pt-4">
-                      Mensajes de Contacto Directo ({leads.contactInquiries.length})
-                    </h5>
-                    {leads.contactInquiries.length === 0 ? (
-                      <p className="text-xs text-slate-500 italic p-4 bg-slate-50 rounded-xl">
-                        Sin mensajes pendientes en la bandeja de contacto.
-                      </p>
-                    ) : (
-                      <div className="space-y-3">
-                        {leads.contactInquiries.map((inq: any) => (
-                          <div
-                            key={inq.id}
-                            className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-2 text-xs"
-                          >
-                            <div className="flex items-center justify-between font-mono">
-                              <span className="font-bold text-slate-900">
-                                {inq.name} ({inq.email})
-                              </span>
-                              <span className="text-slate-500">{inq.created_at?.split('T')[0]}</span>
-                            </div>
-                            <div className="text-blue-700 font-semibold">Área: {inq.service_area}</div>
-                            <div className="text-slate-700 bg-white p-2.5 rounded-lg border border-slate-200 whitespace-pre-wrap">
-                              {inq.requirements}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
                   </div>
                 </div>
               )}
@@ -1354,9 +1276,9 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
                 <div className="space-y-6">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 pb-4">
                     <div>
-                      <h4 className="text-lg font-bold text-slate-900">Portal de Clientes, Proyectos & Soporte SLA</h4>
+                      <h4 className="text-lg font-bold text-slate-900">Portal de Clientes, Proyectos 40/40/20 & Soporte SLA</h4>
                       <p className="text-xs text-slate-500">
-                        Supervisa el avance de los proyectos en curso, responde consultas de asesoramiento y gestiona incidencias
+                        Editá en vivo el avance de sprints, hitos de entrega, sesiones Google Meet, consultas técnicas e incidencias
                       </p>
                     </div>
                     <button
@@ -1369,73 +1291,479 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
                     </button>
                   </div>
 
-                  {/* 1. Proyectos de Clientes en Curso */}
+                  {portalAdminFeedback && (
+                    <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                      <span>{portalAdminFeedback}</span>
+                    </div>
+                  )}
+
+                  {/* 1. Proyectos de Clientes en Curso (con Editor Live de Sprints, Hitos y Bitácora) */}
                   <div className="space-y-3">
                     <h5 className="text-xs font-mono font-bold uppercase tracking-wider text-blue-700 flex items-center gap-1.5">
                       <FolderGit2 className="w-4 h-4" />
-                      <span>Proyectos Activos ({clientPortalData.projects.length})</span>
+                      <span>1. Proyectos Activos & Editor de Sprints 40/40/20 ({clientPortalData.projects.length})</span>
                     </h5>
 
                     <div className="grid grid-cols-1 gap-4">
-                      {clientPortalData.projects.map((proj: any) => (
-                        <div
-                          key={proj.id}
-                          className="p-5 rounded-2xl bg-slate-50 border border-slate-200 space-y-4"
-                        >
-                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                            <div>
-                              <div className="flex items-center gap-2">
-                                <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 uppercase">
-                                  {proj.serviceCategory}
-                                </span>
-                                <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 uppercase">
-                                  {proj.status}
-                                </span>
+                      {clientPortalData.projects.map((proj: any) => {
+                        const isEditing = editingProjectId === proj.id;
+                        const draft = projectDrafts[proj.id] || {
+                          activeSprint: proj.activeSprint || '',
+                          stagingUrl: proj.stagingUrl || '',
+                          progressPercent: Number(proj.progressPercent ?? 15),
+                          status: proj.status || 'in_progress',
+                        };
+                        const updDraft = newUpdateDrafts[proj.id] || { title: '', summary: '' };
+
+                        return (
+                          <div
+                            key={proj.id}
+                            className="p-5 rounded-2xl bg-slate-50 border border-slate-200 space-y-4"
+                          >
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                              <div>
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 uppercase">
+                                    {proj.serviceCategory}
+                                  </span>
+                                  <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 uppercase">
+                                    {proj.status}
+                                  </span>
+                                  {proj.quoteNumber && (
+                                    <span className="text-[10px] font-mono text-slate-500">
+                                      Ref: {proj.quoteNumber}
+                                    </span>
+                                  )}
+                                </div>
+                                <h4 className="text-sm font-bold text-slate-900 mt-1">{proj.projectName}</h4>
+                                <div className="text-xs text-slate-600">
+                                  <strong>{proj.clientName}</strong> ({proj.clientEmail}) · {proj.company}
+                                </div>
                               </div>
-                              <h4 className="text-sm font-bold text-slate-900 mt-1">{proj.projectName}</h4>
-                              <div className="text-xs text-slate-600">
-                                <strong>{proj.clientName}</strong> ({proj.clientEmail}) · {proj.company}
+
+                              <div className="flex items-center gap-3">
+                                <div className="text-right">
+                                  <span className="text-xs font-mono font-bold text-blue-700">
+                                    {proj.progressPercent}% Completado
+                                  </span>
+                                  <div className="w-32 h-2.5 bg-slate-200 rounded-full overflow-hidden mt-1">
+                                    <div
+                                      className="h-full bg-blue-600 rounded-full transition-all"
+                                      style={{ width: `${proj.progressPercent}%` }}
+                                    />
+                                  </div>
+                                </div>
+
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (isEditing) {
+                                      setEditingProjectId(null);
+                                    } else {
+                                      setProjectDrafts((prev) => ({
+                                        ...prev,
+                                        [proj.id]: {
+                                          activeSprint: proj.activeSprint || '',
+                                          stagingUrl: proj.stagingUrl || '',
+                                          progressPercent: Number(proj.progressPercent ?? 15),
+                                          status: proj.status || 'in_progress',
+                                        },
+                                      }));
+                                      setEditingProjectId(proj.id);
+                                    }
+                                  }}
+                                  className="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer"
+                                >
+                                  <Edit className="w-3.5 h-3.5" />
+                                  <span>{isEditing ? 'Cerrar Editor' : 'Gestionar Proyecto'}</span>
+                                </button>
                               </div>
                             </div>
 
-                            <div className="text-right">
-                              <span className="text-xs font-mono font-bold text-blue-700">{proj.progressPercent}% Completado</span>
-                              <div className="w-32 h-2.5 bg-slate-200 rounded-full overflow-hidden mt-1">
-                                <div
-                                  className="h-full bg-blue-600 rounded-full"
-                                  style={{ width: `${proj.progressPercent}%` }}
-                                />
+                            <div className="p-3 bg-white rounded-xl border border-slate-200 text-xs flex flex-wrap items-center justify-between gap-2">
+                              <div>
+                                <span className="font-bold text-slate-700">Sprint Activo: </span>
+                                <span className="text-slate-900">{proj.activeSprint}</span>
                               </div>
+                              {proj.stagingUrl && (
+                                <a
+                                  href={proj.stagingUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-blue-600 hover:underline flex items-center gap-1 font-semibold"
+                                >
+                                  <span>Ver Staging UAT</span>
+                                  <ExternalLink className="w-3 h-3" />
+                                </a>
+                              )}
                             </div>
-                          </div>
 
-                          <div className="p-3 bg-white rounded-xl border border-slate-200 text-xs flex flex-wrap items-center justify-between gap-2">
-                            <div>
-                              <span className="font-bold text-slate-700">Sprint Activo: </span>
-                              <span className="text-slate-900">{proj.activeSprint}</span>
-                            </div>
-                            {proj.stagingUrl && (
-                              <a
-                                href={proj.stagingUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-blue-600 hover:underline flex items-center gap-1 font-semibold"
-                              >
-                                <span>Ver Staging UAT</span>
-                                <ExternalLink className="w-3 h-3" />
-                              </a>
+                            {/* Hitos 40/40/20 Rápidos */}
+                            {Array.isArray(proj.milestones) && proj.milestones.length > 0 && (
+                              <div className="space-y-2">
+                                <div className="text-[11px] font-mono font-bold uppercase text-slate-500">
+                                  Hitos 40/40/20 (Clic para alternar avance técnico o estado de cobro):
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
+                                  {proj.milestones.map((ms: any) => (
+                                    <div
+                                      key={ms.id}
+                                      className="p-3 rounded-xl bg-white border border-slate-200 text-xs space-y-2 flex flex-col justify-between"
+                                    >
+                                      <div>
+                                        <div className="flex items-center justify-between text-[10px] font-mono text-slate-500">
+                                          <span>{ms.percentage}% · {ms.currency} ${Number(ms.amount || 0).toLocaleString()}</span>
+                                        </div>
+                                        <div className="font-bold text-slate-900 mt-0.5 line-clamp-2">{ms.title}</div>
+                                      </div>
+
+                                      <div className="flex flex-wrap items-center gap-1.5 pt-1 border-t border-slate-100">
+                                        <button
+                                          type="button"
+                                          disabled={isSavingProject === proj.id}
+                                          onClick={() => {
+                                            const nextStatus =
+                                              ms.status === 'pending'
+                                                ? 'in_progress'
+                                                : ms.status === 'in_progress'
+                                                ? 'completed'
+                                                : 'pending';
+                                            const updatedMilestones = proj.milestones.map((m: any) =>
+                                              m.id === ms.id ? { ...m, status: nextStatus } : m
+                                            );
+                                            handlePatchClientProject(
+                                              proj.id,
+                                              { milestones: updatedMilestones },
+                                              `Hito "${ms.title}" actualizado a ${nextStatus.toUpperCase()}.`
+                                            );
+                                          }}
+                                          className={`px-2 py-1 rounded-lg text-[10px] font-mono font-bold cursor-pointer ${
+                                            ms.status === 'completed'
+                                              ? 'bg-emerald-100 text-emerald-800'
+                                              : ms.status === 'in_progress'
+                                              ? 'bg-blue-100 text-blue-800'
+                                              : 'bg-slate-100 text-slate-700'
+                                          }`}
+                                        >
+                                          {ms.status === 'completed'
+                                            ? '✓ Completado'
+                                            : ms.status === 'in_progress'
+                                            ? '⏳ En Curso'
+                                            : 'Pendiente'}
+                                        </button>
+
+                                        <button
+                                          type="button"
+                                          disabled={isSavingProject === proj.id}
+                                          onClick={() => {
+                                            const nextPay = ms.paymentStatus === 'paid' ? 'pending' : 'paid';
+                                            const updatedMilestones = proj.milestones.map((m: any) =>
+                                              m.id === ms.id ? { ...m, paymentStatus: nextPay } : m
+                                            );
+                                            handlePatchClientProject(
+                                              proj.id,
+                                              { milestones: updatedMilestones },
+                                              `Estado financiero de "${ms.title}" marcado como ${
+                                                nextPay === 'paid' ? 'ABONADO' : 'PENDIENTE'
+                                              }.`
+                                            );
+                                          }}
+                                          className={`px-2 py-1 rounded-lg text-[10px] font-mono font-bold cursor-pointer ${
+                                            ms.paymentStatus === 'paid'
+                                              ? 'bg-emerald-600 text-white'
+                                              : 'bg-amber-100 text-amber-800'
+                                          }`}
+                                        >
+                                          {ms.paymentStatus === 'paid' ? '✓ Abonado' : '$ Pago Pendiente'}
+                                        </button>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Live Project & Sprint Editor Drawer */}
+                            {isEditing && (
+                              <div className="p-4 rounded-xl bg-white border-2 border-blue-200 space-y-4 text-xs">
+                                <div className="font-bold text-slate-900 flex items-center justify-between border-b border-slate-100 pb-2">
+                                  <span>Editor en Vivo · Sincronización Instantánea con Portal Cliente (#portal)</span>
+                                  <span className="text-[10px] font-mono text-blue-700">ID: {proj.id}</span>
+                                </div>
+
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                  <div>
+                                    <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                                      Estado del Proyecto
+                                    </label>
+                                    <select
+                                      value={draft.status}
+                                      onChange={(e) =>
+                                        setProjectDrafts((prev) => ({
+                                          ...prev,
+                                          [proj.id]: { ...draft, status: e.target.value },
+                                        }))
+                                      }
+                                      className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs"
+                                    >
+                                      <option value="onboarding">Onboarding & Kickoff</option>
+                                      <option value="in_progress">En Desarrollo Activo</option>
+                                      <option value="staging">En Staging / Homologación UAT</option>
+                                      <option value="completed">Completado en Producción</option>
+                                      <option value="maintenance">Mantenimiento & SLA Activo</option>
+                                    </select>
+                                  </div>
+
+                                  <div className="sm:col-span-2">
+                                    <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                                      Porcentaje de Avance ({draft.progressPercent}%)
+                                    </label>
+                                    <div className="flex items-center gap-2">
+                                      <input
+                                        type="range"
+                                        min={0}
+                                        max={100}
+                                        step={5}
+                                        value={draft.progressPercent}
+                                        onChange={(e) =>
+                                          setProjectDrafts((prev) => ({
+                                            ...prev,
+                                            [proj.id]: { ...draft, progressPercent: Number(e.target.value) },
+                                          }))
+                                        }
+                                        className="flex-1"
+                                      />
+                                      {[15, 40, 65, 85, 100].map((pct) => (
+                                        <button
+                                          key={pct}
+                                          type="button"
+                                          onClick={() =>
+                                            setProjectDrafts((prev) => ({
+                                              ...prev,
+                                              [proj.id]: { ...draft, progressPercent: pct },
+                                            }))
+                                          }
+                                          className={`px-2 py-1 rounded-lg font-mono text-[10px] font-bold cursor-pointer ${
+                                            draft.progressPercent === pct
+                                              ? 'bg-blue-600 text-white'
+                                              : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                                          }`}
+                                        >
+                                          {pct}%
+                                        </button>
+                                      ))}
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                  <div>
+                                    <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                                      Sprint Activo Visible por el Cliente
+                                    </label>
+                                    <input
+                                      type="text"
+                                      value={draft.activeSprint}
+                                      onChange={(e) =>
+                                        setProjectDrafts((prev) => ({
+                                          ...prev,
+                                          [proj.id]: { ...draft, activeSprint: e.target.value },
+                                        }))
+                                      }
+                                      placeholder="Ej: Sprint 2 · Integración API & Staging UAT"
+                                      className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs"
+                                    />
+                                  </div>
+
+                                  <div>
+                                    <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                                      URL de Entorno Staging / Demo UAT
+                                    </label>
+                                    <input
+                                      type="url"
+                                      value={draft.stagingUrl}
+                                      onChange={(e) =>
+                                        setProjectDrafts((prev) => ({
+                                          ...prev,
+                                          [proj.id]: { ...draft, stagingUrl: e.target.value },
+                                        }))
+                                      }
+                                      placeholder="https://staging.cliente.gastonbarea.com"
+                                      className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-mono"
+                                    />
+                                  </div>
+                                </div>
+
+                                <div className="flex justify-end">
+                                  <button
+                                    type="button"
+                                    disabled={isSavingProject === proj.id}
+                                    onClick={() =>
+                                      handlePatchClientProject(
+                                        proj.id,
+                                        {
+                                          status: draft.status,
+                                          progressPercent: draft.progressPercent,
+                                          activeSprint: draft.activeSprint,
+                                          stagingUrl: draft.stagingUrl,
+                                        },
+                                        `Avance y Sprint de "${proj.projectName}" actualizados en el Portal Cliente.`
+                                      )
+                                    }
+                                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                                  >
+                                    <Save className="w-3.5 h-3.5" />
+                                    <span>Guardar Cambios de Proyecto</span>
+                                  </button>
+                                </div>
+
+                                {/* Publicar en Bitácora de Actualizaciones */}
+                                <div className="pt-3 border-t border-slate-200 space-y-2">
+                                  <div className="font-bold text-slate-800">
+                                    Publicar Novedad en Bitácora Técnica del Cliente
+                                  </div>
+                                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                                    <input
+                                      type="text"
+                                      value={updDraft.title}
+                                      onChange={(e) =>
+                                        setNewUpdateDrafts((prev) => ({
+                                          ...prev,
+                                          [proj.id]: { ...updDraft, title: e.target.value },
+                                        }))
+                                      }
+                                      placeholder="Título (ej: Despliegue en Staging completado)"
+                                      className="px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs"
+                                    />
+                                    <input
+                                      type="text"
+                                      value={updDraft.summary}
+                                      onChange={(e) =>
+                                        setNewUpdateDrafts((prev) => ({
+                                          ...prev,
+                                          [proj.id]: { ...updDraft, summary: e.target.value },
+                                        }))
+                                      }
+                                      placeholder="Resumen técnico de los avances verificables por el cliente..."
+                                      className="sm:col-span-2 px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs"
+                                    />
+                                  </div>
+                                  <div className="flex justify-end">
+                                    <button
+                                      type="button"
+                                      disabled={
+                                        isSavingProject === proj.id ||
+                                        !updDraft.title.trim() ||
+                                        !updDraft.summary.trim()
+                                      }
+                                      onClick={() => {
+                                        handlePatchClientProject(
+                                          proj.id,
+                                          {
+                                            newUpdate: {
+                                              title: updDraft.title.trim(),
+                                              summary: updDraft.summary.trim(),
+                                              author: 'Gastón Barea',
+                                            },
+                                          },
+                                          'Nueva entrada publicada en la Bitácora Técnica del cliente.'
+                                        );
+                                        setNewUpdateDrafts((prev) => ({
+                                          ...prev,
+                                          [proj.id]: { title: '', summary: '' },
+                                        }));
+                                      }}
+                                      className="px-3.5 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-bold text-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                                    >
+                                      <Plus className="w-3.5 h-3.5" />
+                                      <span>Publicar en Bitácora</span>
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
                             )}
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </div>
 
-                  {/* 2. Consultas de Asesoramiento Técnico */}
+                  {/* 2. Sesiones Google Meet Agendadas */}
+                  <div className="space-y-3 pt-2">
+                    <h5 className="text-xs font-mono font-bold uppercase tracking-wider text-emerald-700 flex items-center gap-1.5">
+                      <Calendar className="w-4 h-4" />
+                      <span>2. Sesiones Google Meet & Consultoría Agendadas ({clientPortalData.bookings.length})</span>
+                    </h5>
+
+                    {clientPortalData.bookings.length === 0 ? (
+                      <p className="text-xs text-slate-500 italic p-4 bg-slate-50 rounded-xl">
+                        Sin sesiones agendadas actualmente.
+                      </p>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {clientPortalData.bookings.map((bk: any) => (
+                          <div
+                            key={bk.id}
+                            className="p-4 rounded-2xl bg-emerald-50/40 border border-emerald-200 text-xs space-y-2.5 flex flex-col justify-between"
+                          >
+                            <div className="space-y-1">
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="font-mono font-bold text-emerald-900 bg-emerald-100 px-2 py-0.5 rounded-md text-[10px]">
+                                  {bk.date} · {bk.timeSlot}
+                                </span>
+                                <span className="text-[10px] font-mono uppercase px-2 py-0.5 rounded-full bg-white border border-emerald-200 text-emerald-800 font-bold">
+                                  {bk.status || 'confirmed'}
+                                </span>
+                              </div>
+                              <div className="font-bold text-slate-900 text-sm">{bk.agendaTopic}</div>
+                              <div className="text-slate-600">
+                                <strong>{bk.clientName}</strong> ({bk.clientEmail}) · {bk.company}
+                              </div>
+                              {bk.meetingUrl && (
+                                <a
+                                  href={bk.meetingUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-1 text-blue-600 hover:underline font-mono text-[11px]"
+                                >
+                                  <Video className="w-3.5 h-3.5" />
+                                  <span>{bk.meetingUrl}</span>
+                                </a>
+                              )}
+                            </div>
+
+                            <div className="flex flex-wrap items-center justify-end gap-1.5 pt-2 border-t border-emerald-200/60">
+                              <button
+                                type="button"
+                                onClick={() => handlePatchBooking(bk.id, { status: 'completed' })}
+                                className={`px-2.5 py-1 rounded-lg text-[10px] font-bold cursor-pointer ${
+                                  bk.status === 'completed'
+                                    ? 'bg-emerald-600 text-white'
+                                    : 'bg-white border border-emerald-300 text-emerald-800 hover:bg-emerald-100'
+                                }`}
+                              >
+                                ✓ Marcar Realizada
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handlePatchBooking(bk.id, { releaseSlot: true })}
+                                className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-white border border-rose-200 text-rose-700 hover:bg-rose-50 cursor-pointer"
+                              >
+                                Liberar Turno
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 3. Consultas de Asesoramiento Técnico */}
                   <div className="space-y-3 pt-2">
                     <h5 className="text-xs font-mono font-bold uppercase tracking-wider text-indigo-700 flex items-center gap-1.5">
                       <HelpCircle className="w-4 h-4" />
-                      <span>Consultas de Asesoramiento de Clientes ({clientPortalData.inquiries.length})</span>
+                      <span>3. Consultas de Asesoramiento de Clientes ({clientPortalData.inquiries.length})</span>
                     </h5>
 
                     {clientPortalData.inquiries.length === 0 ? (
@@ -1512,11 +1840,11 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
                     )}
                   </div>
 
-                  {/* 3. Tickets de Soporte Técnico Especializado */}
+                  {/* 4. Tickets de Soporte Técnico Especializado */}
                   <div className="space-y-3 pt-2">
                     <h5 className="text-xs font-mono font-bold uppercase tracking-wider text-rose-700 flex items-center gap-1.5">
                       <ShieldCheck className="w-4 h-4" />
-                      <span>Incidencias de Soporte Técnico ({clientPortalData.tickets.length})</span>
+                      <span>4. Incidencias de Soporte Técnico ({clientPortalData.tickets.length})</span>
                     </h5>
 
                     {clientPortalData.tickets.length === 0 ? (

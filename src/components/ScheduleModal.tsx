@@ -13,7 +13,11 @@ import {
   Mail,
   RefreshCw,
 } from 'lucide-react';
-import { SITE_CONFIG } from '../data/siteConfig';
+import {
+  SITE_CONFIG,
+  DEFAULT_BOOKING_AVAILABILITY,
+  BookingAvailabilityConfig,
+} from '../data/siteConfig';
 
 interface ScheduleModalProps {
   isOpen: boolean;
@@ -52,6 +56,11 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
   const [bookingSlot, setBookingSlot] = useState<string>('15:00 - 15:45 (GMT-3)');
   const [bookingTopic, setBookingTopic] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const [availabilityConfig, setAvailabilityConfig] = useState<BookingAvailabilityConfig>(
+    DEFAULT_BOOKING_AVAILABILITY
+  );
+  const [occupiedSlotsByDate, setOccupiedSlotsByDate] = useState<Record<string, string[]>>({});
+  const [bookingConflictMsg, setBookingConflictMsg] = useState<string>('');
   const [confirmedData, setConfirmedData] = useState<{
     meetingUrl: string;
     googleCalendarUrl: string;
@@ -70,9 +79,18 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
     }
   }, [proposalContext]);
 
-  // Pre-fill from localStorage client session if available
+  // Pre-fill from localStorage client session and fetch live availability if open
   useEffect(() => {
     if (!isOpen) return;
+    fetch('/api/bookings/availability')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (data?.success) {
+          if (data.config) setAvailabilityConfig(data.config);
+          if (data.occupiedSlotsByDate) setOccupiedSlotsByDate(data.occupiedSlotsByDate);
+        }
+      })
+      .catch(() => {});
     try {
       const raw = localStorage.getItem('gb_client_user');
       if (raw) {

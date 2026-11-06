@@ -171,7 +171,13 @@ export default function App() {
     const whatsappUrl = phone
       ? `https://wa.me/${phone}?text=${encodeURIComponent(textToSend)}`
       : `https://wa.me/?text=${encodeURIComponent(textToSend)}`;
-    window.open(whatsappUrl, '_blank', 'noopener,noreferrer');
+    const link = document.createElement('a');
+    link.href = whatsappUrl;
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   const handleSelectService = (serviceName: string) => {

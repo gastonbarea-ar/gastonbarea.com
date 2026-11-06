@@ -2807,18 +2807,25 @@ async function autoProvisionKickoffProject(params: {
   companyName?: string;
   projectTitle: string;
   serviceCategory?: string;
+  totalAmount?: number;
+  currency?: 'USD' | 'ARS';
+  quoteNumber?: string;
 }) {
   const cleanEmail = (params.clientEmail || '').trim().toLowerCase();
   const existing = cachedClientProjects.find(
     (p) =>
-      (cleanEmail && p.clientEmail.toLowerCase() === cleanEmail && p.projectName === params.projectTitle) ||
+      (cleanEmail &&
+        p.clientEmail.toLowerCase() === cleanEmail &&
+        p.projectName === params.projectTitle) ||
       p.projectName === params.projectTitle
   );
   if (existing) return existing;
 
-  const projectId = `PRJ-${new Date().getFullYear()}-${Math.floor(100 + Math.random() * 900)}`;
+  const projectId = `proj-${Date.now().toString().slice(-6)}`;
   const today = new Date().toISOString().split('T')[0];
   const targetDate = new Date(Date.now() + 35 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+  const totalBudget = Number(params.totalAmount) || 4500;
+  const projCurrency: 'USD' | 'ARS' = params.currency === 'ARS' ? 'ARS' : 'USD';
 
   const newProject: any = {
     id: projectId,
@@ -2826,52 +2833,54 @@ async function autoProvisionKickoffProject(params: {
     clientName: params.clientName || 'Cliente Ejecutivo',
     clientEmail: cleanEmail || 'cliente@portal.gastonbarea.com',
     company: params.companyName || 'Organización',
-    category: params.serviceCategory || 'Arquitectura & PMO',
-    status: 'En Desarrollo',
-    overallProgress: 20,
+    serviceCategory: (params.serviceCategory as any) || 'software_architecture',
+    status: 'in_progress',
+    progressPercent: 20,
     startDate: today,
     estimatedDelivery: targetDate,
     stagingUrl: 'https://staging.gastonbarea.com',
-    productionUrl: 'https://www.gastonbarea.com',
-    repositoryBranch: 'main',
-    architectureSummary:
-      'Despliegue auditado bajo metodología 40% Inicio · 40% Staging UAT · 20% Puesta en Producción.',
-    phases: [
+    repositoryUrl: 'https://github.com/gastonbarea-ar',
+    activeSprint: 'Sprint 1 · Arquitectura Base, Entorno & Modelo de Datos (Hito 1 - 40%)',
+    quoteNumber: params.quoteNumber,
+    milestones: [
       {
-        id: `${projectId}-ph1`,
-        name: 'Fase 1 (40%): Relevamiento, Arquitectura & Entorno Base',
-        status: 'in_progress',
-        progress: 50,
-        startDate: today,
-        endDate: today,
+        id: `${projectId}-m1`,
+        title: 'Hito 1: Inicio, Arquitectura & Aprovisionamiento Base',
+        percentage: 40,
         deliverables: [
           'Blueprint de Arquitectura & Modelo de Datos',
-          'Aprovisionamiento de Infraestructura & Repositorio',
+          'Aprovisionamiento de Infraestructura, Repositorio & CI/CD',
         ],
+        status: 'in_progress',
+        paymentStatus: 'pending',
+        amount: Math.round(totalBudget * 0.4),
+        currency: projCurrency,
       },
       {
-        id: `${projectId}-ph2`,
-        name: 'Fase 2 (40%): Desarrollo de Módulos & Validación en Servidor Staging',
-        status: 'pending',
-        progress: 0,
-        startDate: today,
-        endDate: targetDate,
+        id: `${projectId}-m2`,
+        title: 'Hito 2: Desarrollo Core & Despliegue en Servidor Staging (UAT)',
+        percentage: 40,
         deliverables: [
           'Módulos Funcionales en Servidor Staging con Datos Reales',
           'Pruebas de Aceptación UAT con el Equipo del Cliente',
         ],
+        status: 'pending',
+        paymentStatus: 'pending',
+        amount: Math.round(totalBudget * 0.4),
+        currency: projCurrency,
       },
       {
-        id: `${projectId}-ph3`,
-        name: 'Fase 3 (20%): Salida a Producción (Go-Live), Capacitación & SLA',
-        status: 'pending',
-        progress: 0,
-        startDate: targetDate,
-        endDate: targetDate,
+        id: `${projectId}-m3`,
+        title: 'Hito 3: Salida a Producción (Go-Live), Capacitación & SLA',
+        percentage: 20,
         deliverables: [
           'Despliegue en Dominio de Producción con SSL',
-          'Capacitación Operativa y Entrega de Documentación',
+          'Capacitación Operativa y Entrega de Documentación Técnica',
         ],
+        status: 'pending',
+        paymentStatus: 'pending',
+        amount: Math.round(totalBudget * 0.2),
+        currency: projCurrency,
       },
     ],
     recentUpdates: [
@@ -2879,10 +2888,9 @@ async function autoProvisionKickoffProject(params: {
         id: `upd-${Date.now()}`,
         date: today,
         author: 'Gastón Barea (PMO)',
-        title: 'Kick-off Oficial de Proyecto Activado desde CRM',
-        description:
-          'Se habilitó el tablero de seguimiento en el Portal de Clientes con el cronograma 40 · 40 · 20%.',
-        tag: 'milestone',
+        title: 'Kick-off Oficial de Proyecto Activado (Esquema 40/40/20)',
+        summary:
+          'Se habilitó el tablero de seguimiento en el Portal de Clientes con los 3 hitos auditables 40% · 40% · 20% sincronizados con el CRM.',
       },
     ],
   };
@@ -2917,7 +2925,7 @@ async function autoProvisionKickoffProject(params: {
     }
   }
 
-  // Send Kick-off Email via Resend
+  // Send Kick-off Email via Resend (notificaciones@gastonbarea.com)
   sendProjectKickoffEmail({
     clientName: newProject.clientName,
     clientEmail: newProject.clientEmail,
@@ -3024,8 +3032,8 @@ app.post('/api/crm/quotes/:id/dispatch', requireAdminAuth, async (req, res) => {
   });
 });
 
-// AUTOMATION 2.1: 1-Click Quote Approval (Advances Opportunity & Triggers Kick-off if requested)
-app.post('/api/crm/quotes/:id/accept', async (req, res) => {
+// AUTOMATION 2.1: 1-Click Quote Approval from Client Portal or CRM (Moves Opportunity to Won & Auto-Provisions 40/40/20 Project)
+const handleAcceptQuote = async (req: express.Request, res: express.Response) => {
   const { id } = req.params;
   const qIdx = cachedQuotes.findIndex((q) => q.id === id || q.quoteNumber === id);
   if (qIdx === -1) {
@@ -3037,14 +3045,28 @@ app.post('/api/crm/quotes/:id/accept', async (req, res) => {
   quote.updatedAt = new Date().toISOString();
   cachedQuotes[qIdx] = quote;
 
-  if (quote.opportunityId) {
-    const oppIdx = cachedOpportunities.findIndex((o) => o.id === quote.opportunityId);
-    if (oppIdx >= 0) {
-      cachedOpportunities[oppIdx].stage = 'negotiation';
-      cachedOpportunities[oppIdx].probability = 90;
-      cachedOpportunities[oppIdx].updatedAt = new Date().toISOString();
-    }
+  const oppIdx = cachedOpportunities.findIndex(
+    (o) =>
+      (quote.opportunityId && o.id === quote.opportunityId) ||
+      o.linkedQuoteId === quote.quoteNumber ||
+      (quote.clientEmail && o.clientEmail.toLowerCase() === quote.clientEmail.toLowerCase())
+  );
+  if (oppIdx >= 0) {
+    cachedOpportunities[oppIdx].stage = 'won';
+    cachedOpportunities[oppIdx].probability = 100;
+    cachedOpportunities[oppIdx].updatedAt = new Date().toISOString();
   }
+
+  const kickoffProject = await autoProvisionKickoffProject({
+    clientName: quote.clientName,
+    clientEmail: quote.clientEmail,
+    companyName: quote.clientCompany,
+    projectTitle: quote.title,
+    serviceCategory: quote.serviceCategory,
+    totalAmount: quote.total,
+    currency: quote.currency,
+    quoteNumber: quote.quoteNumber,
+  });
 
   if (supabase) {
     try {
@@ -3052,12 +3074,114 @@ app.post('/api/crm/quotes/:id/accept', async (req, res) => {
         .from('crm_quotes')
         .update({ status: 'accepted', updated_at: quote.updatedAt })
         .eq('id', quote.id);
+      if (oppIdx >= 0) {
+        await supabase
+          .from('crm_opportunities')
+          .update({
+            stage: 'won',
+            probability: 100,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', cachedOpportunities[oppIdx].id);
+      }
     } catch (err) {
       console.warn('[Quote Accept] Supabase warning:', err);
     }
   }
 
-  return res.json({ success: true, quote });
+  return res.json({
+    success: true,
+    quote,
+    project: kickoffProject,
+    opportunity: oppIdx >= 0 ? cachedOpportunities[oppIdx] : null,
+  });
+};
+
+app.post('/api/crm/quotes/:id/accept', handleAcceptQuote);
+app.post('/api/client/quotes/:id/accept', handleAcceptQuote);
+
+// AUTOMATION 2.2: Client Reports Milestone Payment / Receipt from Portal -> Syncs to CRM Payments
+app.post('/api/client/projects/:projectId/milestones/:milestoneId/report-payment', async (req, res) => {
+  const { projectId, milestoneId } = req.params;
+  const { method = 'transfer', transactionRef = '', notes = '' } = req.body || {};
+
+  const projIdx = cachedClientProjects.findIndex((p) => p.id === projectId);
+  if (projIdx === -1) {
+    return res.status(404).json({ error: 'Proyecto no encontrado en el Portal.' });
+  }
+
+  const project = cachedClientProjects[projIdx];
+  const milestoneIdx = (project.milestones || []).findIndex((m: any) => m.id === milestoneId);
+  if (milestoneIdx === -1) {
+    return res.status(404).json({ error: 'Hito no encontrado en el proyecto.' });
+  }
+
+  const milestone = project.milestones[milestoneIdx];
+  const cleanRef = String(transactionRef || '').trim() || `REF-${Date.now().toString().slice(-6)}`;
+  const today = new Date().toISOString().split('T')[0];
+
+  const newPayment = {
+    id: `pay-${Date.now()}`,
+    quoteId: project.quoteNumber || undefined,
+    clientName: `${project.clientName} (${project.company})`,
+    amount: milestone.amount || 0,
+    currency: milestone.currency || 'USD',
+    method: (['mercadopago', 'stripe', 'transfer', 'crypto'].includes(method) ? method : 'transfer') as any,
+    status: 'pending' as const,
+    transactionRef: cleanRef,
+    notes: `[Portal Clientes] ${milestone.title} (${milestone.percentage}%). ${notes || ''}`.trim(),
+    createdAt: new Date().toISOString(),
+  };
+
+  cachedPayments.unshift(newPayment);
+
+  project.recentUpdates = [
+    {
+      id: `upd-${Date.now()}`,
+      date: today,
+      title: `Aviso de Pago Informado: ${milestone.title}`,
+      summary: `El cliente informó el comprobante ${cleanRef} (${milestone.currency} $${Number(
+        milestone.amount || 0
+      ).toLocaleString()} vía ${method.toUpperCase()}). Pendiente de conciliación en CRM.`,
+      author: project.clientName || 'Cliente Portal',
+    },
+    ...(project.recentUpdates || []),
+  ];
+
+  cachedClientProjects[projIdx] = project;
+
+  if (supabase) {
+    try {
+      await supabase.from('crm_payments').upsert({
+        id: newPayment.id,
+        quote_id: newPayment.quoteId || null,
+        client_name: newPayment.clientName,
+        amount: newPayment.amount,
+        currency: newPayment.currency,
+        method: newPayment.method,
+        status: newPayment.status,
+        transaction_ref: newPayment.transactionRef,
+        notes: newPayment.notes,
+        created_at: newPayment.createdAt,
+      });
+      await supabase.from('client_projects').upsert({
+        id: project.id,
+        client_email: project.clientEmail,
+        client_name: project.clientName,
+        company: project.company,
+        project_data: project,
+        updated_at: new Date().toISOString(),
+      });
+    } catch (err) {
+      console.warn('[Report Milestone Payment] Supabase sync warning:', err);
+    }
+  }
+
+  return res.json({
+    success: true,
+    payment: newPayment,
+    project,
+  });
 });
 
 // AUTOMATION 4: AI Quote Scope & Items Generator (Gemini + Deterministic Fallback)
@@ -3912,7 +4036,7 @@ let cachedBookingAvailability: BookingAvailabilityConfig = {
 function computeOccupiedSlotsByDate(): Record<string, string[]> {
   const map: Record<string, string[]> = {};
   for (const b of cachedClientBookings) {
-    if (!b.date || !b.timeSlot) continue;
+    if (!b.date || !b.timeSlot || (b as any).status === 'cancelled') continue;
     if (!map[b.date]) map[b.date] = [];
     if (!map[b.date].includes(b.timeSlot)) {
       map[b.date].push(b.timeSlot);
@@ -4061,7 +4185,6 @@ app.post('/api/client/bookings', async (req, res) => {
         companyName: resolvedCompany,
         portalAccessStatus: 'active',
         hasActiveService: false,
-        isPrimaryContact: true,
         notes: `Agendó sesión ${getBookingTypeLabel(resolvedType)} para el ${resolvedDate} (${resolvedSlot}).`,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
@@ -4070,8 +4193,7 @@ app.post('/api/client/bookings', async (req, res) => {
 
     cachedOpportunities.forEach((opp) => {
       if (opp.clientEmail.toLowerCase() === resolvedEmail) {
-        opp.nextAction = `Videollamada Meet (${resolvedDate} · ${resolvedSlot}): ${resolvedTopic}`;
-        opp.nextActionDate = resolvedDate;
+        opp.notes = `${opp.notes ? opp.notes + '\n' : ''}[Meet Agendado ${resolvedDate} · ${resolvedSlot}]: ${resolvedTopic}`;
         opp.updatedAt = new Date().toISOString();
       }
     });
@@ -4102,9 +4224,8 @@ app.post('/api/client/bookings', async (req, res) => {
   if (resolvedPhone) {
     dispatchWhatsAppMessage({
       toPhone: resolvedPhone,
-      clientName: resolvedName,
-      category: 'booking_reminder',
-      customMessage: `Hola ${resolvedName}, confirmamos tu videollamada Google Meet con Gastón Barea (${getBookingTypeLabel(
+      contextType: 'booking_reminder',
+      message: `Hola ${resolvedName}, confirmamos tu videollamada Google Meet con Gastón Barea (${getBookingTypeLabel(
         resolvedType
       )}) para el día ${resolvedDate} a las ${resolvedSlot}.\n\n🎥 Sala Google Meet: ${baseMeetUrl}\n📅 Agregar a Google Calendar: ${googleCalendarUrl}`,
     }).catch(() => {});
@@ -4199,6 +4320,123 @@ app.patch('/api/admin/client-portal/tickets/:id', requireAdminAuth, (req, res) =
   }
 
   return res.json({ success: true, ticket });
+});
+
+// 11B. Admin Side: Live Update Client Project (Progress %, Active Sprint, Staging URL, Milestones 40/40/20 & Sprint Log)
+app.patch('/api/admin/client-portal/projects/:id', requireAdminAuth, async (req, res) => {
+  const { id } = req.params;
+  const {
+    progressPercent,
+    status,
+    activeSprint,
+    stagingUrl,
+    repositoryUrl,
+    estimatedDelivery,
+    milestoneId,
+    milestoneStatus,
+    milestonePaymentStatus,
+    newUpdateTitle,
+    newUpdateSummary,
+  } = req.body || {};
+
+  const projIdx = cachedClientProjects.findIndex((p) => p.id === id);
+  if (projIdx === -1) {
+    return res.status(404).json({ error: 'Proyecto no encontrado' });
+  }
+
+  const project = { ...cachedClientProjects[projIdx] };
+
+  if (typeof progressPercent === 'number') {
+    project.progressPercent = Math.max(0, Math.min(100, progressPercent));
+  }
+  if (status) project.status = status;
+  if (typeof activeSprint === 'string') project.activeSprint = activeSprint.trim();
+  if (typeof stagingUrl === 'string') project.stagingUrl = stagingUrl.trim();
+  if (typeof repositoryUrl === 'string') project.repositoryUrl = repositoryUrl.trim();
+  if (typeof estimatedDelivery === 'string') project.estimatedDelivery = estimatedDelivery.trim();
+
+  if (milestoneId && Array.isArray(project.milestones)) {
+    project.milestones = project.milestones.map((m: any) => {
+      if (m.id !== milestoneId) return m;
+      const updatedMilestone = { ...m };
+      if (milestoneStatus) {
+        updatedMilestone.status = milestoneStatus;
+        if (milestoneStatus === 'completed' && !updatedMilestone.completedAt) {
+          updatedMilestone.completedAt = new Date().toISOString().split('T')[0];
+        }
+      }
+      if (milestonePaymentStatus) {
+        updatedMilestone.paymentStatus = milestonePaymentStatus;
+      }
+      return updatedMilestone;
+    });
+  }
+
+  if (newUpdateTitle && String(newUpdateTitle).trim()) {
+    const today = new Date().toISOString().split('T')[0];
+    const updateEntry = {
+      id: `upd-${Date.now()}`,
+      date: today,
+      title: String(newUpdateTitle).trim(),
+      summary: String(newUpdateSummary || newUpdateTitle).trim(),
+      author: 'Gastón Barea (PMO)',
+    };
+    project.recentUpdates = [updateEntry, ...(project.recentUpdates || [])];
+  }
+
+  cachedClientProjects[projIdx] = project;
+
+  if (supabase) {
+    try {
+      await supabase.from('client_projects').upsert({
+        id: project.id,
+        client_email: project.clientEmail,
+        client_name: project.clientName,
+        company: project.company,
+        project_data: project,
+        updated_at: new Date().toISOString(),
+      });
+    } catch (err) {
+      console.warn('[Admin Project Patch] Supabase sync warning:', err);
+    }
+  }
+
+  return res.json({ success: true, project });
+});
+
+// 11C. Admin Side: Manage or Release Consulting Bookings (Complete, Reschedule, or Free Slot)
+app.patch('/api/admin/client-portal/bookings/:id', requireAdminAuth, (req, res) => {
+  const { id } = req.params;
+  const { status, date, timeSlot, releaseSlot } = req.body || {};
+
+  if (releaseSlot) {
+    cachedClientBookings = cachedClientBookings.filter((b) => b.id !== id);
+    return res.json({
+      success: true,
+      bookings: cachedClientBookings,
+      occupiedSlotsByDate: computeOccupiedSlotsByDate(),
+    });
+  }
+
+  const bIdx = cachedClientBookings.findIndex((b) => b.id === id);
+  if (bIdx === -1) {
+    return res.status(404).json({ error: 'Reserva no encontrada' });
+  }
+
+  const updated = {
+    ...cachedClientBookings[bIdx],
+    ...(status ? { status } : {}),
+    ...(date ? { date } : {}),
+    ...(timeSlot ? { timeSlot } : {}),
+  };
+  cachedClientBookings[bIdx] = updated;
+
+  return res.json({
+    success: true,
+    booking: updated,
+    bookings: cachedClientBookings,
+    occupiedSlotsByDate: computeOccupiedSlotsByDate(),
+  });
 });
 
 // 12. Admin Side: Live Test Transactional Email (Resend.com + CyberPanel notificaciones@gastonbarea.com)

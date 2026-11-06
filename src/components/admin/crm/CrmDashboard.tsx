@@ -198,6 +198,7 @@ export const CrmDashboard: React.FC<CrmDashboardProps> = ({ passkey = 'gaston202
     ok: boolean;
     msg: string;
   } | null>(null);
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
 
   // Load CRM data from backend
   const loadCrmData = async () => {
@@ -538,7 +539,13 @@ export const CrmDashboard: React.FC<CrmDashboardProps> = ({ passkey = 'gaston202
   };
 
   const handleDeleteCompany = async (id: string) => {
-    if (!confirm('¿Eliminar esta empresa de la agenda? Sus contactos pasarán a ser individuales.')) return;
+    if (pendingDeleteId !== id) {
+      setPendingDeleteId(id);
+      setCopiedNotification('Hacé clic nuevamente en Eliminar para confirmar la baja de la corporación.');
+      setTimeout(() => setPendingDeleteId((prev) => (prev === id ? null : prev)), 4000);
+      return;
+    }
+    setPendingDeleteId(null);
     setCompanies(companies.filter((c) => c.id !== id));
     setContacts(
       contacts.map((cnt) =>
@@ -650,7 +657,13 @@ export const CrmDashboard: React.FC<CrmDashboardProps> = ({ passkey = 'gaston202
   };
 
   const handleDeleteContact = async (id: string) => {
-    if (!confirm('¿Eliminar este contacto de la agenda y del Portal Clientes?')) return;
+    if (pendingDeleteId !== id) {
+      setPendingDeleteId(id);
+      setCopiedNotification('Hacé clic nuevamente en Eliminar para confirmar la baja del contacto.');
+      setTimeout(() => setPendingDeleteId((prev) => (prev === id ? null : prev)), 4000);
+      return;
+    }
+    setPendingDeleteId(null);
     setContacts(contacts.filter((c) => c.id !== id));
     try {
       await fetch(`/api/crm/contacts/${id}`, {
@@ -691,7 +704,13 @@ export const CrmDashboard: React.FC<CrmDashboardProps> = ({ passkey = 'gaston202
   };
 
   const handleDeleteOpportunity = async (id: string) => {
-    if (!confirm('¿Deseas eliminar esta oportunidad del pipeline?')) return;
+    if (pendingDeleteId !== id) {
+      setPendingDeleteId(id);
+      setCopiedNotification('Hacé clic nuevamente en Eliminar para confirmar la baja de la oportunidad.');
+      setTimeout(() => setPendingDeleteId((prev) => (prev === id ? null : prev)), 4000);
+      return;
+    }
+    setPendingDeleteId(null);
     setOpportunities(opportunities.filter((o) => o.id !== id));
     try {
       await fetch(`/api/crm/opportunities/${id}`, {
@@ -774,7 +793,13 @@ export const CrmDashboard: React.FC<CrmDashboardProps> = ({ passkey = 'gaston202
   };
 
   const handleDeleteQuote = async (id: string) => {
-    if (!confirm('¿Deseas eliminar este presupuesto?')) return;
+    if (pendingDeleteId !== id) {
+      setPendingDeleteId(id);
+      setCopiedNotification('Hacé clic nuevamente en Eliminar para confirmar la baja del presupuesto.');
+      setTimeout(() => setPendingDeleteId((prev) => (prev === id ? null : prev)), 4000);
+      return;
+    }
+    setPendingDeleteId(null);
     setQuotes(quotes.filter((q) => q.id !== id));
     try {
       await fetch(`/api/crm/quotes/${id}`, {
