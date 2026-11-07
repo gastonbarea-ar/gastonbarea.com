@@ -79,6 +79,38 @@ export const Hero: React.FC<HeroProps> = ({
 
   const [isImmersionActive, setIsImmersionActive] = useState<boolean>(false);
   const [isCinemaExpanded, setIsCinemaExpanded] = useState<boolean>(false);
+  const [isClientLoggedIn, setIsClientLoggedIn] = useState<boolean>(() => {
+    try {
+      return Boolean(
+        localStorage.getItem('gb_client_token') && localStorage.getItem('gb_client_user')
+      );
+    } catch {
+      return false;
+    }
+  });
+
+  useEffect(() => {
+    const syncAuthSession = () => {
+      try {
+        setIsClientLoggedIn(
+          Boolean(localStorage.getItem('gb_client_token') && localStorage.getItem('gb_client_user'))
+        );
+      } catch {
+        setIsClientLoggedIn(false);
+      }
+    };
+    syncAuthSession();
+    window.addEventListener('storage', syncAuthSession);
+    window.addEventListener('gb-client-auth-change', syncAuthSession);
+    window.addEventListener('focus', syncAuthSession);
+    window.addEventListener('hashchange', syncAuthSession);
+    return () => {
+      window.removeEventListener('storage', syncAuthSession);
+      window.removeEventListener('gb-client-auth-change', syncAuthSession);
+      window.removeEventListener('focus', syncAuthSession);
+      window.removeEventListener('hashchange', syncAuthSession);
+    };
+  }, []);
 
   // Interactive Web AI Solution Finder State
   const [aiQuery, setAiQuery] = useState<string>('');
@@ -592,33 +624,49 @@ export const Hero: React.FC<HeroProps> = ({
                 </h1>
 
                 <p className="text-xs sm:text-[13px] text-neutral-300 leading-relaxed">
-                  Operamos con <strong className="text-emerald-400">ARN (Automated Relationship Network)</strong>: escribí o dictá en una línea qué necesitás abajo y recibí al instante tu propuesta <strong className="text-white">40% · 40% · 20%</strong> con acceso directo a tu Portal de Clientes sin llenar formularios.
+                  Operamos con <strong className="text-emerald-400">ARN (Automated Relationship Network)</strong>: registrate e iniciá sesión en el <strong className="text-white">Portal de Clientes</strong> para desbloquear el cotizador en escala (<strong className="text-white">Micro / PyME / Grande</strong>) y gestionar tus presupuestos <strong className="text-white">40% · 40% · 20%</strong>.
                 </p>
               </div>
 
-              {/* Primary Highlight: Jump to ARN Zero-Form Client Console */}
+              {/* Primary Highlight: Access Portal or Jump to Authenticated ARN Console */}
               <div className="p-3.5 bg-emerald-400/10 border border-emerald-400/40 space-y-2.5">
                 <div className="flex items-center justify-between gap-2 text-[11px] font-mono text-emerald-300 font-bold">
                   <span className="inline-flex items-center gap-1.5">
                     <Zap className="w-3.5 h-3.5 text-emerald-400" />
-                    <span>NUEVO · EXPERIENCIA CLIENTE ARN</span>
+                    <span>
+                      {isClientLoggedIn
+                        ? 'SESIÓN ACTIVA · STOCK ARN HABILITADO'
+                        : 'ACCESO EXCLUSIVO · PORTAL CLIENTES ARN'}
+                    </span>
                   </span>
-                  <span>CERO FORMULARIOS</span>
+                  <span>{isClientLoggedIn ? 'CONECTADO' : 'REQUIERE SESIÓN'}</span>
                 </div>
                 <p className="text-xs text-neutral-200 leading-relaxed">
-                  Cotizá tu proyecto en 1 clic con lenguaje natural o voz y entrá directo a tu Portal de Clientes (#portal).
+                  {isClientLoggedIn
+                    ? 'Tu sesión está activa. Ya podés usar el cotizador de Stock ARN en el Home o abrir tu Portal de Clientes (#portal).'
+                    : 'El cotizador de servicios del Stock ARN y el tratamiento de presupuestos 40/40/20 sólo son visibles para usuarios registrados con sesión iniciada.'}
                 </p>
                 <button
                   type="button"
                   onClick={() => {
-                    const el = document.getElementById('arn-home-client-intake');
-                    if (el) {
-                      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    if (isClientLoggedIn) {
+                      const el = document.getElementById('arn-home-client-intake');
+                      if (el) {
+                        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        return;
+                      }
+                    }
+                    if (onClientPortalClick) {
+                      onClientPortalClick();
                     }
                   }}
                   className="w-full min-h-[44px] px-4 py-2.5 text-xs font-mono font-bold text-emerald-950 bg-emerald-400 hover:bg-emerald-300 transition-colors flex items-center justify-between gap-2 cursor-pointer"
                 >
-                  <span>Probar Interacción Cliente ARN (1-Clic)</span>
+                  <span>
+                    {isClientLoggedIn
+                      ? 'Ir al Cotizador de Stock ARN (Sesión Activa)'
+                      : 'Iniciar Sesión / Registrarme en Portal Clientes'}
+                  </span>
                   <ArrowRight className="w-4 h-4 shrink-0" />
                 </button>
               </div>
@@ -727,39 +775,41 @@ export const Hero: React.FC<HeroProps> = ({
       </div>
 
       {/* =====================================================================
-          BLOQUE 1.5 (NUEVO EN HOME): INTERACCIÓN DIRECTA DEL CLIENTE CON ARN
-          Cero Formularios · Voz o Texto Natural · Propuesta 40/40/20 + Portal en 1 Clic
+          BLOQUE 1.5 (EXCLUSIVO PARA USUARIOS REGISTRADOS Y CON SESIÓN INICIADA):
+          INTERACCIÓN DIRECTA CON STOCK DE SERVICIOS ARN & PRESUPUESTO 40/40/20
          ===================================================================== */}
-      <div
-        id="arn-home-client-intake"
-        className="w-full px-4 sm:px-8 lg:px-12 py-10 sm:py-14 bg-[#0B0D17] border-b border-white/10 scroll-mt-20"
-      >
-        <div className="w-full space-y-5 text-left">
-          <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4">
-            <div className="space-y-1.5 max-w-3xl">
-              <div className="text-xs font-mono text-emerald-400 font-bold uppercase tracking-wider">
-                TRATAMIENTO DE PRESUPUESTOS MEDIANTE REGISTRO · RED AUTÓNOMA ARN
+      {isClientLoggedIn && (
+        <div
+          id="arn-home-client-intake"
+          className="w-full px-4 sm:px-8 lg:px-12 py-10 sm:py-14 bg-[#0B0D17] border-b border-white/10 scroll-mt-20"
+        >
+          <div className="w-full space-y-5 text-left">
+            <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4">
+              <div className="space-y-1.5 max-w-3xl">
+                <div className="text-xs font-mono text-emerald-400 font-bold uppercase tracking-wider">
+                  SESIÓN INICIADA EN PORTAL · TRATAMIENTO DE PRESUPUESTOS ARN (MICRO / PYME / GRANDE)
+                </div>
+                <h2
+                  className="font-display text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight text-white"
+                  style={{ textWrap: 'balance' }}
+                >
+                  Seleccioná tu servicio del Stock ARN y generá tu presupuesto 40/40/20.
+                </h2>
               </div>
-              <h2
-                className="font-display text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight text-white"
-                style={{ textWrap: 'balance' }}
-              >
-                Registrate en 1 paso y gestioná tu presupuesto 40/40/20 directamente en tu Portal.
-              </h2>
+              <p className="text-xs sm:text-sm text-neutral-300 max-w-md leading-relaxed">
+                Esta sección es visible únicamente porque tenés sesión iniciada como usuario registrado. Elegí el servicio y la cantidad de empleados de tu empresa para tratar tu presupuesto en tu Portal.
+              </p>
             </div>
-            <p className="text-xs sm:text-sm text-neutral-300 max-w-md leading-relaxed">
-              Elegí el servicio del Stock ARN y la cantidad de empleados de tu empresa. Para proteger tu confidencialidad y evitar correos automáticos desde la portada, todo el tratamiento del presupuesto se realiza dentro de tu Portal de Clientes registrado.
-            </p>
-          </div>
 
-          <ArnClientIntakeWidget
-            variant="hero-dark"
-            onOpenPortalWithSession={onClientPortalClick}
-            onScheduleClick={onScheduleClick}
-            onWhatsAppClick={onWhatsAppClick}
-          />
+            <ArnClientIntakeWidget
+              variant="hero-dark"
+              onOpenPortalWithSession={onClientPortalClick}
+              onScheduleClick={onScheduleClick}
+              onWhatsAppClick={onWhatsAppClick}
+            />
+          </div>
         </div>
-      </div>
+      )}
 
       {/* BLOQUE 2: BUSCADOR Y ESTRUCTURADOR DE SOLUCIONES CON IA */}
       <div className="w-full px-4 sm:px-8 lg:px-12 xl:px-12 py-14 md:py-20 bg-[#F7F7FA]">

@@ -53,6 +53,7 @@ import {
   INITIAL_CRM_OPPORTUNITIES,
   INITIAL_CRM_QUOTES,
 } from '../../data/crmTemplates';
+import { ArnClientIntakeWidget } from '../ArnClientIntakeWidget';
 import {
   DEFAULT_BOOKING_AVAILABILITY,
   BookingAvailabilityConfig,
@@ -213,6 +214,14 @@ export const ClientPortalModal: React.FC<ClientPortalModalProps> = ({ isOpen = t
       verifyActiveSession();
     }
   }, [isOpen, token]);
+
+  useEffect(() => {
+    try {
+      window.dispatchEvent(new Event('gb-client-auth-change'));
+    } catch {
+      // ignore
+    }
+  }, [token, clientSession]);
 
   // Auto-select first available slot if current slot is occupied on selected date
   useEffect(() => {
@@ -1995,49 +2004,12 @@ export const ClientPortalModal: React.FC<ClientPortalModalProps> = ({ isOpen = t
 
             {/* Workspace Body */}
             <div className="flex-1 p-4 sm:p-8 lg:p-10 max-w-6xl w-full mx-auto space-y-6">
-              {/* ALWAYS-VISIBLE ARN CONVERSATIONAL BAR FOR LOGGED-IN CLIENTS */}
+              {/* ALWAYS-VISIBLE ARN STOCK SELECTOR FOR LOGGED-IN CLIENTS */}
               {activeTab === 'project' && (
-                <form
-                  onSubmit={handleArnConversationalIntake}
-                  className="bg-gradient-to-r from-[#130E2B] via-[#1B143D] to-[#0D261E] text-white p-4 sm:p-5 border border-emerald-400/30 shadow-md space-y-3"
-                >
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div className="inline-flex items-center gap-2 text-xs font-mono font-bold text-emerald-400 uppercase tracking-wider">
-                      <Sparkles className="w-4 h-4" />
-                      <span>Autopiloto Cliente ARN · Cotizar Nueva Necesidad en 1 Línea (Cero Formularios)</span>
-                    </div>
-                    <span className="text-[11px] font-mono text-neutral-300">
-                      Impacta en tiempo real en tu Portal y en el Centro ARN de Gastón
-                    </span>
-                  </div>
-
-                  <div className="flex flex-col sm:flex-row items-stretch gap-2.5">
-                    <input
-                      type="text"
-                      value={arnIntakeMessage}
-                      onChange={(e) => setArnIntakeMessage(e.target.value)}
-                      placeholder="Ej: Necesitamos sumar módulo E-Commerce B2B2C o trazabilidad IoT por USD 4800..."
-                      className="flex-1 min-h-[46px] px-3.5 py-2.5 bg-black/40 border border-white/20 text-base sm:text-sm text-white placeholder:text-neutral-400 focus:outline-none focus:border-emerald-400"
-                    />
-                    <button
-                      type="submit"
-                      disabled={isSubmittingArnIntake || !arnIntakeMessage.trim()}
-                      className="min-h-[46px] px-5 py-2.5 bg-emerald-400 hover:bg-emerald-300 text-emerald-950 font-mono font-bold text-xs uppercase tracking-wider transition-colors flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 shrink-0"
-                    >
-                      {isSubmittingArnIntake ? (
-                        <>
-                          <RefreshCw className="w-4 h-4 animate-spin" />
-                          <span>Generando 40/40/20...</span>
-                        </>
-                      ) : (
-                        <>
-                          <Sparkles className="w-4 h-4" />
-                          <span>Generar Propuesta 40/40/20 (1-Clic)</span>
-                        </>
-                      )}
-                    </button>
-                  </div>
-                </form>
+                <ArnClientIntakeWidget
+                  variant="portal-compact"
+                  onOpenPortalWithSession={() => loadDashboardData(token, clientSession)}
+                />
               )}
 
               {/* TAB 1A: USUARIO REGISTRADO SIN PROYECTO ACTIVO CONTRATADO */}

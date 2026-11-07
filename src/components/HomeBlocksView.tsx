@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   ArrowRight,
   ArrowUpRight,
@@ -52,6 +52,38 @@ export const HomeBlocksView: React.FC<HomeBlocksViewProps> = ({
 
   const [selectedPostForReading, setSelectedPostForReading] = useState<BlogPost | null>(null);
   const [isEditorOpen, setIsEditorOpen] = useState<boolean>(false);
+  const [isClientLoggedIn, setIsClientLoggedIn] = useState<boolean>(() => {
+    try {
+      return Boolean(
+        localStorage.getItem('gb_client_token') && localStorage.getItem('gb_client_user')
+      );
+    } catch {
+      return false;
+    }
+  });
+
+  useEffect(() => {
+    const syncAuthSession = () => {
+      try {
+        setIsClientLoggedIn(
+          Boolean(localStorage.getItem('gb_client_token') && localStorage.getItem('gb_client_user'))
+        );
+      } catch {
+        setIsClientLoggedIn(false);
+      }
+    };
+    syncAuthSession();
+    window.addEventListener('storage', syncAuthSession);
+    window.addEventListener('gb-client-auth-change', syncAuthSession);
+    window.addEventListener('focus', syncAuthSession);
+    window.addEventListener('hashchange', syncAuthSession);
+    return () => {
+      window.removeEventListener('storage', syncAuthSession);
+      window.removeEventListener('gb-client-auth-change', syncAuthSession);
+      window.removeEventListener('focus', syncAuthSession);
+      window.removeEventListener('hashchange', syncAuthSession);
+    };
+  }, []);
 
   const handleSavePost = (newPost: BlogPost) => {
     const existingIndex = posts.findIndex((p) => p.id === newPost.id);
@@ -713,21 +745,36 @@ export const HomeBlocksView: React.FC<HomeBlocksViewProps> = ({
 
               <button
                 type="button"
-                onClick={() => onWhatsAppClick()}
-                className="min-h-[46px] px-5 py-3 text-xs font-mono font-semibold text-emerald-950 bg-emerald-400 hover:bg-emerald-300 rounded-none transition-colors inline-flex items-center gap-1.5 cursor-pointer"
+                onClick={onClientPortalClick}
+                className="min-h-[46px] px-5 py-3 text-xs font-mono font-bold text-emerald-950 bg-emerald-400 hover:bg-emerald-300 rounded-none transition-colors inline-flex items-center gap-1.5 cursor-pointer"
               >
-                <MessageSquare className="w-4 h-4" />
+                <UserCheck className="w-4 h-4" />
+                <span>
+                  {isClientLoggedIn
+                    ? 'Abrir Mi Portal de Clientes (#portal)'
+                    : 'Registrarme / Iniciar Sesión en Portal (#portal)'}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => onWhatsAppClick()}
+                className="min-h-[46px] px-5 py-3 text-xs font-mono font-semibold text-white bg-white/10 hover:bg-white/20 border border-white/15 rounded-none transition-colors inline-flex items-center gap-1.5 cursor-pointer"
+              >
+                <MessageSquare className="w-4 h-4 text-emerald-400" />
                 <span>WhatsApp Directo</span>
               </button>
             </div>
           </div>
 
-          <ArnClientIntakeWidget
-            variant="hero-dark"
-            onOpenPortalWithSession={onClientPortalClick}
-            onScheduleClick={onScheduleClick}
-            onWhatsAppClick={onWhatsAppClick}
-          />
+          {isClientLoggedIn && (
+            <ArnClientIntakeWidget
+              variant="hero-dark"
+              onOpenPortalWithSession={onClientPortalClick}
+              onScheduleClick={onScheduleClick}
+              onWhatsAppClick={onWhatsAppClick}
+            />
+          )}
         </div>
       </section>
 

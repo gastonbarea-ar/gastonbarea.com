@@ -516,27 +516,47 @@ export const ArnClientIntakeWidget: React.FC<ArnClientIntakeWidgetProps> = ({
               </div>
 
               <div
-                className={`p-2.5 border flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs font-mono ${
+                className={`p-3 border space-y-2 text-xs font-mono ${
                   isDark || variant === 'portal-compact'
                     ? 'bg-emerald-950/40 border-emerald-400/30 text-emerald-200'
                     : 'bg-emerald-50 border-emerald-300 text-emerald-950'
                 }`}
               >
-                <span className="flex items-center gap-2 font-bold">
-                  <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
-                  <span>
-                    Ítem 1 (Escala {livePricingPreview.companyScale.toUpperCase()}) + Ítem 2 (
-                    {employeeCount} Empleados) + Hitos 40/40/20:
+                <div className="flex flex-wrap items-center justify-between gap-2 pb-1.5 border-b border-current/15 font-bold">
+                  <span className="flex items-center gap-2">
+                    <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
+                    <span>
+                      VALORES DEL STOCK HABILITADOS EN TU SESIÓN ACTIVA ({livePricingPreview.companyScale.toUpperCase()}):
+                    </span>
                   </span>
-                </span>
-                <span className="text-[11px] px-2 py-0.5 bg-emerald-400 text-emerald-950 font-bold">
-                  🔒 Valores disponibles al registrarte en el Portal
-                </span>
+                  <span className="px-2 py-0.5 bg-emerald-400 text-emerald-950 font-bold">
+                    Total: {livePricingPreview.currency} $
+                    {livePricingPreview.totalImplementationCost.toLocaleString()} + SLA{' '}
+                    {livePricingPreview.currency} $
+                    {livePricingPreview.monthlySupportFee.toLocaleString()}/mes
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px]">
+                  <div className="flex items-center justify-between gap-2 p-1.5 bg-black/20">
+                    <span>1. Base {livePricingPreview.companyScaleLabel}</span>
+                    <span className="font-bold">
+                      {livePricingPreview.currency} $
+                      {livePricingPreview.baseImplementationCost.toLocaleString()}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between gap-2 p-1.5 bg-black/20">
+                    <span>2. Dotación: {livePricingPreview.employeeRangeLabel}</span>
+                    <span className="font-bold">
+                      {livePricingPreview.currency} $
+                      {livePricingPreview.scaleIncrementCost.toLocaleString()}
+                    </span>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
 
-          {/* Step 3: Registration Fields to Open & Treat Quote in Portal Clientes */}
+          {/* Step 3: Active Session Confirmation to Open & Treat Quote in Portal Clientes */}
           <div
             className={`p-4 border space-y-3 ${
               isDark || variant === 'portal-compact'
@@ -548,11 +568,11 @@ export const ArnClientIntakeWidget: React.FC<ArnClientIntakeWidgetProps> = ({
               <div className="flex items-center gap-2 text-xs sm:text-sm font-bold">
                 <UserPlus className="w-4 h-4 text-emerald-400 shrink-0" />
                 <span>
-                  3. Registrate en 1 paso para abrir y tratar tu Presupuesto 40/40/20 en el Portal Clientes:
+                  3. Confirmá los datos de tu cuenta activa para emitir y tratar tu Presupuesto 40/40/20 en el Portal:
                 </span>
               </div>
               <span className="text-[11px] font-mono opacity-75">
-                Acceso inmediato a #portal sin spam de correos
+                Sesión verificada · Sin envío de emails públicos
               </span>
             </div>
 
