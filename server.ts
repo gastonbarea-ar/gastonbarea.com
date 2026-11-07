@@ -1903,6 +1903,8 @@ function syncContactAndCompanyFromOpportunity(opp: {
   stage?: string;
   employeeCount?: number;
   employeeRangeLabel?: string;
+  password?: string;
+  username?: string;
 }) {
   let resolvedCompanyId = opp.companyId;
   const cleanCompanyName = (opp.company || '').trim();
@@ -1940,6 +1942,8 @@ function syncContactAndCompanyFromOpportunity(opp: {
   let resolvedContactId = opp.contactId;
   const cleanEmail = (opp.clientEmail || '').trim().toLowerCase();
   const cleanName = (opp.clientName || '').trim();
+  const cleanPassword = (opp.password || '').trim();
+  const cleanUsername = (opp.username || '').trim().toLowerCase();
 
   if ((cleanEmail || cleanName) && !resolvedContactId) {
     const existingContact = cachedCrmContacts.find(
@@ -1949,6 +1953,15 @@ function syncContactAndCompanyFromOpportunity(opp: {
     );
     if (existingContact) {
       resolvedContactId = existingContact.id;
+      if (cleanPassword) {
+        existingContact.password = cleanPassword;
+      }
+      if (cleanUsername) {
+        existingContact.username = cleanUsername;
+      }
+      if (opp.clientPhone && !existingContact.phone) {
+        existingContact.phone = opp.clientPhone;
+      }
       if (resolvedCompanyId && !existingContact.companyId) {
         existingContact.companyId = resolvedCompanyId;
         existingContact.companyName = cleanCompanyName;
@@ -1958,13 +1971,16 @@ function syncContactAndCompanyFromOpportunity(opp: {
       const generatedEmail =
         cleanEmail ||
         `${cleanName.toLowerCase().replace(/[^a-z0-9]/g, '.')}@portal.gastonbarea.com`;
-      const generatedUsername = generatedEmail.split('@')[0].replace(/[^a-z0-9._-]/g, '');
+      const generatedUsername =
+        cleanUsername ||
+        generatedEmail.split('@')[0].replace(/[^a-z0-9._-]/g, '') ||
+        `usuario.${Date.now().toString().slice(-4)}`;
       const newContact = {
         id: `cnt-${Date.now()}`,
         fullName: cleanName,
         email: generatedEmail,
-        username: generatedUsername || `usuario.${Date.now().toString().slice(-4)}`,
-        password: 'cliente2026',
+        username: generatedUsername,
+        password: cleanPassword || 'cliente2026',
         phone: opp.clientPhone || '',
         roleTitle: cleanCompanyName ? 'Representante Corporativo' : 'Contacto Individual',
         contactType: cleanCompanyName ? ('corporate_member' as const) : ('individual' as const),
@@ -1972,7 +1988,7 @@ function syncContactAndCompanyFromOpportunity(opp: {
         companyName: cleanCompanyName || undefined,
         portalAccessStatus: 'active' as const,
         hasActiveService: opp.stage === 'won',
-        notes: 'Usuario del Portal Clientes habilitado automáticamente desde el Pipeline CRM.',
+        notes: 'Usuario registrado desde ARN con acceso al tratamiento de presupuestos en Portal Clientes.',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
@@ -4994,21 +5010,62 @@ app.post('/api/arn/autopilot', requireAdminAuth, async (req, res) => {
   });
 });
 
-// 13C. Client Zero-Form Conversational Intake (/api/arn/intake)
+// 13C. Client Registration-Gated Conversational Intake (/api/arn/intake)
 app.post('/api/arn/intake', async (req, res) => {
-  const { message, contactChannel, employeeCount, stockServiceId } = req.body || {};
-  if (!message && !contactChannel) {
+  const {
+    message,
+    contactChannel,
+    employeeCount,
+    stockServiceId,
+    fullName,
+    companyName,
+    email,
+    phone,
+    password,
+    username,
+    sendEmail = false,
+  } = req.body || {};
+
+  const resolvedChannel = String(email || contactChannel || '').trim();
+  const compositeMessage = [
+    fullName ? `Soy ${String(fullName).trim()}` : '',
+    companyName ? `de ${String(companyName).trim()}` : '',
+    message ? String(message).trim() : '',
+  ]
+    .filter(Boolean)
+    .join(', ');
+
+  if (!compositeMessage && !resolvedChannel) {
     return res
       .status(400)
-      .json({ error: 'Contanos brevemente qué necesitás junto con tu correo o WhatsApp.' });
+      .json({ error: 'Completá tus datos de registro y el servicio a presupuestar en tu Portal.' });
   }
 
   const parsed = await resolveArnCommandWithAi(
-    String(message || 'Evaluación de arquitectura y propuesta 40/40/20'),
-    String(contactChannel || ''),
+    compositeMessage || 'Evaluación de arquitectura y propuesta 40/40/20',
+    resolvedChannel,
     employeeCount ? Number(employeeCount) : undefined,
     stockServiceId ? String(stockServiceId) : undefined
   );
+
+  // Override with explicit registration fields if provided
+  if (fullName && String(fullName).trim()) {
+    parsed.clientName = String(fullName).trim();
+  }
+  if (companyName && String(companyName).trim()) {
+    parsed.companyName = String(companyName).trim();
+  }
+  if (email && String(email).trim().includes('@')) {
+    parsed.clientEmail = String(email).trim().toLowerCase();
+  }
+  if (phone && String(phone).trim()) {
+    parsed.phone = String(phone).trim();
+  }
+
+  const cleanPassword = password && String(password).trim() ? String(password).trim() : 'cliente2026';
+  const cleanUsername =
+    (username && String(username).trim().toLowerCase()) ||
+    parsed.clientEmail.split('@')[0].replace(/[^a-z0-9._-]/g, '');
 
   // 1. Auto-create/update Company & Contact with active Portal credentials
   const { companyId, contactId } = syncContactAndCompanyFromOpportunity({
@@ -5019,6 +5076,8 @@ app.post('/api/arn/intake', async (req, res) => {
     stage: 'proposal_sent',
     employeeCount: parsed.employeeCount,
     employeeRangeLabel: parsed.employeeRangeLabel,
+    password: cleanPassword,
+    username: cleanUsername,
   });
 
   // 2. Create Opportunity in ARN Pipeline
@@ -5046,7 +5105,7 @@ app.post('/api/arn/intake', async (req, res) => {
     scaleIncrementCost: parsed.scaleIncrementCost,
     monthlySupportFee: parsed.monthlySupportFee,
     probability: 70,
-    notes: `[Auto-Perfilado ARN · Stock ${parsed.stockServiceCode} · ${parsed.employeeRangeLabel}]: ${parsed.extractedNotes}`,
+    notes: `[Registro Portal ARN · Stock ${parsed.stockServiceCode} · ${parsed.employeeRangeLabel}]: ${parsed.extractedNotes}`,
     source: 'portal_registration' as const,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
@@ -5077,11 +5136,11 @@ app.post('/api/arn/intake', async (req, res) => {
   const clientSessionObj = {
     id: contactId,
     email: parsed.clientEmail,
-    username: parsed.clientEmail.split('@')[0],
+    username: cleanUsername,
     name: parsed.clientName,
     company: parsed.companyName,
     companyId,
-    role: 'Ejecutivo ARN',
+    role: 'Ejecutivo Registrado ARN',
     contactType:
       parsed.companyName && parsed.companyName !== 'Contacto Individual'
         ? ('corporate_member' as const)
@@ -5093,15 +5152,21 @@ app.post('/api/arn/intake', async (req, res) => {
     expiresAt: Date.now() + 1000 * 60 * 60 * 24 * 7,
   });
 
-  // 5. AWAIT Transactional Quote Email to Client + Gastón (notificaciones@gastonbarea.com)
-  const emailResult = await sendOfficialQuoteEmail({
-    quote: autoQuote,
-    paymentConfig: cachedPaymentConfig,
-    customSubject: `📄 Presupuesto 40/40/20 #${autoQuote.quoteNumber} [${parsed.stockServiceCode} · ${parsed.employeeRangeLabel}] · ${autoQuote.title}`,
-  }).catch((err) => ({
+  // 5. Only send transactional email if explicitly requested (never auto-fired from public Home intake)
+  let emailResult: { success: boolean; error?: string } = {
     success: false,
-    error: err?.message || 'Error al despachar presupuesto por correo.',
-  }));
+    error: 'Tratamiento exclusivo en Portal Clientes mediante registro (sin envío automático de correo desde Home).',
+  };
+  if (sendEmail === true) {
+    emailResult = await sendOfficialQuoteEmail({
+      quote: autoQuote,
+      paymentConfig: cachedPaymentConfig,
+      customSubject: `📄 Presupuesto 40/40/20 #${autoQuote.quoteNumber} [${parsed.stockServiceCode} · ${parsed.employeeRangeLabel}] · ${autoQuote.title}`,
+    }).catch((err) => ({
+      success: false,
+      error: err?.message || 'Error al despachar presupuesto por correo.',
+    }));
+  }
 
   return res.json({
     success: true,
@@ -5111,7 +5176,7 @@ app.post('/api/arn/intake', async (req, res) => {
     quote: autoQuote,
     parsed,
     emailResult,
-    message: `¡Bienvenido/a ${parsed.clientName}! El motor ARN consultó el Stock de Servicios [${parsed.stockServiceCode}] para ${parsed.companyName} (${parsed.employeeRangeLabel}) y envió tu propuesta de valor 40/40/20 (${autoQuote.quoteNumber}) a ${parsed.clientEmail}.`,
+    message: `¡Cuenta registrada con éxito, ${parsed.clientName}! Tu presupuesto 40/40/20 #${autoQuote.quoteNumber} ([${parsed.stockServiceCode}] · ${parsed.employeeRangeLabel}) ya está disponible para su tratamiento exclusivo dentro de tu Portal de Clientes.`,
   });
 });
 

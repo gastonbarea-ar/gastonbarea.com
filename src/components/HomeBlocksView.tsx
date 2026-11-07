@@ -688,7 +688,7 @@ export const HomeBlocksView: React.FC<HomeBlocksViewProps> = ({
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 text-left">
             <div className="space-y-2.5 max-w-2xl">
               <div className="text-xs font-mono text-emerald-400 font-semibold">
-                BLOQUE 05 · INICIO DE RELACIÓN ARN (CERO FORMULARIOS) & PROTOCOLO NDA
+                BLOQUE 05 · TRATAMIENTO DE PRESUPUESTO MEDIANTE REGISTRO ARN & PROTOCOLO NDA
               </div>
               <h2
                 className="font-display text-2xl sm:text-4xl font-bold tracking-tight text-white leading-tight"
@@ -697,7 +697,7 @@ export const HomeBlocksView: React.FC<HomeBlocksViewProps> = ({
                 ¿Listo para evaluar tu proyecto tecnológico, de IA Services o bioeconomía?
               </h2>
               <p className="text-sm text-neutral-300 leading-relaxed">
-                Escribí o dictá en una línea tu necesidad abajo para generar al instante tu propuesta 40/40/20 y abrir tu Portal de Clientes, o agendá directamente una sesión en Google Meet Pro.
+                Seleccioná tu servicio del Stock ARN, la dotación de tu empresa y registrate en 1 paso para abrir y tratar tu presupuesto 40/40/20 de forma exclusiva dentro de tu Portal de Clientes.
               </p>
             </div>
 

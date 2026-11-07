@@ -302,12 +302,36 @@ export const ClientPortalModal: React.FC<ClientPortalModalProps> = ({ isOpen = t
           (o.company || '').toLowerCase() === fallbackCompanyProfile.name.toLowerCase())
     );
 
-    const fallbackQuotes = INITIAL_CRM_QUOTES.filter(
-      (q) =>
-        q.clientEmail.toLowerCase() === activeEmail ||
-        (fallbackCompanyProfile &&
-          (q.clientCompany || '').toLowerCase() === fallbackCompanyProfile.name.toLowerCase())
-    );
+    let localStoredQuotes: any[] = [];
+    try {
+      const rawStored = localStorage.getItem('gb_arn_client_quotes_v1');
+      if (rawStored) {
+        const parsed = JSON.parse(rawStored);
+        if (Array.isArray(parsed)) {
+          localStoredQuotes = parsed.filter(
+            (q: any) =>
+              String(q.clientEmail || '').toLowerCase() === activeEmail ||
+              (fallbackCompanyProfile &&
+                String(q.clientCompany || '').toLowerCase() === fallbackCompanyProfile.name.toLowerCase()) ||
+              (activeSession?.company &&
+                String(q.clientCompany || '').toLowerCase() === String(activeSession.company).toLowerCase())
+          );
+        }
+      }
+    } catch {
+      // ignore localStorage read errors
+    }
+
+    const fallbackQuotes = [
+      ...localStoredQuotes,
+      ...INITIAL_CRM_QUOTES.filter(
+        (q) =>
+          !localStoredQuotes.some((lq) => lq.id === q.id) &&
+          (q.clientEmail.toLowerCase() === activeEmail ||
+            (fallbackCompanyProfile &&
+              (q.clientCompany || '').toLowerCase() === fallbackCompanyProfile.name.toLowerCase()))
+      ),
+    ];
 
     const fallbackInquiries = INITIAL_CONSULTING_INQUIRIES.filter(
       (i) =>
@@ -345,7 +369,12 @@ export const ClientPortalModal: React.FC<ClientPortalModalProps> = ({ isOpen = t
               : fallbackColleagues
           );
           setRelatedOpportunities(data.relatedOpportunities || fallbackOpps);
-          setRelatedQuotes(data.relatedQuotes || fallbackQuotes);
+          const apiQuotes = Array.isArray(data.relatedQuotes) ? data.relatedQuotes : [];
+          const mergedQuotes = [
+            ...apiQuotes,
+            ...fallbackQuotes.filter((fq) => !apiQuotes.some((aq: any) => aq.id === fq.id)),
+          ];
+          setRelatedQuotes(mergedQuotes);
           setInquiries(data.inquiries && data.inquiries.length > 0 ? data.inquiries : fallbackInquiries);
           setTickets(data.tickets && data.tickets.length > 0 ? data.tickets : fallbackTickets);
           setBookings(data.bookings && data.bookings.length > 0 ? data.bookings : fallbackBookings);
@@ -858,6 +887,20 @@ export const ClientPortalModal: React.FC<ClientPortalModalProps> = ({ isOpen = t
         setRelatedQuotes((prev) =>
           prev.map((q) => (q.id === quote.id ? { ...q, status: 'accepted' } : q))
         );
+        try {
+          const rawStored = localStorage.getItem('gb_arn_client_quotes_v1');
+          if (rawStored) {
+            const parsed = JSON.parse(rawStored);
+            if (Array.isArray(parsed)) {
+              const updatedStored = parsed.map((q: any) =>
+                q.id === quote.id ? { ...q, status: 'accepted' } : q
+              );
+              localStorage.setItem('gb_arn_client_quotes_v1', JSON.stringify(updatedStored));
+            }
+          }
+        } catch {
+          // ignore localStorage update errors
+        }
         if (data.project) {
           setProject(data.project);
         }
@@ -1289,58 +1332,36 @@ export const ClientPortalModal: React.FC<ClientPortalModalProps> = ({ isOpen = t
                 <p className="text-xs sm:text-sm text-[#515154]">
                   {loginMethod === 'register'
                     ? 'Registrate como miembro de una corporación o como contacto individual. Todos los contactos pasan a ser usuarios del Portal Clientes sin necesidad de tener un servicio contratado activo.'
-                    : 'Ingresá con tu usuario de la Agenda ARN o usá el Ingreso Conversacional en 1 clic sin llenar formularios.'}
+                    : 'Ingresá con tu usuario y clave registrados en la Agenda ARN o creá tu cuenta corporativa para gestionar tus presupuestos 40/40/20.'}
                 </p>
               </div>
 
-              {/* ZERO-FORM ARN CONVERSATIONAL INTAKE CARD */}
-              <form
-                onSubmit={handleArnConversationalIntake}
-                className="p-4 bg-[#0F172A] text-white border border-slate-800 space-y-3"
-              >
+              {/* REGISTRATION-PROTECTED BUDGET POLICY BANNER */}
+              <div className="p-4 bg-[#0F172A] text-white border border-slate-800 space-y-2.5">
                 <div className="flex items-center justify-between gap-2 text-xs">
                   <span className="font-bold text-emerald-400 flex items-center gap-1.5">
                     <Sparkles className="w-3.5 h-3.5" />
-                    <span>Ingreso Rápido ARN · Cero Formularios (1-Clic)</span>
+                    <span>Tratamiento de Presupuesto 40/40/20 Exclusivo para Usuarios Registrados</span>
                   </span>
-                  <span className="text-[10px] font-mono text-slate-400">Auto-Perfilado con IA</span>
+                  <span className="text-[10px] font-mono text-slate-400">Stock ARN · Micro / PyME / Grande</span>
                 </div>
                 <p className="text-xs text-slate-300 leading-relaxed">
-                  Escribí en una línea quién sos, tu empresa y qué necesitás junto con tu correo o WhatsApp. El motor ARN crea tu cuenta y estructura tu propuesta 40/40/20 automáticamente:
+                  Por confidencialidad comercial, todo el desglose de valores en escala, condición de dotación de empleados e hitos 40/40/20 se gestiona únicamente con cuenta registrada dentro del Portal Clientes.
                 </p>
-                <div className="space-y-2">
-                  <input
-                    type="text"
-                    required
-                    value={arnIntakeMessage}
-                    onChange={(e) => setArnIntakeMessage(e.target.value)}
-                    placeholder='Ej: "Soy Martín de AgroSur, buscamos implementar Odoo v18 e IoT"...'
-                    className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-700 text-xs text-white placeholder:text-slate-400 focus:outline-none focus:border-emerald-400"
-                  />
-                  <div className="flex flex-col sm:flex-row gap-2">
-                    <input
-                      type="text"
-                      required
-                      value={arnIntakeChannel}
-                      onChange={(e) => setArnIntakeChannel(e.target.value)}
-                      placeholder="Tu Email o WhatsApp (ej: martin@agrosur.com)"
-                      className="flex-1 px-3.5 py-2 bg-slate-900 border border-slate-700 text-xs font-mono text-white placeholder:text-slate-400 focus:outline-none focus:border-emerald-400"
-                    />
-                    <button
-                      type="submit"
-                      disabled={isSubmittingArnIntake || !arnIntakeMessage.trim()}
-                      className="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 whitespace-nowrap"
-                    >
-                      {isSubmittingArnIntake ? (
-                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                      ) : (
-                        <ArrowRight className="w-3.5 h-3.5" />
-                      )}
-                      <span>Entrar y Cotizar 40/40/20</span>
-                    </button>
-                  </div>
-                </div>
-              </form>
+                {loginMethod !== 'register' && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setLoginMethod('register');
+                      setAuthError('');
+                    }}
+                    className="w-full py-2 px-3 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
+                  >
+                    <ArrowRight className="w-3.5 h-3.5" />
+                    <span>Crear Cuenta Corporativa para Cotizar 40/40/20</span>
+                  </button>
+                )}
+              </div>
 
               {/* Login / Register Method Switcher */}
               <div className="grid grid-cols-3 border border-black/10 bg-[#F5F5F7] p-1">
@@ -2118,32 +2139,87 @@ export const ClientPortalModal: React.FC<ClientPortalModalProps> = ({ isOpen = t
                           {relatedQuotes.map((qt: any) => (
                             <div
                               key={qt.id}
-                              className="p-4 bg-emerald-50/50 border border-emerald-200 space-y-3 flex flex-col justify-between"
+                              className="p-4 sm:p-5 bg-emerald-50/60 border-2 border-emerald-300 space-y-3.5 flex flex-col justify-between md:col-span-2"
                             >
-                              <div className="space-y-2">
-                                <div className="flex items-center justify-between">
-                                  <span className="text-[10px] font-mono font-bold uppercase px-2 py-0.5 bg-emerald-100 text-emerald-800">
-                                    Cotización {qt.quoteNumber} · {qt.status}
-                                  </span>
-                                  <span className="text-xs font-mono font-bold text-emerald-950">
-                                    {qt.currency} ${Number(qt.total || 0).toLocaleString()}
+                              <div className="space-y-3">
+                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                  <div className="flex flex-wrap items-center gap-2">
+                                    <span className="text-[10px] font-mono font-bold uppercase px-2.5 py-0.5 bg-emerald-800 text-white">
+                                      Presupuesto Oficial {qt.quoteNumber} · {qt.status === 'accepted' ? 'Aprobado' : 'En Evaluación en Portal'}
+                                    </span>
+                                    {qt.companySizeScaleLabel && (
+                                      <span className="text-[10px] font-mono font-bold uppercase px-2 py-0.5 bg-indigo-100 text-indigo-900 border border-indigo-300">
+                                        Escala: {qt.companySizeScaleLabel}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <span className="text-base font-mono font-bold text-emerald-950">
+                                    Inversión Total: {qt.currency} ${Number(qt.total || 0).toLocaleString()}
                                   </span>
                                 </div>
-                                <div className="text-sm font-bold text-[#1D1D1F]">
-                                  {qt.title || 'Propuesta Formal Emitida'}
+                                <div className="text-base font-bold text-[#1D1D1F]">
+                                  {qt.title || 'Propuesta Formal Emitida desde Stock ARN'}
                                 </div>
                                 <div className="flex flex-wrap items-center gap-2 text-[11px] font-mono text-emerald-900">
-                                  <span className="px-2 py-0.5 bg-emerald-100/80 border border-emerald-300">
-                                    Dotación: {qt.employeeRangeLabel || `Hasta ${qt.employeeCount || 5} empleados`}
+                                  <span className="px-2 py-0.5 bg-emerald-100/90 border border-emerald-300 font-bold">
+                                    Dotación Declarada: {qt.employeeRangeLabel || `Hasta ${qt.employeeCount || 5} empleados`}
                                   </span>
-                                  <span className="px-2 py-0.5 bg-emerald-900 text-emerald-100">
-                                    Servicio Mensual + Soporte SLA: {qt.currency} ${Number(qt.monthlySupportFee || 250).toLocaleString()}/mes
+                                  <span className="px-2 py-0.5 bg-emerald-900 text-emerald-100 font-bold">
+                                    Servicio Mensual + Soporte SLA Incluido: {qt.currency} ${Number(qt.monthlySupportFee || 250).toLocaleString()}/mes
                                   </span>
                                 </div>
+
+                                {/* Desglose de Ítems del Stock ARN (Ítem 1: Servicio Base en Escala + Ítem 2: Condición de Empleados) */}
+                                {Array.isArray(qt.items) && qt.items.length > 0 && (
+                                  <div className="bg-white border border-emerald-200 p-3 space-y-2">
+                                    <div className="text-[10px] font-mono font-bold uppercase tracking-wider text-emerald-900">
+                                      Desglose de Ítems del Stock de Servicios ARN
+                                    </div>
+                                    <div className="divide-y divide-slate-100">
+                                      {qt.items.map((item: any, idx: number) => (
+                                        <div key={idx} className="py-1.5 flex items-center justify-between gap-3 text-xs">
+                                          <span className="text-slate-800 font-medium">{item.description}</span>
+                                          <span className="font-mono font-bold text-slate-900 shrink-0">
+                                            {qt.currency} ${Number(item.total ?? item.unitPrice ?? 0).toLocaleString()}
+                                          </span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* Cronograma de Hitos 40% / 40% / 20% */}
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1">
+                                  <div className="p-2.5 bg-white border border-emerald-200">
+                                    <div className="text-[10px] font-mono font-bold uppercase text-emerald-800">
+                                      Hito 1 · 40% Anticipo Kickoff
+                                    </div>
+                                    <div className="text-sm font-mono font-bold text-slate-900 mt-0.5">
+                                      {qt.currency} ${Math.round(Number(qt.total || 0) * 0.4).toLocaleString()}
+                                    </div>
+                                  </div>
+                                  <div className="p-2.5 bg-white border border-emerald-200">
+                                    <div className="text-[10px] font-mono font-bold uppercase text-emerald-800">
+                                      Hito 2 · 40% Staging & UAT
+                                    </div>
+                                    <div className="text-sm font-mono font-bold text-slate-900 mt-0.5">
+                                      {qt.currency} ${Math.round(Number(qt.total || 0) * 0.4).toLocaleString()}
+                                    </div>
+                                  </div>
+                                  <div className="p-2.5 bg-white border border-emerald-200">
+                                    <div className="text-[10px] font-mono font-bold uppercase text-emerald-800">
+                                      Hito 3 · 20% Go-Live Final
+                                    </div>
+                                    <div className="text-sm font-mono font-bold text-slate-900 mt-0.5">
+                                      {qt.currency} ${(Number(qt.total || 0) - Math.round(Number(qt.total || 0) * 0.4) * 2).toLocaleString()}
+                                    </div>
+                                  </div>
+                                </div>
+
                                 <p className="text-xs text-slate-600">{qt.paymentTerms}</p>
                               </div>
 
-                              <div className="pt-2 border-t border-emerald-200/70 flex items-center justify-between gap-2">
+                              <div className="pt-3 border-t border-emerald-200/80 flex items-center justify-between gap-2">
                                 {qt.status === 'accepted' ? (
                                   <span className="text-xs font-bold text-emerald-800 flex items-center gap-1.5">
                                     <CheckCircle2 className="w-4 h-4 text-emerald-600" />
@@ -2154,14 +2230,14 @@ export const ClientPortalModal: React.FC<ClientPortalModalProps> = ({ isOpen = t
                                     type="button"
                                     disabled={isApprovingQuoteId === qt.id}
                                     onClick={() => handleAcceptQuoteFromPortal(qt)}
-                                    className="w-full py-2.5 px-4 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold transition-colors flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                                    className="w-full py-3 px-4 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold uppercase tracking-wider transition-colors flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
                                   >
                                     {isApprovingQuoteId === qt.id ? (
-                                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                                      <RefreshCw className="w-4 h-4 animate-spin" />
                                     ) : (
                                       <CheckCircle2 className="w-4 h-4" />
                                     )}
-                                    <span>Aprobar Presupuesto e Iniciar Proyecto 40/40/20 (1-Clic)</span>
+                                    <span>Aprobar Presupuesto en Portal e Iniciar Proyecto 40/40/20 (1-Clic)</span>
                                   </button>
                                 )}
                               </div>

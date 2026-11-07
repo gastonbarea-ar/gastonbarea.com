@@ -738,17 +738,17 @@ export const Hero: React.FC<HeroProps> = ({
           <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4">
             <div className="space-y-1.5 max-w-3xl">
               <div className="text-xs font-mono text-emerald-400 font-bold uppercase tracking-wider">
-                INTERACCIÓN DIRECTA DEL USUARIO-CLIENTE · RED AUTÓNOMA ARN (CERO FORMULARIOS)
+                TRATAMIENTO DE PRESUPUESTOS MEDIANTE REGISTRO · RED AUTÓNOMA ARN
               </div>
               <h2
                 className="font-display text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight text-white"
                 style={{ textWrap: 'balance' }}
               >
-                Iniciá tu relación, generá tu presupuesto 40/40/20 y abrí tu Portal en 1 solo paso.
+                Registrate en 1 paso y gestioná tu presupuesto 40/40/20 directamente en tu Portal.
               </h2>
             </div>
             <p className="text-xs sm:text-sm text-neutral-300 max-w-md leading-relaxed">
-              Sin formularios eternos: contanos en una línea (o dictá con el micrófono) quién sos y qué necesitás. El sistema crea tu nodo corporativo, estructura tu propuesta 40/40/20 y te conecta directo a tu Portal de Clientes.
+              Elegí el servicio del Stock ARN y la cantidad de empleados de tu empresa. Para proteger tu confidencialidad y evitar correos automáticos desde la portada, todo el tratamiento del presupuesto se realiza dentro de tu Portal de Clientes registrado.
             </p>
           </div>
 
