@@ -300,7 +300,7 @@ export const Header: React.FC<HeaderProps> = ({
             <a
               href="#inicio"
               onClick={(e) => handleNavClick(e, '#inicio')}
-              className="flex flex-col leading-none shrink-0 hover:opacity-80 transition-opacity text-left"
+              className="inline-flex flex-col items-end leading-none shrink-0 hover:opacity-80 transition-opacity"
             >
               <span
                 className={`font-display text-[15px] sm:text-[17px] font-bold tracking-[-0.02em] whitespace-nowrap ${
@@ -310,7 +310,7 @@ export const Header: React.FC<HeaderProps> = ({
                 GASTONBAREA.COM
               </span>
               <span
-                className={`font-mono text-[9.5px] sm:text-[10px] font-semibold uppercase tracking-[0.18em] mt-1 ${
+                className={`self-end text-right font-mono text-[9.5px] sm:text-[10px] font-semibold uppercase tracking-[0.16em] mt-1 ${
                   isOverDarkStage ? 'text-emerald-400' : 'text-[#291B64]'
                 }`}
               >

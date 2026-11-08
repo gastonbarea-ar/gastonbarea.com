@@ -63,12 +63,12 @@ export const Footer: React.FC<FooterProps> = ({
             <a
               href="#inicio"
               onClick={(e) => handleLinkClick(e, '#inicio')}
-              className="inline-flex flex-col leading-none group transition-colors"
+              className="inline-flex flex-col items-end leading-none group transition-colors"
             >
               <span className="font-display text-lg font-extrabold text-slate-900 tracking-wider group-hover:text-[#291B64]">
                 GASTONBAREA.COM
               </span>
-              <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-[#291B64] mt-1">
+              <span className="self-end text-right font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-[#291B64] mt-1">
                 Human Innovation
               </span>
             </a>
