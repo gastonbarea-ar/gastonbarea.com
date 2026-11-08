@@ -352,62 +352,61 @@ export const Hero: React.FC<HeroProps> = ({
 
   return (
     <section id="inicio" className="relative w-full bg-white">
-      {/* BLOQUE 1: ESCENARIO AUDIOVISUAL ENCUADRADO CON MARGEN SIMÉTRICO A AMBOS LADOS */}
-      <div className="w-full pt-20 sm:pt-24 pb-6 sm:pb-10 px-4 sm:px-8 lg:px-12 xl:px-16 bg-[#08080C] text-white overflow-hidden">
-        <div className="w-full border border-white/15 bg-[#0B0B10] shadow-2xl overflow-hidden">
-          {/* Optional YouTube or Cloudflare R2 Direct MP4 URL Loader Bar */}
-          {showVideoSelector && (
-            <div className="w-full px-4 sm:px-6 lg:px-8 py-3.5 bg-[#12121A] border-b border-white/10 space-y-2.5">
-              <form
-                onSubmit={handleApplyCustomVideo}
-                className="w-full flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3"
-              >
-                <div className="text-xs font-mono text-neutral-300">
-                  Pegá una URL pública <strong className="text-emerald-400">Cloudflare R2 (pub-xxx.r2.dev/archivo.mp4)</strong> o el ID/URL de <strong className="text-white">YouTube</strong>:
-                </div>
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-                  <input
-                    type="text"
-                    value={customYoutubeInput}
-                    onChange={(e) => {
-                      setCustomYoutubeInput(e.target.value);
-                      if (directVideoError) setDirectVideoError('');
-                    }}
-                    placeholder="https://pub-xxx.r2.dev/video.mp4 o https://youtu.be/XVYUP8Pz-hE"
-                    className="px-3.5 py-2 text-xs font-mono bg-black/60 text-white rounded-none border border-white/15 focus:outline-none focus:border-white sm:min-w-[340px]"
-                  />
-                  <button
-                    type="submit"
-                    className="px-4 py-2 text-xs font-mono font-bold text-white bg-[#291B64] hover:bg-[#382586] rounded-none transition-colors cursor-pointer whitespace-nowrap"
-                  >
-                    Cargar Stream
-                  </button>
-                </div>
-              </form>
-              {directVideoError && (
-                <div className="p-2.5 bg-amber-500/15 border border-amber-400/40 text-amber-200 text-xs font-mono leading-relaxed">
-                  ⚠️ {directVideoError}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Main Framed Cinema Split (Equal Left & Right Distance) */}
-          <div className="w-full grid grid-cols-1 lg:grid-cols-12 items-stretch">
-            {/* LEFT / FULL STAGE: HYBRID VIDEO STREAM (CDN MP4 OR YOUTUBE) + NON-OVERLAPPING CONTROL BAR */}
-            <div
-              className={`${
-                isCinemaExpanded ? 'lg:col-span-12' : 'lg:col-span-8'
-              } relative bg-[#08080C] p-3 sm:p-5 lg:p-6 overflow-hidden flex flex-col justify-between transition-all duration-150`}
+      {/* BLOQUE 1: ESCENARIO AUDIOVISUAL FULL-COVER ALINEADO HORIZONTALMENTE */}
+      <div className="w-full pt-16 bg-[#08080C] text-white overflow-hidden">
+        {/* Optional YouTube or Cloudflare R2 Direct MP4 URL Loader Bar */}
+        {showVideoSelector && (
+          <div className="w-full px-4 sm:px-8 lg:px-12 py-3.5 bg-[#12121A] border-b border-white/10 space-y-2.5">
+            <form
+              onSubmit={handleApplyCustomVideo}
+              className="w-full flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3"
             >
-              {/* Video Frame Container — Encuadrado con misma distancia a izquierda y derecha */}
-              <div
-                className={`relative w-full aspect-video ${
-                  videoFitMode === 'cover' && !isCinemaExpanded
-                    ? 'lg:aspect-auto lg:flex-1 lg:min-h-[460px]'
-                    : 'lg:aspect-video'
-                } bg-black border border-white/10 overflow-hidden group`}
-              >
+              <div className="text-xs font-mono text-neutral-300">
+                Pegá una URL pública <strong className="text-emerald-400">Cloudflare R2 (pub-xxx.r2.dev/archivo.mp4)</strong> o el ID/URL de <strong className="text-white">YouTube</strong>:
+              </div>
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                <input
+                  type="text"
+                  value={customYoutubeInput}
+                  onChange={(e) => {
+                    setCustomYoutubeInput(e.target.value);
+                    if (directVideoError) setDirectVideoError('');
+                  }}
+                  placeholder="https://pub-xxx.r2.dev/video.mp4 o https://youtu.be/XVYUP8Pz-hE"
+                  className="px-3.5 py-2 text-xs font-mono bg-black/60 text-white rounded-none border border-white/15 focus:outline-none focus:border-white sm:min-w-[340px]"
+                />
+                <button
+                  type="submit"
+                  className="px-4 py-2 text-xs font-mono font-bold text-white bg-[#291B64] hover:bg-[#382586] rounded-none transition-colors cursor-pointer whitespace-nowrap"
+                >
+                  Cargar Stream
+                </button>
+              </div>
+            </form>
+            {directVideoError && (
+              <div className="p-2.5 bg-amber-500/15 border border-amber-400/40 text-amber-200 text-xs font-mono leading-relaxed">
+                ⚠️ {directVideoError}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Main Cinema Split — Same Horizontal Distance on Both Sides, No Borders/Frames */}
+        <div className="w-full px-4 sm:px-8 lg:px-12 grid grid-cols-1 lg:grid-cols-12 items-stretch">
+          {/* LEFT / FULL STAGE: HYBRID VIDEO STREAM (CDN MP4 OR YOUTUBE) + NON-OVERLAPPING CONTROL BAR */}
+          <div
+            className={`${
+              isCinemaExpanded ? 'lg:col-span-12' : 'lg:col-span-8'
+            } relative bg-black overflow-hidden flex flex-col justify-between transition-all duration-150`}
+          >
+            {/* Video Frame Container — Strictly fitted to frame without black letterbox bars */}
+            <div
+              className={`relative w-full aspect-video ${
+                videoFitMode === 'cover' && !isCinemaExpanded
+                  ? 'lg:aspect-auto lg:flex-1 lg:min-h-[480px]'
+                  : 'lg:aspect-video'
+              } bg-black overflow-hidden group`}
+            >
               {activeDirectVideoUrl ? (
                 <video
                   key={`${activeDirectVideoUrl}-${isMuted ? 'muted' : 'sound'}`}
@@ -772,7 +771,6 @@ export const Hero: React.FC<HeroProps> = ({
               </div>
             </div>
           )}
-          </div>
         </div>
       </div>
 
