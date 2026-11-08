@@ -63,9 +63,14 @@ export const Footer: React.FC<FooterProps> = ({
             <a
               href="#inicio"
               onClick={(e) => handleLinkClick(e, '#inicio')}
-              className="inline-block font-display text-lg font-extrabold text-slate-900 tracking-wider hover:text-[#291B64] transition-colors"
+              className="inline-flex flex-col leading-none group transition-colors"
             >
-              GASTONBAREA.COM
+              <span className="font-display text-lg font-extrabold text-slate-900 tracking-wider group-hover:text-[#291B64]">
+                GASTONBAREA.COM
+              </span>
+              <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-[#291B64] mt-1">
+                Human Innovation
+              </span>
             </a>
             <p className="text-xs text-slate-600 leading-relaxed max-w-md">
               Consultor y Desarrollador de Proyectos de Base Tecnológica, IA Services y Bioeconomía. 30 años de experiencia en el sector tecnológico-productivo y 14 años dirigiendo proyectos estratégicos con clientes.

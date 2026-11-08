@@ -608,12 +608,17 @@ export const Hero: React.FC<HeroProps> = ({
             <div className="lg:col-span-4 p-4 sm:p-7 lg:p-8 flex flex-col justify-between gap-5 text-left bg-[#0E0E14] border-t lg:border-t-0 lg:border-l border-white/10">
               {/* Top: Identity Badge + Executive Title */}
               <div className="space-y-3">
-                <div className="inline-flex flex-wrap items-center gap-2 px-2.5 py-1 bg-white/[0.05] border border-white/10 text-[11px] font-mono text-neutral-300">
-                  <span className="text-white font-bold tracking-wider">GASTONBAREA.COM</span>
-                  <span aria-hidden="true">·</span>
-                  <span>30 AÑOS TECH</span>
-                  <span aria-hidden="true">·</span>
-                  <span className="text-emerald-400 font-bold">14 AÑOS PMO</span>
+                <div className="inline-flex flex-col px-2.5 py-1.5 bg-white/[0.05] border border-white/10 text-[11px] font-mono text-neutral-300">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-white font-bold tracking-wider">GASTONBAREA.COM</span>
+                    <span aria-hidden="true">·</span>
+                    <span>30 AÑOS TECH</span>
+                    <span aria-hidden="true">·</span>
+                    <span className="text-emerald-400 font-bold">14 AÑOS PMO</span>
+                  </div>
+                  <span className="text-[10px] font-mono font-semibold uppercase tracking-[0.18em] text-emerald-400 mt-0.5">
+                    Human Innovation
+                  </span>
                 </div>
 
                 <h1
