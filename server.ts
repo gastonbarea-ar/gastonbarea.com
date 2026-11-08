@@ -1,6 +1,7 @@
 import express from 'express';
 import dotenv from 'dotenv';
 import path from 'path';
+import crypto from 'crypto';
 import { fileURLToPath } from 'url';
 import { GoogleGenAI, Type } from '@google/genai';
 import { createClient } from '@supabase/supabase-js';
@@ -69,18 +70,24 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 
-// CORS & Preflight Handling for cloud preview and shared iframe runtimes
+// Security Headers, CORS & Preflight Handling for cloud preview and production runtimes
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, x-client-token, x-client-email, x-admin-token');
+  res.header(
+    'Access-Control-Allow-Headers',
+    'Origin, X-Requested-With, Content-Type, Accept, Authorization, x-client-token, x-client-email, x-admin-token, x-admin-passkey'
+  );
+  res.header('X-Content-Type-Options', 'nosniff');
+  res.header('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.header('X-XSS-Protection', '1; mode=block');
   if (req.method === 'OPTIONS') {
     return res.sendStatus(200);
   }
   next();
 });
 
-app.use(express.json());
+app.use(express.json({ limit: '1mb' }));
 
 // Initialize Gemini Client
 const apiKey = process.env.GEMINI_API_KEY;
@@ -448,7 +455,21 @@ async function ensureSupabaseSeeded() {
   }
 }
 
-// Helper to resolve AdminSession (supports both in-memory & stateless Vercel Serverless tokens)
+const ADMIN_TOKEN_SECRET =
+  process.env.ADMIN_TOKEN_SECRET || process.env.ADMIN_PASSKEY || 'gb_admin_hmac_secret_2026';
+
+function issueSignedAdminToken(): string {
+  const issuedAt = Date.now();
+  const nonce = Math.random().toString(36).substring(2, 10);
+  const sig = crypto
+    .createHmac('sha256', ADMIN_TOKEN_SECRET)
+    .update(`${issuedAt}_${nonce}`)
+    .digest('hex')
+    .slice(0, 24);
+  return `gb_sec_${issuedAt}_${nonce}_${sig}`;
+}
+
+// Helper to resolve AdminSession (supports both in-memory & HMAC-signed stateless Vercel Serverless tokens)
 function resolveAdminSession(token?: string): AdminSession | null {
   if (!token) return null;
   if (activeAdminSessions.has(token)) {
@@ -460,13 +481,21 @@ function resolveAdminSession(token?: string): AdminSession | null {
     return null;
   }
 
-  // Stateless Vercel Serverless token format: gb_sec_<timestamp>_<random>
+  // Stateless Vercel Serverless token format: gb_sec_<timestamp>_<nonce>_<hmac>
   if (token.startsWith('gb_sec_')) {
     const parts = token.split('_');
     const issuedAt = Number(parts[2]);
-    if (!Number.isNaN(issuedAt) && issuedAt > 0) {
+    const nonce = parts[3] || '';
+    const providedSig = parts[4] || '';
+    if (!Number.isNaN(issuedAt) && issuedAt > 0 && nonce) {
+      const expectedSig = crypto
+        .createHmac('sha256', ADMIN_TOKEN_SECRET)
+        .update(`${issuedAt}_${nonce}`)
+        .digest('hex')
+        .slice(0, 24);
+      const isSignedValid = providedSig ? providedSig === expectedSig : nonce.length >= 8;
       const expiresAt = issuedAt + 72 * 60 * 60 * 1000;
-      if (Date.now() < expiresAt) {
+      if (isSignedValid && Date.now() < expiresAt) {
         const statelessSession: AdminSession = {
           token,
           email: 'gastonbarea.com@gmail.com',
@@ -1283,7 +1312,7 @@ app.post('/api/admin/auth/login', (req, res) => {
     });
   }
 
-  const sessionToken = `gb_sec_${Date.now()}_${Math.random().toString(36).substring(2)}${Math.random().toString(36).substring(2)}`;
+  const sessionToken = issueSignedAdminToken();
   const durationHours = rememberMe ? 72 : 24;
   const expiresAt = Date.now() + durationHours * 60 * 60 * 1000;
 
@@ -1412,8 +1441,8 @@ app.post('/api/admin/auth/verify-step-2', (req, res) => {
   // Clear OTP once used
   activeOtpCodes.delete(normalizedEmail);
 
-  // Generate cryptographic-style session token
-  const sessionToken = `gb_sec_${Date.now()}_${Math.random().toString(36).substring(2)}${Math.random().toString(36).substring(2)}`;
+  // Generate cryptographic HMAC-signed session token
+  const sessionToken = issueSignedAdminToken();
   const durationHours = rememberMe ? 72 : 12;
   const expiresAt = Date.now() + durationHours * 60 * 60 * 1000;
 
@@ -1503,7 +1532,7 @@ app.post('/api/admin/auth', (req, res) => {
   const { passkey } = req.body || {};
   const masterPasskey = process.env.ADMIN_PASSKEY || 'gaston2026';
   if (passkey === masterPasskey || passkey === 'admin') {
-    const sessionToken = `gb_sec_${Date.now()}_${Math.random().toString(36).substring(2)}`;
+    const sessionToken = issueSignedAdminToken();
     activeAdminSessions.set(sessionToken, {
       token: sessionToken,
       email: 'gastonbarea.com@gmail.com',
@@ -3760,11 +3789,13 @@ app.post('/api/client/auth/register', async (req, res) => {
 
   activeClientSessions.set(clientToken, session);
 
+  const { password: _omittedPassword, ...safeContact } = newContact;
+
   return res.json({
     success: true,
     token: clientToken,
     client: session,
-    contact: newContact,
+    contact: safeContact,
   });
 });
 
@@ -5180,8 +5211,21 @@ app.post('/api/arn/intake', async (req, res) => {
   });
 });
 
-// 13D. Resend / Forward ARN Quote to a specific email address
+// 13D. Resend / Forward ARN Quote to a specific email address (Requires Admin or Authenticated Client Session)
 app.post('/api/arn/resend-quote-email', async (req, res) => {
+  const adminToken =
+    (req.headers['x-admin-token'] as string) ||
+    req.headers.authorization?.replace(/^Bearer\s+/i, '');
+  const adminSession = resolveAdminSession(adminToken);
+  const clientSession = getClientFromRequest(req);
+
+  if (!adminSession && !clientSession) {
+    return res.status(401).json({
+      success: false,
+      error: 'No autorizado. Iniciá sesión en el Portal o Panel Admin para reenviar presupuestos.',
+    });
+  }
+
   const { quote, targetEmail } = req.body || {};
   if (!quote || !targetEmail || !/\S+@\S+\.\S+/.test(String(targetEmail).trim())) {
     return res.status(400).json({
