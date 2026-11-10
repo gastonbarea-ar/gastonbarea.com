@@ -228,6 +228,7 @@ export const CrmDashboard: React.FC<CrmDashboardProps> = ({
 
   // ARN (Automated Relationship Network) Zero-Form Copiloto & Autonomous Radar State
   const [arnCommandInput, setArnCommandInput] = useState<string>('');
+  const [preferredAiEngine, setPreferredAiEngine] = useState<'auto' | 'groq' | 'gemini'>('auto');
   const [isExecutingArnCommand, setIsExecutingArnCommand] = useState<boolean>(false);
   const [isListeningVoice, setIsListeningVoice] = useState<boolean>(false);
   const [isExecutingAutopilotId, setIsExecutingAutopilotId] = useState<string | null>(null);
@@ -959,7 +960,10 @@ export const CrmDashboard: React.FC<CrmDashboardProps> = ({
           'Content-Type': 'application/json',
           'x-admin-passkey': passkey,
         },
-        body: JSON.stringify({ commandText: textToRun }),
+        body: JSON.stringify({
+          commandText: textToRun,
+          preferredEngine: preferredAiEngine,
+        }),
       });
       const json = await res.json();
       if (res.ok && json.success) {
@@ -1372,9 +1376,44 @@ export const CrmDashboard: React.FC<CrmDashboardProps> = ({
                       Agente IA Autónomo ARN (Ciclo ReAct 4 Fases · Cero Formularios)
                     </span>
                   </div>
-                  <span className="px-2 py-0.5 bg-emerald-500/15 border border-emerald-400/40 text-emerald-300 font-mono text-[10px]">
-                    Stack $0: Gemini API + Groq Failover + StateGraph TS + n8n Ready
-                  </span>
+                  <div className="inline-flex items-center bg-slate-900 border border-slate-700 p-0.5 text-[10px] font-mono">
+                    <button
+                      type="button"
+                      onClick={() => setPreferredAiEngine('auto')}
+                      className={`px-2 py-0.5 transition-colors cursor-pointer ${
+                        preferredAiEngine === 'auto'
+                          ? 'bg-emerald-500 text-slate-950 font-bold'
+                          : 'text-slate-300 hover:text-white'
+                      }`}
+                      title="Modo Dual-Engine: Gemini 3 Flash + Failover automático a Groq LPU"
+                    >
+                      Auto (Gemini + Groq)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPreferredAiEngine('groq')}
+                      className={`px-2 py-0.5 transition-colors cursor-pointer ${
+                        preferredAiEngine === 'groq'
+                          ? 'bg-amber-400 text-slate-950 font-bold'
+                          : 'text-amber-300 hover:text-amber-200'
+                      }`}
+                      title="Forzar motor primario Groq LPU (Llama 3.3 70B >300 tok/s)"
+                    >
+                      ⚡ Groq LPU (Llama 3.3 70B)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPreferredAiEngine('gemini')}
+                      className={`px-2 py-0.5 transition-colors cursor-pointer ${
+                        preferredAiEngine === 'gemini'
+                          ? 'bg-sky-400 text-slate-950 font-bold'
+                          : 'text-sky-300 hover:text-sky-200'
+                      }`}
+                      title="Motor primario Google Gemini 3 Flash"
+                    >
+                      Gemini 3 Flash
+                    </button>
+                  </div>
                 </div>
 
                 <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-mono">

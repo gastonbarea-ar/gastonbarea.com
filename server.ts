@@ -64,6 +64,8 @@ import {
 import {
   runArnAutonomousAgent,
   ArnAgentTrace,
+  callGroqCloudLpu,
+  PreferredAiEngine,
 } from './src/services/arnAgentOrchestrator.ts';
 
 dotenv.config();
@@ -577,8 +579,7 @@ app.post('/api/architecture-proposal', async (req, res) => {
       contactName = '',
     } = req.body;
 
-    if (ai) {
-      const prompt = `El cliente ha solicitado estructurar un proyecto en gastonbarea.com:
+    const prompt = `El cliente ha solicitado estructurar un proyecto en gastonbarea.com:
 - Organización / Sector: ${organizationType}
 - Eje o Desafío Principal: ${primaryChallenge}
 - Tecnologías o recursos actuales: ${currentStack.join(', ') || 'En definición'}
@@ -588,72 +589,103 @@ app.post('/api/architecture-proposal', async (req, res) => {
 
 Como Gastón Barea (30 años en el sector tecnológico-productivo, 14 años en dirección de proyectos con clientes, especialista en proyectos de base tecnológica, IA Services y bioeconomía), genera una propuesta ejecutiva en formato JSON estructurado.`;
 
-      const response = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
-        contents: prompt,
-        config: {
-          responseMimeType: 'application/json',
-          systemInstruction: GASTON_DIGITAL_TWIN_SYSTEM_INSTRUCTION + ' Devuelve únicamente el objeto JSON válido.',
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              architectureTitle: { type: Type.STRING },
-              diagnosticSummary: { type: Type.STRING },
-              estimatedTimeline: { type: Type.STRING },
-              recommendedStack: {
-                type: Type.ARRAY,
-                items: { type: Type.STRING },
-              },
-              keyComponents: {
-                type: Type.ARRAY,
-                items: {
-                  type: Type.OBJECT,
-                  properties: {
-                    name: { type: Type.STRING },
-                    detail: { type: Type.STRING },
-                  },
-                  required: ['name', 'detail'],
+    if (ai) {
+      try {
+        const response = await ai.models.generateContent({
+          model: 'gemini-3-flash-preview',
+          contents: prompt,
+          config: {
+            responseMimeType: 'application/json',
+            systemInstruction: GASTON_DIGITAL_TWIN_SYSTEM_INSTRUCTION + ' Devuelve únicamente el objeto JSON válido.',
+            responseSchema: {
+              type: Type.OBJECT,
+              properties: {
+                architectureTitle: { type: Type.STRING },
+                diagnosticSummary: { type: Type.STRING },
+                estimatedTimeline: { type: Type.STRING },
+                recommendedStack: {
+                  type: Type.ARRAY,
+                  items: { type: Type.STRING },
                 },
-              },
-              workPhases: {
-                type: Type.ARRAY,
-                items: {
-                  type: Type.OBJECT,
-                  properties: {
-                    phase: { type: Type.STRING },
-                    duration: { type: Type.STRING },
-                    deliverable: { type: Type.STRING },
+                keyComponents: {
+                  type: Type.ARRAY,
+                  items: {
+                    type: Type.OBJECT,
+                    properties: {
+                      name: { type: Type.STRING },
+                      detail: { type: Type.STRING },
+                    },
+                    required: ['name', 'detail'],
                   },
-                  required: ['phase', 'duration', 'deliverable'],
                 },
+                workPhases: {
+                  type: Type.ARRAY,
+                  items: {
+                    type: Type.OBJECT,
+                    properties: {
+                      phase: { type: Type.STRING },
+                      duration: { type: Type.STRING },
+                      deliverable: { type: Type.STRING },
+                    },
+                    required: ['phase', 'duration', 'deliverable'],
+                  },
+                },
+                tangibleBenefits: {
+                  type: Type.ARRAY,
+                  items: { type: Type.STRING },
+                },
+                executiveMessage: { type: Type.STRING },
               },
-              tangibleBenefits: {
-                type: Type.ARRAY,
-                items: { type: Type.STRING },
-              },
-              executiveMessage: { type: Type.STRING },
+              required: [
+                'architectureTitle',
+                'diagnosticSummary',
+                'estimatedTimeline',
+                'recommendedStack',
+                'keyComponents',
+                'workPhases',
+                'tangibleBenefits',
+                'executiveMessage',
+              ],
             },
-            required: [
-              'architectureTitle',
-              'diagnosticSummary',
-              'estimatedTimeline',
-              'recommendedStack',
-              'keyComponents',
-              'workPhases',
-              'tangibleBenefits',
-              'executiveMessage',
-            ],
           },
-        },
-      });
-
-      const responseText = response.text;
-      if (responseText) {
-        const parsed = JSON.parse(responseText);
-        return res.json({
-          ...parsed,
-          isAiGenerated: true,
         });
+
+        const responseText = response.text;
+        if (responseText) {
+          const parsed = JSON.parse(responseText);
+          return res.json({
+            ...parsed,
+            isAiGenerated: true,
+            aiEngine: 'gemini',
+          });
+        }
+      } catch (gemErr) {
+        console.warn('[/api/architecture-proposal] Gemini error, trying Groq failover:', gemErr);
+      }
+    }
+
+    if (process.env.GROQ_API_KEY) {
+      const groqJson = await callGroqCloudLpu({
+        systemPrompt:
+          GASTON_DIGITAL_TWIN_SYSTEM_INSTRUCTION +
+          '\nDevolvé un JSON con las claves exactas: architectureTitle (string), diagnosticSummary (string), estimatedTimeline (string), recommendedStack (string[]), keyComponents ({name, detail}[]), workPhases ({phase, duration, deliverable}[]), tangibleBenefits (string[]), executiveMessage (string).',
+        userPrompt: prompt,
+        jsonMode: true,
+        maxTokens: 900,
+      });
+      if (groqJson) {
+        try {
+          const parsedGroq = JSON.parse(groqJson);
+          if (parsedGroq.architectureTitle && parsedGroq.diagnosticSummary) {
+            return res.json({
+              ...parsedGroq,
+              isAiGenerated: true,
+              aiEngine: 'groq',
+            });
+          }
+        } catch {
+          // fallback below
+        }
       }
     }
 
@@ -686,8 +718,7 @@ app.post('/api/architecture-qa', async (req, res) => {
       return res.status(400).json({ error: 'Pregunta requerida' });
     }
 
-    if (ai) {
-      const prompt = `Contexto del proyecto evaluado:
+    const prompt = `Contexto del proyecto evaluado:
 "${JSON.stringify(proposalContext || {})}"
 
 Consulta del cliente:
@@ -695,15 +726,33 @@ Consulta del cliente:
 
 Responde como Gastón Barea en 2 párrafos claros, pragmáticos y ejecutivos, conectando tu experiencia de 30 años en el sector tecnológico-productivo y 14 años dirigiendo proyectos con clientes.`;
 
-      const response = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
-        contents: prompt,
-        config: {
-          systemInstruction: GASTON_DIGITAL_TWIN_SYSTEM_INSTRUCTION,
-        },
-      });
+    if (ai) {
+      try {
+        const response = await ai.models.generateContent({
+          model: 'gemini-3-flash-preview',
+          contents: prompt,
+          config: {
+            systemInstruction: GASTON_DIGITAL_TWIN_SYSTEM_INSTRUCTION,
+          },
+        });
 
-      return res.json({ answer: response.text });
+        if (response.text) {
+          return res.json({ answer: response.text, aiEngine: 'gemini' });
+        }
+      } catch (gemErr) {
+        console.warn('[/api/architecture-qa] Gemini error, trying Groq failover:', gemErr);
+      }
+    }
+
+    if (process.env.GROQ_API_KEY) {
+      const groqAnswer = await callGroqCloudLpu({
+        systemPrompt: GASTON_DIGITAL_TWIN_SYSTEM_INSTRUCTION,
+        userPrompt: prompt,
+        maxTokens: 500,
+      });
+      if (groqAnswer) {
+        return res.json({ answer: groqAnswer, aiEngine: 'groq' });
+      }
     }
 
     return res.json({
@@ -728,37 +777,63 @@ app.post('/api/digital-twin/chat', async (req, res) => {
     const matchedSolution = matchWebSolution(message);
     const fallbackBlueprint = buildCustomSolutionBlueprint(message);
 
-    if (ai) {
-      const formattedHistory = Array.isArray(history)
-        ? history
-            .slice(-6)
-            .map((m: { role: string; text: string }) => `${m.role === 'user' ? 'Visitante' : 'Web IA (Gastón Barea)'}: ${m.text}`)
-            .join('\n\n')
-        : '';
+    const formattedHistory = Array.isArray(history)
+      ? history
+          .slice(-6)
+          .map((m: { role: string; text: string }) => `${m.role === 'user' ? 'Visitante' : 'Web IA (Gastón Barea)'}: ${m.text}`)
+          .join('\n\n')
+      : '';
 
-      const fullPrompt = `${
-        formattedHistory ? `Historial reciente:\n${formattedHistory}\n\n` : ''
-      }Consulta del usuario en la web: "${message}"
+    const fullPrompt = `${
+      formattedHistory ? `Historial reciente:\n${formattedHistory}\n\n` : ''
+    }Consulta del usuario en la web: "${message}"
 Solución detectada dentro de la web: "${matchedSolution.serviceTitle}" (${matchedSolution.summary})
 
 Responde en 2 párrafos ágiles y ejecutivos como la inteligencia viva de gastonbarea.com (con la voz y experiencia de 30 años en el sector tecnológico-productivo y 14 años dirigiendo proyectos con clientes de Gastón Barea). Orienta al usuario exactamente a cómo resolvemos su problema y por qué la solución "${matchedSolution.serviceTitle}" dentro de la web es el camino indicado.`;
 
-      const response = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
-        contents: fullPrompt,
-        config: {
-          systemInstruction: GASTON_DIGITAL_TWIN_SYSTEM_INSTRUCTION,
-        },
-      });
+    if (ai) {
+      try {
+        const response = await ai.models.generateContent({
+          model: 'gemini-3-flash-preview',
+          contents: fullPrompt,
+          config: {
+            systemInstruction: GASTON_DIGITAL_TWIN_SYSTEM_INSTRUCTION,
+          },
+        });
 
-      if (response.text) {
+        if (response.text) {
+          return res.json({
+            reply: response.text,
+            matchedSolution,
+            suggestedAction: matchedSolution.ctaLabel,
+            aiEngine: 'gemini',
+            blueprint: {
+              ...fallbackBlueprint,
+              executiveDiagnosis: response.text,
+              isAiGenerated: true,
+            },
+          });
+        }
+      } catch (gemErr) {
+        console.warn('[/api/digital-twin/chat] Gemini error, trying Groq failover:', gemErr);
+      }
+    }
+
+    if (process.env.GROQ_API_KEY) {
+      const groqReply = await callGroqCloudLpu({
+        systemPrompt: GASTON_DIGITAL_TWIN_SYSTEM_INSTRUCTION,
+        userPrompt: fullPrompt,
+        maxTokens: 550,
+      });
+      if (groqReply) {
         return res.json({
-          reply: response.text,
+          reply: groqReply,
           matchedSolution,
           suggestedAction: matchedSolution.ctaLabel,
+          aiEngine: 'groq',
           blueprint: {
             ...fallbackBlueprint,
-            executiveDiagnosis: response.text,
+            executiveDiagnosis: groqReply,
             isAiGenerated: true,
           },
         });
@@ -793,10 +868,7 @@ app.post('/api/ai-custom-solution', async (req, res) => {
   }
 
   const baseBlueprint = buildCustomSolutionBlueprint(rawQuery);
-
-  if (ai) {
-    try {
-      const prompt = `El usuario realizó la siguiente consulta en la barra estratégica de gastonbarea.com:
+  const prompt = `El usuario realizó la siguiente consulta en la barra estratégica de gastonbarea.com:
 "${rawQuery}"
 
 Diseña una solución tecnológica y de dirección ejecutiva PMO reorganizando el contenido y creando 3 servicios/módulos a medida para sus necesidades.
@@ -808,6 +880,8 @@ Ids válidos de proyectos en catálogo para reordenar según relevancia (recomme
 - "agente-rag-operaciones-b2b"
 - "infraestructura-critica-linux-cluster"`;
 
+  if (ai) {
+    try {
       const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
         contents: prompt,
@@ -891,6 +965,7 @@ Ids válidos de proyectos en catálogo para reordenar según relevancia (recomme
       if (response.text) {
         const parsed = JSON.parse(response.text);
         return res.json({
+          aiEngine: 'gemini',
           blueprint: {
             ...baseBlueprint,
             ...parsed,
@@ -903,7 +978,39 @@ Ids válidos de proyectos en catálogo para reordenar según relevancia (recomme
         });
       }
     } catch (err) {
-      console.error('Fallback to deterministic synthesizer in /api/ai-custom-solution:', err);
+      console.warn('[/api/ai-custom-solution] Gemini error, trying Groq failover:', err);
+    }
+  }
+
+  if (process.env.GROQ_API_KEY) {
+    const groqJson = await callGroqCloudLpu({
+      systemPrompt:
+        GASTON_DIGITAL_TWIN_SYSTEM_INSTRUCTION +
+        '\nDevolvé un JSON con solutionTitle (string), executiveDiagnosis (string), primaryVertical (string), estimatedTimeline (string), recommendedStack (string[]).',
+      userPrompt: prompt,
+      jsonMode: true,
+      maxTokens: 700,
+    });
+    if (groqJson) {
+      try {
+        const parsedGroq = JSON.parse(groqJson);
+        if (parsedGroq.solutionTitle && parsedGroq.executiveDiagnosis) {
+          return res.json({
+            aiEngine: 'groq',
+            blueprint: {
+              ...baseBlueprint,
+              ...parsedGroq,
+              id: `sol-groq-${Date.now()}`,
+              query: rawQuery,
+              createdAt: new Date().toISOString(),
+              matchedSolution: baseBlueprint.matchedSolution,
+              isAiGenerated: true,
+            },
+          });
+        }
+      } catch {
+        // fallback below
+      }
     }
   }
 
@@ -3329,11 +3436,38 @@ Devuelve entre 3 y 4 ítems de ingeniería concretos con descripción ejecutiva,
         return res.json({
           success: true,
           isAiGenerated: true,
+          aiEngine: 'gemini',
           ...parsed,
         });
       }
     } catch (err) {
-      console.warn('[AI Quote Generator] Fallback deterministic:', err);
+      console.warn('[AI Quote Generator] Gemini error, trying Groq failover:', err);
+    }
+  }
+
+  if (process.env.GROQ_API_KEY) {
+    const groqQuoteJson = await callGroqCloudLpu({
+      systemPrompt:
+        GASTON_DIGITAL_TWIN_SYSTEM_INSTRUCTION +
+        '\nDevolvé un JSON con suggestedTitle (string), suggestedTimeline (string) e items ({description, deliverable, hours, unitPrice, quantity}[]).',
+      userPrompt: `Cliente: "${companyName || 'Corporativo'}". Requerimiento: "${cleanContext}". Categoría: ${serviceCategory}. Moneda: ${currency}.`,
+      jsonMode: true,
+      maxTokens: 700,
+    });
+    if (groqQuoteJson) {
+      try {
+        const parsedGroq = JSON.parse(groqQuoteJson);
+        if (Array.isArray(parsedGroq.items) && parsedGroq.items.length > 0) {
+          return res.json({
+            success: true,
+            isAiGenerated: true,
+            aiEngine: 'groq',
+            ...parsedGroq,
+          });
+        }
+      } catch {
+        // fallback below
+      }
     }
   }
 
@@ -4583,7 +4717,8 @@ async function resolveArnCommandWithAi(
   rawInput: string,
   contactChannel?: string,
   overrideEmployeeCount?: number,
-  preferredStockId?: string
+  preferredStockId?: string,
+  preferredEngine: PreferredAiEngine = 'auto'
 ): Promise<ParsedArnCommand> {
   const deterministic = parseNaturalArnCommand(
     rawInput,
@@ -4592,49 +4727,96 @@ async function resolveArnCommandWithAi(
     cachedServiceStock,
     preferredStockId
   );
-  if (!ai || !rawInput || rawInput.trim().length < 8) {
+  if ((!ai && !process.env.GROQ_API_KEY) || !rawInput || rawInput.trim().length < 8) {
     return deterministic;
   }
 
   try {
-    const aiCall = ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
-      contents: `Extraé las entidades comerciales, dotación de empleados y técnicas de la siguiente nota o mensaje natural para el motor ARN de Gastón Barea.\nTexto: "${rawInput}"\nCanal adicional: "${contactChannel || ''}"\nCantidad de empleados indicada: "${overrideEmployeeCount || ''}"`,
-      config: {
-        responseMimeType: 'application/json',
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            clientName: { type: Type.STRING },
-            clientEmail: { type: Type.STRING },
-            companyName: { type: Type.STRING },
-            phone: { type: Type.STRING },
-            employeeCount: {
-              type: Type.NUMBER,
-              description: 'Cantidad de empleados de la empresa (ej. 5, 10, 15, 25, 50)',
+    let parsedJson: Record<string, any> = {};
+
+    const tryGroqParser = async () => {
+      if (!process.env.GROQ_API_KEY) return;
+      const groqJson = await callGroqCloudLpu({
+        systemPrompt:
+          'Extraé las entidades comerciales del mensaje para el motor ARN. Devolvé un objeto JSON con: clientName, clientEmail, companyName, phone, employeeCount (number), serviceCategory (software_architecture | odoo_erp | ecommerce_b2b2c | fractional_cto | linux_docker | bi_analytics), estimatedValue (number), currency (USD | ARS), shouldGenerateQuote (boolean), shouldActivateKickoff (boolean), summaryTitle.',
+        userPrompt: `Texto: "${rawInput}"\nCanal: "${contactChannel || ''}"\nDotación: "${overrideEmployeeCount || ''}"`,
+        jsonMode: true,
+        maxTokens: 350,
+        timeoutMs: 2500,
+      });
+      if (groqJson) {
+        parsedJson = JSON.parse(groqJson);
+      }
+    };
+
+    const tryGeminiParser = async () => {
+      if (!ai) return;
+      const aiCall = ai.models.generateContent({
+        model: 'gemini-3-flash-preview',
+        contents: `Extraé las entidades comerciales, dotación de empleados y técnicas de la siguiente nota o mensaje natural para el motor ARN de Gastón Barea.\nTexto: "${rawInput}"\nCanal adicional: "${contactChannel || ''}"\nCantidad de empleados indicada: "${overrideEmployeeCount || ''}"`,
+        config: {
+          responseMimeType: 'application/json',
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              clientName: { type: Type.STRING },
+              clientEmail: { type: Type.STRING },
+              companyName: { type: Type.STRING },
+              phone: { type: Type.STRING },
+              employeeCount: {
+                type: Type.NUMBER,
+                description: 'Cantidad de empleados de la empresa (ej. 5, 10, 15, 25, 50)',
+              },
+              serviceCategory: {
+                type: Type.STRING,
+                description:
+                  'Uno de: software_architecture, odoo_erp, ecommerce_b2b2c, fractional_cto, linux_docker, bi_analytics',
+              },
+              estimatedValue: { type: Type.NUMBER },
+              currency: { type: Type.STRING, description: 'USD o ARS' },
+              shouldGenerateQuote: { type: Type.BOOLEAN },
+              shouldActivateKickoff: { type: Type.BOOLEAN },
+              summaryTitle: { type: Type.STRING },
             },
-            serviceCategory: {
-              type: Type.STRING,
-              description:
-                'Uno de: software_architecture, odoo_erp, ecommerce_b2b2c, fractional_cto, linux_docker, bi_analytics',
-            },
-            estimatedValue: { type: Type.NUMBER },
-            currency: { type: Type.STRING, description: 'USD o ARS' },
-            shouldGenerateQuote: { type: Type.BOOLEAN },
-            shouldActivateKickoff: { type: Type.BOOLEAN },
-            summaryTitle: { type: Type.STRING },
           },
         },
-      },
-    });
+      });
 
-    const timeoutGuard = new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error('ARN AI parser timeout (2.5s)')), 2500)
-    );
+      const timeoutGuard = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('ARN AI parser timeout (2.5s)')), 2500)
+      );
 
-    const response = await Promise.race([aiCall, timeoutGuard]);
+      const response = await Promise.race([aiCall, timeoutGuard]);
+      parsedJson = JSON.parse((response.text ?? '{}').trim());
+    };
 
-    const parsedJson = JSON.parse((response.text ?? '{}').trim());
+    if (preferredEngine === 'groq') {
+      try {
+        await tryGroqParser();
+      } catch {
+        // Fallback to Gemini below
+      }
+      if (Object.keys(parsedJson).length === 0) {
+        try {
+          await tryGeminiParser();
+        } catch {
+          // Deterministic fallback
+        }
+      }
+    } else {
+      try {
+        await tryGeminiParser();
+      } catch {
+        // Fallback to Groq LPU below
+      }
+      if (Object.keys(parsedJson).length === 0) {
+        try {
+          await tryGroqParser();
+        } catch {
+          // Deterministic fallback
+        }
+      }
+    }
     const validCategories = [
       'software_architecture',
       'odoo_erp',
@@ -4796,16 +4978,59 @@ app.delete('/api/arn/service-stock/:id', requireAdminAuth, (req, res) => {
 
 // 13A. Admin Omnibar: Natural Language / Voice / WhatsApp Command Execution
 app.post('/api/arn/command', requireAdminAuth, async (req, res) => {
-  const { commandText, employeeCount, stockServiceId } = req.body || {};
+  const { commandText, employeeCount, stockServiceId, preferredEngine } = req.body || {};
   if (!commandText || !String(commandText).trim()) {
     return res.status(400).json({ error: 'Ingresá o dictá una instrucción en lenguaje natural.' });
+  }
+
+  const validEngine: PreferredAiEngine =
+    preferredEngine === 'groq' || preferredEngine === 'gemini' ? preferredEngine : 'auto';
+
+  const isPortalUserOnlyCommand =
+    /(registrar usuario|crear usuario|alta de usuario|habilitar acceso|bloquear acceso|revocar acceso|suspender usuario|activar usuario|reactivar usuario|auditar usuarios|listar usuarios|resetear clave|cambiar clave)/i.test(
+      String(commandText)
+    ) && !/(cotiz|presupuest|propuesta|40\/40\/20|kickoff|oportunidad)/i.test(String(commandText));
+
+  if (isPortalUserOnlyCommand) {
+    const agentRun = await runArnAutonomousAgent({
+      prompt: String(commandText),
+      callerRole: 'admin_arn',
+      preferredEngine: validEngine,
+      aiClient: ai,
+      store: buildAdminArnStoreAdapter(),
+    });
+    const arnNodes = computeArnRelationshipNodes({
+      opportunities: cachedOpportunities,
+      companies: cachedCrmCompanies,
+      contacts: cachedCrmContacts,
+      quotes: cachedQuotes,
+      projects: cachedClientProjects,
+      bookings: cachedClientBookings,
+    });
+    return res.json({
+      success: true,
+      actionsExecuted: agentRun.actionsExecuted,
+      finalResponse: agentRun.finalResponse,
+      agentTrace: agentRun.agentTrace,
+      managedUser: agentRun.artifacts.managedUser || null,
+      arnNodes,
+      data: {
+        opportunities: cachedOpportunities,
+        companies: cachedCrmCompanies,
+        contacts: cachedCrmContacts,
+        quotes: cachedQuotes,
+        payments: cachedPayments,
+        serviceStock: cachedServiceStock,
+      },
+    });
   }
 
   const parsed = await resolveArnCommandWithAi(
     String(commandText),
     undefined,
     employeeCount ? Number(employeeCount) : undefined,
-    stockServiceId ? String(stockServiceId) : undefined
+    stockServiceId ? String(stockServiceId) : undefined,
+    validEngine
   );
   const actionsExecuted: string[] = [];
 
@@ -4960,16 +5185,18 @@ app.post('/api/arn/command', requireAdminAuth, async (req, res) => {
     bookings: cachedClientBookings,
   });
 
-  // Generate 4-Stage Agentic Trace for full observability in Admin Omnibar (without duplicate LLM call)
+  // Generate 4-Stage Agentic Trace for full observability in Admin Omnibar
   let agentTrace: ArnAgentTrace | null = null;
   let finalResponse = '';
   try {
+    const adminAdapter = buildAdminArnStoreAdapter();
     const traceRun = await runArnAutonomousAgent({
       prompt: String(commandText),
       callerRole: 'admin_arn',
       overrideEmployeeCount: parsed.employeeCount,
       preferredStockId: parsed.stockServiceId,
-      aiClient: null, // Avoid double Gemini call since resolveArnCommandWithAi already ran above
+      preferredEngine: validEngine,
+      aiClient: validEngine === 'groq' ? ai : null,
       store: {
         opportunities: cachedOpportunities,
         companies: cachedCrmCompanies,
@@ -4981,6 +5208,7 @@ app.post('/api/arn/command', requireAdminAuth, async (req, res) => {
         bookings: cachedClientBookings,
         serviceStock: cachedServiceStock,
         onPersistQuoteAndOpportunity: () => {},
+        onManagePortalUser: adminAdapter.onManagePortalUser,
       },
     });
     agentTrace = traceRun.agentTrace;
@@ -5263,12 +5491,15 @@ function buildAdminArnStoreAdapter() {
 
 // 13A-2. Admin Autonomous Agent Loop Executor (4-Node StateGraph: Evaluate -> Memory -> Tools -> Verify)
 app.post('/api/arn/agent-execute', requireAdminAuth, async (req, res) => {
-  const { prompt, employeeCount, stockServiceId } = req.body || {};
+  const { prompt, employeeCount, stockServiceId, preferredEngine } = req.body || {};
   if (!prompt || !String(prompt).trim()) {
     return res
       .status(400)
       .json({ error: 'Ingresá el objetivo para el Agente Autónomo ARN.' });
   }
+
+  const validEngine: PreferredAiEngine =
+    preferredEngine === 'groq' || preferredEngine === 'gemini' ? preferredEngine : 'auto';
 
   try {
     const result = await runArnAutonomousAgent({
@@ -5276,6 +5507,7 @@ app.post('/api/arn/agent-execute', requireAdminAuth, async (req, res) => {
       callerRole: 'admin_arn',
       overrideEmployeeCount: employeeCount ? Number(employeeCount) : undefined,
       preferredStockId: stockServiceId ? String(stockServiceId) : undefined,
+      preferredEngine: validEngine,
       aiClient: ai,
       store: buildAdminArnStoreAdapter(),
     });
@@ -5321,13 +5553,16 @@ app.post('/api/client-portal/agent-assist', async (req, res) => {
     });
   }
 
-  const { prompt, employeeCount, stockServiceId } = req.body || {};
+  const { prompt, employeeCount, stockServiceId, preferredEngine } = req.body || {};
   if (!prompt || !String(prompt).trim()) {
     return res.status(400).json({
       success: false,
       error: 'Escribí tu consulta o ajuste sobre tu presupuesto 40/40/20 o proyecto.',
     });
   }
+
+  const validEngine: PreferredAiEngine =
+    preferredEngine === 'groq' || preferredEngine === 'gemini' ? preferredEngine : 'auto';
 
   try {
     const result = await runArnAutonomousAgent({
@@ -5341,6 +5576,7 @@ app.post('/api/client-portal/agent-assist', async (req, res) => {
       },
       overrideEmployeeCount: employeeCount ? Number(employeeCount) : undefined,
       preferredStockId: stockServiceId ? String(stockServiceId) : undefined,
+      preferredEngine: validEngine,
       aiClient: ai,
       store: {
         ...buildAdminArnStoreAdapter(),

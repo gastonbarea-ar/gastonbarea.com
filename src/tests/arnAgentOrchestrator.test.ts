@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { runArnAutonomousAgent } from '../services/arnAgentOrchestrator.ts';
+import { runArnAutonomousAgent, callGroqCloudLpu } from '../services/arnAgentOrchestrator.ts';
 import {
   INITIAL_ARN_SERVICE_STOCK,
   INITIAL_CRM_COMPANIES,
@@ -145,5 +145,32 @@ describe('10. Motor de Agentes IA Autónomos ARN (Ciclo StateGraph de 4 Fases)',
     });
     assert.equal(activateRes.success, true);
     assert.equal(activateRes.artifacts.managedUser?.portalAccessStatus, 'active');
+  });
+
+  it('debe soportar modo Dual-Engine con preferredEngine="groq" y garantizar resiliencia determinista si GROQ_API_KEY no está presente en test local', async () => {
+    const store = createMockStore();
+
+    const groqNullFallback = await callGroqCloudLpu({
+      systemPrompt: 'Test system prompt',
+      userPrompt: 'Test user prompt',
+      jsonMode: true,
+    });
+    if (!process.env.GROQ_API_KEY) {
+      assert.equal(groqNullFallback, null);
+    }
+
+    const res = await runArnAutonomousAgent({
+      prompt:
+        'Hablé con Ramiro de TecnoSur, correo ramiro@tecnosur.com.ar, somos 14 empleados, armar presupuesto 40/40/20 de Linux y Docker',
+      callerRole: 'admin_arn',
+      preferredEngine: 'groq',
+      store,
+    });
+
+    assert.equal(res.success, true);
+    assert.equal(res.agentTrace.step4_resultVerification.goalResolved, true);
+    assert.equal(res.agentTrace.step4_resultVerification.math404020Verified, true);
+    assert.ok(res.artifacts.quote);
+    assert.equal(res.artifacts.quote.employeeCount, 14);
   });
 });

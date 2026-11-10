@@ -117,6 +117,8 @@ export interface ArnAgentStoreAdapter {
   }) => Promise<PortalUserManagementActionResult> | PortalUserManagementActionResult;
 }
 
+export type PreferredAiEngine = 'auto' | 'gemini' | 'groq';
+
 export interface RunArnAgentParams {
   prompt: string;
   callerRole: AgentCallerRole;
@@ -128,6 +130,7 @@ export interface RunArnAgentParams {
   };
   overrideEmployeeCount?: number;
   preferredStockId?: string;
+  preferredEngine?: PreferredAiEngine;
   aiClient?: GoogleGenAI | null;
   groqApiKey?: string;
   n8nWebhookUrl?: string;
@@ -361,33 +364,47 @@ export const ARN_AGENT_FUNCTION_DECLARATIONS: FunctionDeclaration[] = [
 ];
 
 /**
- * Optional Groq Cloud ($0 Free Tier) fast inference helper (>300 tokens/s)
- * Used as fast classifier or automatic failover if Gemini Free Tier hits 15 RPM
+ * Groq Cloud ($0 Free Tier) fast inference helper (>300 tokens/s on Llama 3.3 70B)
+ * Used both as selectable primary engine ('groq') and automatic failover if Gemini hits 15 RPM.
  */
-async function callGroqFastFailover(params: {
-  groqApiKey: string;
+export async function callGroqCloudLpu(params: {
+  groqApiKey?: string;
   systemPrompt: string;
   userPrompt: string;
+  jsonMode?: boolean;
+  maxTokens?: number;
+  timeoutMs?: number;
 }): Promise<string | null> {
-  if (!params.groqApiKey || params.groqApiKey.trim().length < 10) return null;
+  const key = (params.groqApiKey ?? process.env.GROQ_API_KEY ?? '').trim();
+  if (!key || key.length < 10) return null;
   try {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 2800);
+    const timer = setTimeout(() => controller.abort(), params.timeoutMs || 3800);
+    const bodyPayload: Record<string, any> = {
+      model: 'llama-3.3-70b-versatile',
+      temperature: 0.15,
+      max_tokens: params.maxTokens || 700,
+      messages: [
+        {
+          role: 'system',
+          content: params.jsonMode
+            ? `${params.systemPrompt}\nIMPORTANTE: Respondé ÚNICAMENTE con un objeto JSON válido.`
+            : params.systemPrompt,
+        },
+        { role: 'user', content: params.userPrompt },
+      ],
+    };
+    if (params.jsonMode) {
+      bodyPayload.response_format = { type: 'json_object' };
+    }
+
     const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${params.groqApiKey.trim()}`,
+        Authorization: `Bearer ${key}`,
       },
-      body: JSON.stringify({
-        model: 'llama-3.3-70b-versatile',
-        temperature: 0.1,
-        max_tokens: 450,
-        messages: [
-          { role: 'system', content: params.systemPrompt },
-          { role: 'user', content: params.userPrompt },
-        ],
-      }),
+      body: JSON.stringify(bodyPayload),
       signal: controller.signal,
     });
     clearTimeout(timer);
@@ -415,6 +432,7 @@ export async function runArnAutonomousAgent(
     authenticatedClient,
     overrideEmployeeCount,
     preferredStockId,
+    preferredEngine = 'auto',
     aiClient,
     groqApiKey = process.env.GROQ_API_KEY || '',
     n8nWebhookUrl = process.env.N8N_WEBHOOK_URL || process.env.WHATSAPP_WEBHOOK_URL || '',
@@ -858,9 +876,27 @@ export async function runArnAutonomousAgent(
     durationMs: Math.max(1, Date.now() - t2Start),
   });
 
-  // Optional Gemini Function Calling / Groq LPU Reasoning Pass
+  // Dual-Engine AI Reasoning Pass: Supports preferredEngine ('auto' | 'gemini' | 'groq')
   let aiExecutiveSynthesis: string | null = null;
-  if (aiClient) {
+  const groqSystemPrompt =
+    'Sos el Agente Autónomo ARN de gastonbarea.com. Respondé en español argentino (vos) en 2 oraciones ejecutivas confirmando la acción ejecutada, el presupuesto 40/40/20 (si aplica) y el estado en el Portal de Clientes.';
+  const groqUserPrompt = `Cliente: ${targetClientName} (${targetCompanyName} · ${targetClientEmail}). Dotación: ${resolvedPricing.employeeCount} empleados (${resolvedPricing.companyScaleLabel}). Servicio: [${effectiveStockService.code}] ${effectiveStockService.name}. Total: ${resolvedPricing.currency} $${resolvedPricing.totalImplementationCost.toLocaleString()}. Pedido: "${cleanPrompt}"`;
+
+  const tryGroqFirst = preferredEngine === 'groq' && Boolean(groqApiKey);
+
+  if (tryGroqFirst) {
+    const groqReply = await callGroqCloudLpu({
+      groqApiKey,
+      systemPrompt: groqSystemPrompt,
+      userPrompt: groqUserPrompt,
+    });
+    if (groqReply) {
+      llmEngineUsed = 'groq-lpu-failover';
+      aiExecutiveSynthesis = groqReply.trim();
+    }
+  }
+
+  if (!aiExecutiveSynthesis && aiClient && preferredEngine !== 'groq') {
     try {
       const toolSelectionResponse = await Promise.race([
         aiClient.models.generateContent({
@@ -899,11 +935,10 @@ Si corresponde ejecutar una herramienta adicional o sintetizar la confirmación 
     } catch {
       // Automatic Failover to Groq Cloud ($0 Free Tier) if configured
       if (groqApiKey) {
-        const groqReply = await callGroqFastFailover({
+        const groqReply = await callGroqCloudLpu({
           groqApiKey,
-          systemPrompt:
-            'Sos el Agente Autónomo ARN de gastonbarea.com. Respondé en español argentino (vos) en 2 oraciones ejecutivas confirmando el presupuesto 40/40/20 y el estado en el Portal de Clientes.',
-          userPrompt: `Cliente: ${targetClientName} (${targetCompanyName}). Dotación: ${resolvedPricing.employeeCount} empleados (${resolvedPricing.companyScaleLabel}). Servicio: [${effectiveStockService.code}] ${effectiveStockService.name}. Total: ${resolvedPricing.currency} $${resolvedPricing.totalImplementationCost.toLocaleString()}. Pedido: "${cleanPrompt}"`,
+          systemPrompt: groqSystemPrompt,
+          userPrompt: groqUserPrompt,
         });
         if (groqReply) {
           llmEngineUsed = 'groq-lpu-failover';
@@ -911,12 +946,11 @@ Si corresponde ejecutar una herramienta adicional o sintetizar la confirmación 
         }
       }
     }
-  } else if (groqApiKey) {
-    const groqReply = await callGroqFastFailover({
+  } else if (!aiExecutiveSynthesis && groqApiKey) {
+    const groqReply = await callGroqCloudLpu({
       groqApiKey,
-      systemPrompt:
-        'Sos el Agente Autónomo ARN de gastonbarea.com. Respondé en español argentino (vos) en 2 oraciones ejecutivas confirmando el presupuesto 40/40/20 y el estado en el Portal de Clientes.',
-      userPrompt: `Cliente: ${targetClientName} (${targetCompanyName}). Dotación: ${resolvedPricing.employeeCount} empleados (${resolvedPricing.companyScaleLabel}). Servicio: [${effectiveStockService.code}] ${effectiveStockService.name}. Total: ${resolvedPricing.currency} $${resolvedPricing.totalImplementationCost.toLocaleString()}. Pedido: "${cleanPrompt}"`,
+      systemPrompt: groqSystemPrompt,
+      userPrompt: groqUserPrompt,
     });
     if (groqReply) {
       llmEngineUsed = 'groq-lpu-failover';

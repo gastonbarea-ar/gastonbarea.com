@@ -4,26 +4,6 @@
   "outputDirectory": "dist",
   "rewrites": [
     {
-      "source": "/api/ai-custom-solution",
-      "destination": "/api/ai-custom-solution"
-    },
-    {
-      "source": "/api/architecture-proposal",
-      "destination": "/api/architecture-proposal"
-    },
-    {
-      "source": "/api/architecture-qa",
-      "destination": "/api/architecture-qa"
-    },
-    {
-      "source": "/api/save-contact",
-      "destination": "/api/save-contact"
-    },
-    {
-      "source": "/api/save-proposal",
-      "destination": "/api/save-proposal"
-    },
-    {
       "source": "/api/(.*)",
       "destination": "/api/index"
     },
