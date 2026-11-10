@@ -106,4 +106,44 @@ describe('10. Motor de Agentes IA Autónomos ARN (Ciclo StateGraph de 4 Fases)',
     assert.ok(result.artifacts.ticket);
     assert.equal(result.artifacts.ticket.clientEmail, 'martin@distribuidorasur.com.ar');
   });
+
+  it('debe permitir administrar usuarios del Portal (alta por correo, bloqueo de acceso y reactivación) desde el Agente IA', async () => {
+    const store = createMockStore();
+
+    // 1. Crear nuevo usuario registrado por correo
+    const createRes = await runArnAutonomousAgent({
+      prompt:
+        'Registrar usuario para Sofía Méndez de Grupo Sur S.A., correo sofia@gruposur.com.ar, clave: sur2026',
+      callerRole: 'admin_arn',
+      store,
+    });
+    assert.equal(createRes.success, true);
+    assert.ok(
+      createRes.agentTrace.step3_toolsExecuted.some(
+        (t) => t.toolName === 'administrar_usuarios_portal'
+      )
+    );
+    assert.ok(createRes.artifacts.managedUser);
+    assert.equal(createRes.artifacts.managedUser.email, 'sofia@gruposur.com.ar');
+    assert.equal(createRes.artifacts.managedUser.portalAccessStatus, 'active');
+    assert.equal(createRes.artifacts.managedUser.password, 'sur2026');
+
+    // 2. Bloquear acceso al Portal para ese usuario
+    const blockRes = await runArnAutonomousAgent({
+      prompt: 'Bloquear acceso al Portal para sofia@gruposur.com.ar',
+      callerRole: 'admin_arn',
+      store,
+    });
+    assert.equal(blockRes.success, true);
+    assert.equal(blockRes.artifacts.managedUser?.portalAccessStatus, 'revoked');
+
+    // 3. Reactivar usuario
+    const activateRes = await runArnAutonomousAgent({
+      prompt: 'Reactivar usuario sofia@gruposur.com.ar en el Portal',
+      callerRole: 'admin_arn',
+      store,
+    });
+    assert.equal(activateRes.success, true);
+    assert.equal(activateRes.artifacts.managedUser?.portalAccessStatus, 'active');
+  });
 });

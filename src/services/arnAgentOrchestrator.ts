@@ -71,6 +71,13 @@ export interface ArnAgentTrace {
   step4_resultVerification: AgentVerificationReport;
 }
 
+export interface PortalUserManagementActionResult {
+  success: boolean;
+  summary: string;
+  contact?: CrmContact | null;
+  users?: CrmContact[];
+}
+
 export interface ArnAgentStoreAdapter {
   opportunities: Opportunity[];
   companies: CrmCompany[];
@@ -100,6 +107,14 @@ export interface ArnAgentStoreAdapter {
   }) => Promise<ClientProject> | ClientProject;
   onCreateSupportTicket?: (ticket: SupportTicket) => Promise<void> | void;
   onCreateBooking?: (booking: ConsultingBooking) => Promise<void> | void;
+  onManagePortalUser?: (params: {
+    action: 'create_user' | 'block_user' | 'activate_user' | 'reset_password' | 'list_users';
+    email?: string;
+    fullName?: string;
+    companyName?: string;
+    password?: string;
+    phone?: string;
+  }) => Promise<PortalUserManagementActionResult> | PortalUserManagementActionResult;
 }
 
 export interface RunArnAgentParams {
@@ -130,6 +145,7 @@ export interface RunArnAgentResult {
     project?: ClientProject | null;
     ticket?: SupportTicket | null;
     booking?: ConsultingBooking | null;
+    managedUser?: CrmContact | null;
   };
 }
 
@@ -308,6 +324,38 @@ export const ARN_AGENT_FUNCTION_DECLARATIONS: FunctionDeclaration[] = [
         },
       },
       required: ['eventType', 'summary'],
+    },
+  },
+  {
+    name: 'administrar_usuarios_portal',
+    description:
+      'Administra el sistema de usuarios registrados en el Portal de Clientes (#portal): crear/registrar usuario por email, bloquear/suspender acceso, reactivar acceso, resetear contraseña o auditar el padrón de usuarios.',
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        action: {
+          type: Type.STRING,
+          description:
+            'Acción administrativa: create_user, block_user, activate_user, reset_password, list_users.',
+        },
+        email: {
+          type: Type.STRING,
+          description: 'Correo electrónico del usuario del Portal.',
+        },
+        fullName: {
+          type: Type.STRING,
+          description: 'Nombre y apellido del usuario.',
+        },
+        companyName: {
+          type: Type.STRING,
+          description: 'Nombre de la empresa u organización.',
+        },
+        password: {
+          type: Type.STRING,
+          description: 'Contraseña asignada o blanqueada para el Portal.',
+        },
+      },
+      required: ['action'],
     },
   },
 ];
@@ -499,16 +547,75 @@ export async function runArnAutonomousAgent(
     lowerPrompt.includes('agend') ||
     lowerPrompt.includes('turno');
 
-  const wantsQuote =
-    parsedCommand.shouldGenerateQuote ||
+  const isBlockUserCmd =
+    callerRole === 'admin_arn' &&
+    (lowerPrompt.includes('bloquear usuario') ||
+      lowerPrompt.includes('bloquear acceso') ||
+      lowerPrompt.includes('suspender usuario') ||
+      lowerPrompt.includes('suspender acceso') ||
+      lowerPrompt.includes('revocar acceso') ||
+      lowerPrompt.includes('inhabilitar usuario'));
+
+  const isActivateUserCmd =
+    callerRole === 'admin_arn' &&
+    !isBlockUserCmd &&
+    (lowerPrompt.includes('activar usuario') ||
+      lowerPrompt.includes('reactivar usuario') ||
+      lowerPrompt.includes('habilitar usuario') ||
+      lowerPrompt.includes('desbloquear usuario') ||
+      lowerPrompt.includes('habilitar acceso') ||
+      lowerPrompt.includes('restaurar acceso'));
+
+  const isResetPasswordCmd =
+    callerRole === 'admin_arn' &&
+    (lowerPrompt.includes('resetear clave') ||
+      lowerPrompt.includes('blanquear clave') ||
+      lowerPrompt.includes('cambiar clave') ||
+      lowerPrompt.includes('nueva clave') ||
+      lowerPrompt.includes('reset password'));
+
+  const isListUsersCmd =
+    callerRole === 'admin_arn' &&
+    (lowerPrompt.includes('listar usuarios') ||
+      lowerPrompt.includes('usuarios registrados') ||
+      lowerPrompt.includes('auditar usuarios') ||
+      lowerPrompt.includes('padron de usuarios') ||
+      lowerPrompt.includes('padrón de usuarios') ||
+      lowerPrompt.includes('ver usuarios'));
+
+  const isCreateUserCmd =
+    callerRole === 'admin_arn' &&
+    !isBlockUserCmd &&
+    !isActivateUserCmd &&
+    !isResetPasswordCmd &&
+    !isListUsersCmd &&
+    (lowerPrompt.includes('crear usuario') ||
+      lowerPrompt.includes('registrar usuario') ||
+      lowerPrompt.includes('alta de usuario') ||
+      lowerPrompt.includes('dar de alta usuario') ||
+      lowerPrompt.includes('nuevo usuario'));
+
+  const wantsUserManagement =
+    isBlockUserCmd ||
+    isActivateUserCmd ||
+    isResetPasswordCmd ||
+    isListUsersCmd ||
+    isCreateUserCmd;
+
+  const explicitQuoteInPrompt =
     lowerPrompt.includes('cotiz') ||
     lowerPrompt.includes('presupuesto') ||
     lowerPrompt.includes('40/40/20') ||
     lowerPrompt.includes('emplead') ||
     lowerPrompt.includes('escala') ||
     lowerPrompt.includes('sumar') ||
-    lowerPrompt.includes('actualizar') ||
-    (!wantsTicket && !wantsMeet);
+    lowerPrompt.includes('actualizar');
+
+  const wantsQuote = wantsUserManagement
+    ? explicitQuoteInPrompt
+    : parsedCommand.shouldGenerateQuote ||
+      explicitQuoteInPrompt ||
+      (!wantsTicket && !wantsMeet);
 
   const wantsN8n =
     callerRole === 'admin_arn' &&
@@ -530,6 +637,24 @@ export async function runArnAutonomousAgent(
       status: 'pending',
     },
   ];
+
+  if (wantsUserManagement) {
+    subtasks.push({
+      id: `sub-${subtasks.length + 1}`,
+      order: subtasks.length + 1,
+      description: isBlockUserCmd
+        ? `Bloquear acceso al Portal de Clientes para ${targetClientEmail}`
+        : isActivateUserCmd
+        ? `Reactivar y habilitar acceso al Portal de Clientes para ${targetClientEmail}`
+        : isResetPasswordCmd
+        ? `Blanquear contraseña de acceso al Portal para ${targetClientEmail}`
+        : isListUsersCmd
+        ? 'Auditar padrón de usuarios registrados y estados de acceso en el Portal'
+        : `Registrar usuario ${targetClientName} (${targetClientEmail}) en el Portal de Clientes`,
+      targetTool: 'administrar_usuarios_portal',
+      status: 'pending',
+    });
+  }
 
   if (wantsQuote) {
     subtasks.push({
@@ -1129,6 +1254,135 @@ Si corresponde ejecutar una herramienta adicional o sintetizar la confirmación 
     });
   }
 
+  // Tool 8 Execution: administrar_usuarios_portal (Admin User Management)
+  let managedUser: CrmContact | null = null;
+  if (wantsUserManagement) {
+    const tUserStart = Date.now();
+    const userAction: 'create_user' | 'block_user' | 'activate_user' | 'reset_password' | 'list_users' =
+      isBlockUserCmd
+        ? 'block_user'
+        : isActivateUserCmd
+        ? 'activate_user'
+        : isResetPasswordCmd
+        ? 'reset_password'
+        : isListUsersCmd
+        ? 'list_users'
+        : 'create_user';
+
+    // Extract optional explicit password (e.g. "clave: miClave2026" or "password: xyz")
+    const pwdMatch = cleanPrompt.match(/(?:clave|contraseñ[a]|password)\s*[:=]?\s*([^\s,;]+)/i);
+    const extractedPassword = pwdMatch?.[1]?.trim() || 'cliente2026';
+
+    let userSummary = '';
+    if (store.onManagePortalUser) {
+      const result = await store.onManagePortalUser({
+        action: userAction,
+        email: targetClientEmail,
+        fullName: targetClientName,
+        companyName: targetCompanyName,
+        password: extractedPassword,
+        phone: parsedCommand.phone,
+      });
+      userSummary = result.summary;
+      managedUser = result.contact || null;
+    } else {
+      // Deterministic in-memory fallback on store.contacts
+      const idx = store.contacts.findIndex(
+        (c) => c.email.toLowerCase() === targetClientEmail
+      );
+      if (userAction === 'list_users') {
+        const total = store.contacts.length;
+        const activeCount = store.contacts.filter((c) => c.portalAccessStatus !== 'revoked').length;
+        const blockedCount = store.contacts.filter((c) => c.portalAccessStatus === 'revoked').length;
+        userSummary = `Padrón de Usuarios del Portal auditado: ${total} usuarios registrados (${activeCount} con acceso activo, ${blockedCount} suspendidos/bloqueados).`;
+      } else if (userAction === 'block_user') {
+        if (idx !== -1) {
+          store.contacts[idx] = {
+            ...store.contacts[idx],
+            portalAccessStatus: 'revoked',
+          };
+          managedUser = store.contacts[idx];
+          userSummary = `Acceso al Portal de Clientes BLOQUEADO (revoked) para ${managedUser.fullName} (${managedUser.email}).`;
+        } else {
+          userSummary = `No se encontró el usuario ${targetClientEmail} para bloquear.`;
+        }
+      } else if (userAction === 'activate_user') {
+        if (idx !== -1) {
+          store.contacts[idx] = {
+            ...store.contacts[idx],
+            portalAccessStatus: 'active',
+          };
+          managedUser = store.contacts[idx];
+          userSummary = `Acceso al Portal de Clientes REACTIVADO (active) para ${managedUser.fullName} (${managedUser.email}).`;
+        } else {
+          userSummary = `No se encontró el usuario ${targetClientEmail} para reactivar.`;
+        }
+      } else if (userAction === 'reset_password') {
+        if (idx !== -1) {
+          store.contacts[idx] = {
+            ...store.contacts[idx],
+            password: extractedPassword,
+            portalAccessStatus: 'active',
+          };
+          managedUser = store.contacts[idx];
+          userSummary = `Contraseña de Portal actualizada (${extractedPassword}) y acceso activo para ${managedUser.fullName} (${managedUser.email}).`;
+        } else {
+          userSummary = `No se encontró el usuario ${targetClientEmail} para blanquear clave.`;
+        }
+      } else {
+        // create_user
+        if (idx !== -1) {
+          store.contacts[idx] = {
+            ...store.contacts[idx],
+            fullName: targetClientName || store.contacts[idx].fullName,
+            companyName: targetCompanyName || store.contacts[idx].companyName,
+            portalAccessStatus: 'active',
+            password: store.contacts[idx].password || extractedPassword,
+          };
+          managedUser = store.contacts[idx];
+          userSummary = `Usuario del Portal actualizado y habilitado: ${managedUser.fullName} (${managedUser.email} · ${managedUser.companyName}).`;
+        } else {
+          const newUser: CrmContact = {
+            id: `cnt-user-${Date.now()}`,
+            fullName: targetClientName,
+            roleTitle: 'Cliente Registrado Portal',
+            email: targetClientEmail,
+            phone: parsedCommand.phone || '',
+            companyName: targetCompanyName,
+            contactType: 'corporate_member',
+            hasActiveService: false,
+            portalAccessStatus: 'active',
+            username: targetClientEmail,
+            password: extractedPassword,
+            notes: 'Registrado por Agente Autónomo ARN',
+            createdAt: new Date().toISOString().split('T')[0],
+            updatedAt: new Date().toISOString(),
+          };
+          store.contacts.unshift(newUser);
+          managedUser = newUser;
+          userSummary = `Nuevo usuario registrado en el Portal de Clientes: ${newUser.fullName} (${newUser.email} · Clave inicial: ${newUser.password}).`;
+        }
+      }
+    }
+
+    actionsExecuted.push(userSummary);
+    const userSub = subtasks.find((s) => s.targetTool === 'administrar_usuarios_portal');
+    if (userSub) userSub.status = 'completed';
+
+    toolsExecuted.push({
+      toolName: 'administrar_usuarios_portal',
+      args: {
+        action: userAction,
+        email: targetClientEmail,
+        fullName: targetClientName,
+        companyName: targetCompanyName,
+      },
+      outputSummary: userSummary,
+      success: true,
+      durationMs: Math.max(1, Date.now() - tUserStart),
+    });
+  }
+
   // ==========================================================================
   // NODO 4: ANALIZAR Y VERIFICAR EL RESULTADO (Self-Verification & Reflection)
   // ==========================================================================
@@ -1190,7 +1444,7 @@ Si corresponde ejecutar una herramienta adicional o sintetizar la confirmación 
     loopIterations,
     step1_evaluateObjective: {
       primaryGoal: cleanPrompt,
-      detectedIntent: parsedCommand.intent,
+      detectedIntent: wantsUserManagement ? 'portal_user_management' : parsedCommand.intent,
       callerRole,
       subtasks,
     },
@@ -1219,6 +1473,7 @@ Si corresponde ejecutar una herramienta adicional o sintetizar la confirmación 
       project: createdOrUpdatedProject,
       ticket: createdTicket,
       booking: createdBooking,
+      managedUser,
     },
   };
 }

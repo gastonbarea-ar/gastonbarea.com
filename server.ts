@@ -2275,6 +2275,16 @@ app.put('/api/crm/contacts/:id', requireAdminAuth, async (req, res) => {
   };
   cachedCrmContacts[idx] = updated;
 
+  // If access was revoked, immediately invalidate any active client portal sessions for this email
+  if (updated.portalAccessStatus === 'revoked' && updated.email) {
+    const lowerRevokedEmail = updated.email.toLowerCase();
+    for (const [tok, sess] of activeClientSessions.entries()) {
+      if ((sess.email || '').toLowerCase() === lowerRevokedEmail) {
+        activeClientSessions.delete(tok);
+      }
+    }
+  }
+
   if (supabase) {
     try {
       await supabase
@@ -2306,6 +2316,15 @@ app.put('/api/crm/contacts/:id', requireAdminAuth, async (req, res) => {
 
 app.delete('/api/crm/contacts/:id', requireAdminAuth, async (req, res) => {
   const { id } = req.params;
+  const targetContact = cachedCrmContacts.find((c) => c.id === id);
+  if (targetContact?.email) {
+    const lowerDeletedEmail = targetContact.email.toLowerCase();
+    for (const [tok, sess] of activeClientSessions.entries()) {
+      if ((sess.email || '').toLowerCase() === lowerDeletedEmail) {
+        activeClientSessions.delete(tok);
+      }
+    }
+  }
   cachedCrmContacts = cachedCrmContacts.filter((c) => c.id !== id);
 
   if (supabase) {
@@ -3463,6 +3482,13 @@ function getClientFromRequest(req: express.Request) {
   if (token && activeClientSessions.has(token)) {
     const session = activeClientSessions.get(token)!;
     if (Date.now() < session.expiresAt) {
+      const matchedContact = cachedCrmContacts.find(
+        (c) => c.email.toLowerCase() === (session.email || '').toLowerCase()
+      );
+      if (matchedContact && matchedContact.portalAccessStatus === 'revoked') {
+        activeClientSessions.delete(token);
+        return null;
+      }
       return session;
     } else {
       activeClientSessions.delete(token);
@@ -3475,6 +3501,9 @@ function getClientFromRequest(req: express.Request) {
     const normalizedEmail = email.toLowerCase().trim();
     const matchedContact = cachedCrmContacts.find((c) => c.email.toLowerCase() === normalizedEmail);
     if (matchedContact) {
+      if (matchedContact.portalAccessStatus === 'revoked') {
+        return null;
+      }
       return {
         id: matchedContact.id,
         email: matchedContact.email,
@@ -3562,6 +3591,14 @@ app.post('/api/client/auth/login', async (req, res) => {
   const matchedContact = cachedCrmContacts.find(
     (c) => c.username.toLowerCase() === identifier || c.email.toLowerCase() === identifier
   );
+
+  if (matchedContact && matchedContact.portalAccessStatus === 'revoked') {
+    return res.status(403).json({
+      success: false,
+      error:
+        'Tu cuenta de usuario en el Portal de Clientes se encuentra suspendida temporalmente. Contactá a administración para habilitar el acceso.',
+    });
+  }
 
   // Also check static CLIENT_ACCOUNTS fallback
   const matchedAccount = CLIENT_ACCOUNTS.find(
@@ -5036,6 +5073,190 @@ function buildAdminArnStoreAdapter() {
         currency: quote.currency,
         quoteNumber: quote.quoteNumber,
       });
+    },
+    onManagePortalUser: async ({ action, email, fullName, companyName, password, phone }: any) => {
+      const normalizedEmail = (email || '').toLowerCase().trim();
+      if (action === 'list_users') {
+        const total = cachedCrmContacts.length;
+        const activeCount = cachedCrmContacts.filter(
+          (c) => c.portalAccessStatus !== 'revoked'
+        ).length;
+        const blockedCount = cachedCrmContacts.filter(
+          (c) => c.portalAccessStatus === 'revoked'
+        ).length;
+        return {
+          success: true,
+          summary: `Padrón de Usuarios del Portal auditado: ${total} usuarios registrados (${activeCount} activos, ${blockedCount} suspendidos/bloqueados).`,
+          users: cachedCrmContacts,
+        };
+      }
+
+      const idx = cachedCrmContacts.findIndex(
+        (c) => c.email.toLowerCase() === normalizedEmail
+      );
+
+      if (action === 'block_user') {
+        if (idx === -1) {
+          return {
+            success: false,
+            summary: `No se encontró un usuario registrado con el correo ${normalizedEmail} para bloquear.`,
+          };
+        }
+        const updated = {
+          ...cachedCrmContacts[idx],
+          portalAccessStatus: 'revoked' as const,
+          updatedAt: new Date().toISOString(),
+        };
+        cachedCrmContacts[idx] = updated;
+        for (const [tok, sess] of activeClientSessions.entries()) {
+          if ((sess.email || '').toLowerCase() === normalizedEmail) {
+            activeClientSessions.delete(tok);
+          }
+        }
+        if (supabase) {
+          try {
+            await supabase
+              .from('crm_contacts')
+              .update({
+                portal_access_status: 'revoked',
+                updated_at: updated.updatedAt,
+              })
+              .eq('id', updated.id);
+          } catch {
+            // non-blocking
+          }
+        }
+        return {
+          success: true,
+          summary: `Acceso al Portal de Clientes BLOQUEADO (revoked) y sesiones cerradas para ${updated.fullName} (${updated.email}).`,
+          contact: updated,
+        };
+      }
+
+      if (action === 'activate_user') {
+        if (idx === -1) {
+          return {
+            success: false,
+            summary: `No se encontró un usuario registrado con el correo ${normalizedEmail} para reactivar.`,
+          };
+        }
+        const updated = {
+          ...cachedCrmContacts[idx],
+          portalAccessStatus: 'active' as const,
+          updatedAt: new Date().toISOString(),
+        };
+        cachedCrmContacts[idx] = updated;
+        if (supabase) {
+          try {
+            await supabase
+              .from('crm_contacts')
+              .update({
+                portal_access_status: 'active',
+                updated_at: updated.updatedAt,
+              })
+              .eq('id', updated.id);
+          } catch {
+            // non-blocking
+          }
+        }
+        return {
+          success: true,
+          summary: `Acceso al Portal de Clientes HABILITADO (active) para ${updated.fullName} (${updated.email}).`,
+          contact: updated,
+        };
+      }
+
+      if (action === 'reset_password') {
+        if (idx === -1) {
+          return {
+            success: false,
+            summary: `No se encontró un usuario registrado con el correo ${normalizedEmail} para blanquear contraseña.`,
+          };
+        }
+        const newPassword = (password || 'cliente2026').trim();
+        const updated = {
+          ...cachedCrmContacts[idx],
+          password: newPassword,
+          portalAccessStatus: 'active' as const,
+          updatedAt: new Date().toISOString(),
+        };
+        cachedCrmContacts[idx] = updated;
+        if (supabase) {
+          try {
+            await supabase
+              .from('crm_contacts')
+              .update({
+                password: newPassword,
+                portal_access_status: 'active',
+                updated_at: updated.updatedAt,
+              })
+              .eq('id', updated.id);
+          } catch {
+            // non-blocking
+          }
+        }
+        return {
+          success: true,
+          summary: `Contraseña de acceso al Portal actualizada (${newPassword}) y cuenta habilitada para ${updated.fullName} (${updated.email}).`,
+          contact: updated,
+        };
+      }
+
+      // action === 'create_user'
+      const synced = syncContactAndCompanyFromOpportunity({
+        clientName: fullName || 'Usuario Registrado',
+        clientEmail: normalizedEmail,
+        clientPhone: phone || '',
+        company: companyName || 'Contacto Individual',
+        stage: 'lead',
+      });
+      const createdIdx = cachedCrmContacts.findIndex(
+        (c) =>
+          (synced.contactId && c.id === synced.contactId) ||
+          c.email.toLowerCase() === normalizedEmail
+      );
+      if (createdIdx !== -1) {
+        cachedCrmContacts[createdIdx] = {
+          ...cachedCrmContacts[createdIdx],
+          password: (password || cachedCrmContacts[createdIdx].password || 'cliente2026').trim(),
+          portalAccessStatus: 'active' as const,
+          updatedAt: new Date().toISOString(),
+        };
+        const createdUser = cachedCrmContacts[createdIdx];
+        if (supabase) {
+          try {
+            await supabase.from('crm_contacts').upsert({
+              id: createdUser.id,
+              full_name: createdUser.fullName,
+              email: createdUser.email,
+              username: createdUser.username,
+              password: createdUser.password,
+              phone: createdUser.phone || null,
+              role_title: createdUser.roleTitle,
+              contact_type: createdUser.contactType,
+              company_id: createdUser.companyId || null,
+              company_name: createdUser.companyName || null,
+              portal_access_status: 'active',
+              has_active_service: Boolean(createdUser.hasActiveService),
+              notes: createdUser.notes || null,
+              created_at: createdUser.createdAt,
+              updated_at: createdUser.updatedAt,
+            });
+          } catch {
+            // non-blocking
+          }
+        }
+        return {
+          success: true,
+          summary: `Usuario registrado y habilitado en el Portal de Clientes: ${createdUser.fullName} (${createdUser.email} · Clave: ${createdUser.password}).`,
+          contact: createdUser,
+        };
+      }
+
+      return {
+        success: false,
+        summary: `No se pudo registrar el usuario ${normalizedEmail}.`,
+      };
     },
   };
 }

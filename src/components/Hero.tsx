@@ -633,34 +633,27 @@ export const Hero: React.FC<HeroProps> = ({
                 </p>
               </div>
 
-              {/* Primary Highlight: Access Portal or Jump to Authenticated ARN Console */}
+              {/* Primary Highlight: Access Portal to Register with Email & Start ARN Process */}
               <div className="p-3.5 bg-emerald-400/10 border border-emerald-400/40 space-y-2.5">
                 <div className="flex items-center justify-between gap-2 text-[11px] font-mono text-emerald-300 font-bold">
                   <span className="inline-flex items-center gap-1.5">
                     <Zap className="w-3.5 h-3.5 text-emerald-400" />
                     <span>
                       {isClientLoggedIn
-                        ? 'SESIÓN ACTIVA · STOCK ARN HABILITADO'
-                        : 'ACCESO EXCLUSIVO · PORTAL CLIENTES ARN'}
+                        ? 'SESIÓN ACTIVA · CONTINUAR PROCESO EN PORTAL'
+                        : 'SERVICIO PROTEGIDO · REGISTRO CON TU CORREO'}
                     </span>
                   </span>
-                  <span>{isClientLoggedIn ? 'CONECTADO' : 'REQUIERE SESIÓN'}</span>
+                  <span>{isClientLoggedIn ? 'CONECTADO' : 'REGISTRO REQUERIDO'}</span>
                 </div>
                 <p className="text-xs text-neutral-200 leading-relaxed">
                   {isClientLoggedIn
-                    ? 'Tu sesión está activa. Ya podés usar el cotizador de Stock ARN en el Home o abrir tu Portal de Clientes (#portal).'
-                    : 'El cotizador de servicios del Stock ARN y el tratamiento de presupuestos 40/40/20 sólo son visibles para usuarios registrados con sesión iniciada.'}
+                    ? 'Tu cuenta está verificada. Ingresá a tu Portal de Clientes (#portal) para seleccionar tu servicio del Stock ARN y gestionar tu presupuesto 40/40/20.'
+                    : 'Este servicio se encuentra oculto en la portada: registrate en el sitio con tu correo electrónico dentro del Portal de Clientes para iniciar el proceso y cotizar en escala 40/40/20.'}
                 </p>
                 <button
                   type="button"
                   onClick={() => {
-                    if (isClientLoggedIn) {
-                      const el = document.getElementById('arn-home-client-intake');
-                      if (el) {
-                        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                        return;
-                      }
-                    }
                     if (onClientPortalClick) {
                       onClientPortalClick();
                     }
@@ -669,8 +662,8 @@ export const Hero: React.FC<HeroProps> = ({
                 >
                   <span>
                     {isClientLoggedIn
-                      ? 'Ir al Cotizador de Stock ARN (Sesión Activa)'
-                      : 'Iniciar Sesión / Registrarme en Portal Clientes'}
+                      ? 'Abrir Mi Portal de Clientes e Iniciar Proceso ARN'
+                      : 'Registrarme con mi Correo e Iniciar Proceso en Portal'}
                   </span>
                   <ArrowRight className="w-4 h-4 shrink-0" />
                 </button>
@@ -780,41 +773,11 @@ export const Hero: React.FC<HeroProps> = ({
       </div>
 
       {/* =====================================================================
-          BLOQUE 1.5 (EXCLUSIVO PARA USUARIOS REGISTRADOS Y CON SESIÓN INICIADA):
-          INTERACCIÓN DIRECTA CON STOCK DE SERVICIOS ARN & PRESUPUESTO 40/40/20
+          BLOQUE 1.5 OCULTO EN PORTADA (SOLO ACCESIBLE TRAS REGISTRO EN #PORTAL)
+          El proceso del servicio ARN comienza exclusivamente dentro del Portal
+          una vez que el usuario se registra con su correo electrónico.
          ===================================================================== */}
-      {isClientLoggedIn && (
-        <div
-          id="arn-home-client-intake"
-          className="w-full px-4 sm:px-8 lg:px-12 py-10 sm:py-14 bg-[#0B0D17] border-b border-white/10 scroll-mt-20"
-        >
-          <div className="w-full space-y-5 text-left">
-            <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4">
-              <div className="space-y-1.5 max-w-3xl">
-                <div className="text-xs font-mono text-emerald-400 font-bold uppercase tracking-wider">
-                  SESIÓN INICIADA EN PORTAL · TRATAMIENTO DE PRESUPUESTOS ARN (MICRO / PYME / GRANDE)
-                </div>
-                <h2
-                  className="font-display text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight text-white"
-                  style={{ textWrap: 'balance' }}
-                >
-                  Seleccioná tu servicio del Stock ARN y generá tu presupuesto 40/40/20.
-                </h2>
-              </div>
-              <p className="text-xs sm:text-sm text-neutral-300 max-w-md leading-relaxed">
-                Esta sección es visible únicamente porque tenés sesión iniciada como usuario registrado. Elegí el servicio y la cantidad de empleados de tu empresa para tratar tu presupuesto en tu Portal.
-              </p>
-            </div>
-
-            <ArnClientIntakeWidget
-              variant="hero-dark"
-              onOpenPortalWithSession={onClientPortalClick}
-              onScheduleClick={onScheduleClick}
-              onWhatsAppClick={onWhatsAppClick}
-            />
-          </div>
-        </div>
-      )}
+      <div id="arn-home-client-intake" className="hidden" aria-hidden="true" />
 
       {/* BLOQUE 2: BUSCADOR Y ESTRUCTURADOR DE SOLUCIONES CON IA */}
       <div className="w-full px-4 sm:px-8 lg:px-12 xl:px-12 py-14 md:py-20 bg-[#F7F7FA]">

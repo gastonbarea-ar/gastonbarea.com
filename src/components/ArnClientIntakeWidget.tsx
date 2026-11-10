@@ -566,44 +566,30 @@ export const ArnClientIntakeWidget: React.FC<ArnClientIntakeWidgetProps> = ({
           >
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
               <div className="flex items-center gap-2 text-xs sm:text-sm font-bold">
-                <UserPlus className="w-4 h-4 text-emerald-400 shrink-0" />
+                <UserCheck className="w-4 h-4 text-emerald-400 shrink-0" />
                 <span>
-                  3. Confirmá los datos de tu cuenta activa para emitir y tratar tu Presupuesto 40/40/20 en el Portal:
+                  {variant === 'portal-compact' && email
+                    ? `3. Cuenta registrada activa (${email}) · Iniciá el proceso 40/40/20 para tu empresa:`
+                    : '3. Confirmá los datos de tu cuenta registrada para iniciar el proceso 40/40/20 en el Portal:'}
                 </span>
               </div>
-              <span className="text-[11px] font-mono opacity-75">
-                Sesión verificada · Sin envío de emails públicos
+              <span className="text-[11px] font-mono text-emerald-400">
+                Usuario registrado · Proceso vinculado a {email || 'tu correo'}
               </span>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
-              <div>
-                <label className="block text-[11px] font-mono uppercase opacity-75 mb-1">
-                  Nombre y Apellido *
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={fullName}
-                  onChange={(e) => {
-                    setFullName(e.target.value);
-                    if (errorMsg) setErrorMsg('');
-                  }}
-                  placeholder="Ej: Martín Rodríguez"
-                  className={`w-full px-3 py-2.5 min-h-[44px] text-xs border focus:outline-none ${
-                    isDark || variant === 'portal-compact'
-                      ? 'bg-black/60 text-white placeholder:text-neutral-400 border-white/20 focus:border-emerald-400'
-                      : 'bg-white text-slate-900 placeholder:text-slate-400 border-slate-300 focus:border-[#291B64]'
-                  }`}
-                />
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-mono uppercase opacity-75 mb-1">
-                  Empresa / Razón Social *
-                </label>
-                <div className="relative">
-                  <Building2 className="w-3.5 h-3.5 opacity-50 absolute left-3 top-1/2 -translate-y-1/2" />
+            {variant === 'portal-compact' && email && fullName ? (
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-2.5 items-center">
+                <div className="md:col-span-4 p-2.5 bg-emerald-400/10 border border-emerald-400/30 text-xs font-mono text-emerald-200 flex items-center justify-between gap-2">
+                  <div className="truncate">
+                    <span className="font-bold text-white">{fullName}</span> · {email}
+                  </div>
+                  <span className="px-1.5 py-0.5 text-[10px] bg-emerald-400 text-emerald-950 font-bold shrink-0">
+                    VERIFICADO
+                  </span>
+                </div>
+                <div className="md:col-span-4 relative">
+                  <Building2 className="w-3.5 h-3.5 opacity-50 absolute left-3 top-1/2 -translate-y-1/2 text-white" />
                   <input
                     type="text"
                     required
@@ -612,124 +598,210 @@ export const ArnClientIntakeWidget: React.FC<ArnClientIntakeWidgetProps> = ({
                       setCompanyName(e.target.value);
                       if (errorMsg) setErrorMsg('');
                     }}
-                    placeholder="Ej: Bodega Austral S.A."
-                    className={`w-full pl-8 pr-3 py-2.5 min-h-[44px] text-xs border focus:outline-none ${
-                      isDark || variant === 'portal-compact'
-                        ? 'bg-black/60 text-white placeholder:text-neutral-400 border-white/20 focus:border-emerald-400'
-                        : 'bg-white text-slate-900 placeholder:text-slate-400 border-slate-300 focus:border-[#291B64]'
-                    }`}
+                    placeholder="Empresa / Razón Social *"
+                    className="w-full pl-8 pr-3 py-2.5 min-h-[44px] text-xs border bg-black/60 text-white placeholder:text-neutral-400 border-white/20 focus:border-emerald-400 focus:outline-none"
                   />
                 </div>
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-mono uppercase opacity-75 mb-1">
-                  Email Corporativo (Usuario) *
-                </label>
-                <input
-                  type="email"
-                  required
-                  value={email}
-                  onChange={(e) => {
-                    setEmail(e.target.value);
-                    if (errorMsg) setErrorMsg('');
-                  }}
-                  placeholder="tu-nombre@empresa.com"
-                  className={`w-full px-3 py-2.5 min-h-[44px] text-xs font-mono border focus:outline-none ${
-                    isDark || variant === 'portal-compact'
-                      ? 'bg-black/60 text-white placeholder:text-neutral-400 border-white/20 focus:border-emerald-400'
-                      : 'bg-white text-slate-900 placeholder:text-slate-400 border-slate-300 focus:border-[#291B64]'
-                  }`}
-                />
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-mono uppercase opacity-75 mb-1">
-                  Clave de Acceso al Portal *
-                </label>
-                <div className="relative">
-                  <KeyRound className="w-3.5 h-3.5 opacity-50 absolute left-3 top-1/2 -translate-y-1/2" />
+                <div className="md:col-span-4 flex items-stretch gap-1.5">
                   <input
                     type="text"
-                    required
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Creá tu clave"
-                    className={`w-full pl-8 pr-3 py-2.5 min-h-[44px] text-xs font-mono border focus:outline-none ${
-                      isDark || variant === 'portal-compact'
-                        ? 'bg-black/60 text-white placeholder:text-neutral-400 border-white/20 focus:border-emerald-400'
-                        : 'bg-white text-slate-900 placeholder:text-slate-400 border-slate-300 focus:border-[#291B64]'
-                    }`}
+                    value={message}
+                    onChange={(e) => setMessage(e.target.value)}
+                    placeholder="Alcance específico o nota (opcional)..."
+                    className="flex-1 min-h-[44px] px-3 py-2.5 text-xs border bg-black/60 text-white placeholder:text-neutral-400 border-white/20 focus:border-emerald-400 focus:outline-none"
                   />
+                  <button
+                    type="button"
+                    onClick={toggleVoiceDictation}
+                    title="Dictar requerimiento por voz"
+                    className={`px-3 min-h-[44px] shrink-0 inline-flex items-center justify-center border transition-colors cursor-pointer ${
+                      isListeningVoice
+                        ? 'bg-rose-600 text-white border-rose-500 animate-pulse'
+                        : 'bg-white/10 hover:bg-white/20 text-emerald-300 border-white/20'
+                    }`}
+                  >
+                    {isListeningVoice ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+                  </button>
+                </div>
+                <div className="md:col-span-12 pt-1">
+                  <button
+                    type="submit"
+                    disabled={isSubmitting}
+                    className="w-full min-h-[46px] px-5 py-3 text-xs sm:text-sm font-mono font-bold text-emerald-950 bg-emerald-400 hover:bg-emerald-300 transition-colors inline-flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 shadow-lg"
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <RefreshCw className="w-4 h-4 animate-spin shrink-0" />
+                        <span>Generando Presupuesto 40/40/20 en tu Cuenta...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="w-4 h-4 shrink-0" />
+                        <span>Iniciar Proceso y Emitir Presupuesto 40/40/20 en Mi Cuenta ({email})</span>
+                        <ArrowRight className="w-4 h-4 shrink-0" />
+                      </>
+                    )}
+                  </button>
                 </div>
               </div>
-            </div>
+            ) : (
+              <>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+                  <div>
+                    <label className="block text-[11px] font-mono uppercase opacity-75 mb-1">
+                      Nombre y Apellido *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={fullName}
+                      onChange={(e) => {
+                        setFullName(e.target.value);
+                        if (errorMsg) setErrorMsg('');
+                      }}
+                      placeholder="Ej: Martín Rodríguez"
+                      className={`w-full px-3 py-2.5 min-h-[44px] text-xs border focus:outline-none ${
+                        isDark || variant === 'portal-compact'
+                          ? 'bg-black/60 text-white placeholder:text-neutral-400 border-white/20 focus:border-emerald-400'
+                          : 'bg-white text-slate-900 placeholder:text-slate-400 border-slate-300 focus:border-[#291B64]'
+                      }`}
+                    />
+                  </div>
 
-            {/* Optional Context / WhatsApp + Submit */}
-            <div className="grid grid-cols-1 md:grid-cols-12 gap-2.5 items-stretch pt-1">
-              <div className="md:col-span-3">
-                <input
-                  type="text"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  placeholder="WhatsApp (opcional: +54 9...)"
-                  className={`w-full h-full min-h-[46px] px-3 py-2.5 text-xs font-mono border focus:outline-none ${
-                    isDark || variant === 'portal-compact'
-                      ? 'bg-black/60 text-white placeholder:text-neutral-400 border-white/20 focus:border-emerald-400'
-                      : 'bg-white text-slate-900 placeholder:text-slate-400 border-slate-300 focus:border-[#291B64]'
-                  }`}
-                />
-              </div>
+                  <div>
+                    <label className="block text-[11px] font-mono uppercase opacity-75 mb-1">
+                      Empresa / Razón Social *
+                    </label>
+                    <div className="relative">
+                      <Building2 className="w-3.5 h-3.5 opacity-50 absolute left-3 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="text"
+                        required
+                        value={companyName}
+                        onChange={(e) => {
+                          setCompanyName(e.target.value);
+                          if (errorMsg) setErrorMsg('');
+                        }}
+                        placeholder="Ej: Bodega Austral S.A."
+                        className={`w-full pl-8 pr-3 py-2.5 min-h-[44px] text-xs border focus:outline-none ${
+                          isDark || variant === 'portal-compact'
+                            ? 'bg-black/60 text-white placeholder:text-neutral-400 border-white/20 focus:border-emerald-400'
+                            : 'bg-white text-slate-900 placeholder:text-slate-400 border-slate-300 focus:border-[#291B64]'
+                        }`}
+                      />
+                    </div>
+                  </div>
 
-              <div className="md:col-span-4 flex items-stretch gap-1.5">
-                <input
-                  type="text"
-                  value={message}
-                  onChange={(e) => setMessage(e.target.value)}
-                  placeholder="Nota adicional o requerimiento específico (opcional)..."
-                  className={`flex-1 min-h-[46px] px-3 py-2.5 text-xs border focus:outline-none ${
-                    isDark || variant === 'portal-compact'
-                      ? 'bg-black/60 text-white placeholder:text-neutral-400 border-white/20 focus:border-emerald-400'
-                      : 'bg-white text-slate-900 placeholder:text-slate-400 border-slate-300 focus:border-[#291B64]'
-                  }`}
-                />
-                <button
-                  type="button"
-                  onClick={toggleVoiceDictation}
-                  title="Dictar requerimiento por voz"
-                  className={`px-3 min-h-[46px] shrink-0 inline-flex items-center justify-center border transition-colors cursor-pointer ${
-                    isListeningVoice
-                      ? 'bg-rose-600 text-white border-rose-500 animate-pulse'
-                      : isDark || variant === 'portal-compact'
-                      ? 'bg-white/10 hover:bg-white/20 text-emerald-300 border-white/20'
-                      : 'bg-slate-100 hover:bg-slate-200 text-[#291B64] border-slate-300'
-                  }`}
-                >
-                  {isListeningVoice ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
-                </button>
-              </div>
+                  <div>
+                    <label className="block text-[11px] font-mono uppercase opacity-75 mb-1">
+                      Email Corporativo (Usuario) *
+                    </label>
+                    <input
+                      type="email"
+                      required
+                      value={email}
+                      onChange={(e) => {
+                        setEmail(e.target.value);
+                        if (errorMsg) setErrorMsg('');
+                      }}
+                      placeholder="tu-nombre@empresa.com"
+                      className={`w-full px-3 py-2.5 min-h-[44px] text-xs font-mono border focus:outline-none ${
+                        isDark || variant === 'portal-compact'
+                          ? 'bg-black/60 text-white placeholder:text-neutral-400 border-white/20 focus:border-emerald-400'
+                          : 'bg-white text-slate-900 placeholder:text-slate-400 border-slate-300 focus:border-[#291B64]'
+                      }`}
+                    />
+                  </div>
 
-              <div className="md:col-span-5">
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="w-full h-full min-h-[46px] px-5 py-3 text-xs sm:text-sm font-mono font-bold text-emerald-950 bg-emerald-400 hover:bg-emerald-300 transition-colors inline-flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 shadow-lg"
-                >
-                  {isSubmitting ? (
-                    <>
-                      <RefreshCw className="w-4 h-4 animate-spin shrink-0" />
-                      <span>Registrando Cuenta y Abriendo Portal...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles className="w-4 h-4 shrink-0" />
-                      <span>Registrarme y Tratar Presupuesto 40/40/20 en Mi Portal</span>
-                      <ArrowRight className="w-4 h-4 shrink-0" />
-                    </>
-                  )}
-                </button>
-              </div>
-            </div>
+                  <div>
+                    <label className="block text-[11px] font-mono uppercase opacity-75 mb-1">
+                      Clave de Acceso al Portal *
+                    </label>
+                    <div className="relative">
+                      <KeyRound className="w-3.5 h-3.5 opacity-50 absolute left-3 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="text"
+                        required
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        placeholder="Creá tu clave"
+                        className={`w-full pl-8 pr-3 py-2.5 min-h-[44px] text-xs font-mono border focus:outline-none ${
+                          isDark || variant === 'portal-compact'
+                            ? 'bg-black/60 text-white placeholder:text-neutral-400 border-white/20 focus:border-emerald-400'
+                            : 'bg-white text-slate-900 placeholder:text-slate-400 border-slate-300 focus:border-[#291B64]'
+                        }`}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Optional Context / WhatsApp + Submit */}
+                <div className="grid grid-cols-1 md:grid-cols-12 gap-2.5 items-stretch pt-1">
+                  <div className="md:col-span-3">
+                    <input
+                      type="text"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      placeholder="WhatsApp (opcional: +54 9...)"
+                      className={`w-full h-full min-h-[46px] px-3 py-2.5 text-xs font-mono border focus:outline-none ${
+                        isDark || variant === 'portal-compact'
+                          ? 'bg-black/60 text-white placeholder:text-neutral-400 border-white/20 focus:border-emerald-400'
+                          : 'bg-white text-slate-900 placeholder:text-slate-400 border-slate-300 focus:border-[#291B64]'
+                      }`}
+                    />
+                  </div>
+
+                  <div className="md:col-span-4 flex items-stretch gap-1.5">
+                    <input
+                      type="text"
+                      value={message}
+                      onChange={(e) => setMessage(e.target.value)}
+                      placeholder="Nota adicional o requerimiento específico (opcional)..."
+                      className={`flex-1 min-h-[46px] px-3 py-2.5 text-xs border focus:outline-none ${
+                        isDark || variant === 'portal-compact'
+                          ? 'bg-black/60 text-white placeholder:text-neutral-400 border-white/20 focus:border-emerald-400'
+                          : 'bg-white text-slate-900 placeholder:text-slate-400 border-slate-300 focus:border-[#291B64]'
+                      }`}
+                    />
+                    <button
+                      type="button"
+                      onClick={toggleVoiceDictation}
+                      title="Dictar requerimiento por voz"
+                      className={`px-3 min-h-[46px] shrink-0 inline-flex items-center justify-center border transition-colors cursor-pointer ${
+                        isListeningVoice
+                          ? 'bg-rose-600 text-white border-rose-500 animate-pulse'
+                          : isDark || variant === 'portal-compact'
+                          ? 'bg-white/10 hover:bg-white/20 text-emerald-300 border-white/20'
+                          : 'bg-slate-100 hover:bg-slate-200 text-[#291B64] border-slate-300'
+                      }`}
+                    >
+                      {isListeningVoice ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+                    </button>
+                  </div>
+
+                  <div className="md:col-span-5">
+                    <button
+                      type="submit"
+                      disabled={isSubmitting}
+                      className="w-full h-full min-h-[46px] px-5 py-3 text-xs sm:text-sm font-mono font-bold text-emerald-950 bg-emerald-400 hover:bg-emerald-300 transition-colors inline-flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 shadow-lg"
+                    >
+                      {isSubmitting ? (
+                        <>
+                          <RefreshCw className="w-4 h-4 animate-spin shrink-0" />
+                          <span>Registrando Cuenta y Abriendo Portal...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="w-4 h-4 shrink-0" />
+                          <span>Registrarme y Tratar Presupuesto 40/40/20 en Mi Portal</span>
+                          <ArrowRight className="w-4 h-4 shrink-0" />
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
 
           {errorMsg && (

@@ -34,6 +34,7 @@ import {
   Copy,
   Check,
   Layers,
+  UserCheck,
 } from 'lucide-react';
 import {
   Opportunity,
@@ -717,6 +718,62 @@ export const CrmDashboard: React.FC<CrmDashboardProps> = ({
     }
   };
 
+  const handleTogglePortalUserAccess = async (cnt: CrmContact) => {
+    const nextStatus: CrmContact['portalAccessStatus'] =
+      cnt.portalAccessStatus === 'revoked' ? 'active' : 'revoked';
+    const updatedContact: CrmContact = {
+      ...cnt,
+      portalAccessStatus: nextStatus,
+      updatedAt: new Date().toISOString(),
+    };
+    setContacts((prev) => prev.map((c) => (c.id === cnt.id ? updatedContact : c)));
+    try {
+      await fetch(`/api/crm/contacts/${cnt.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-passkey': passkey,
+        },
+        body: JSON.stringify(updatedContact),
+      });
+      setCopiedNotification(
+        nextStatus === 'revoked'
+          ? `Acceso al Portal BLOQUEADO y sesiones revocadas para ${cnt.fullName} (${cnt.email}).`
+          : `Acceso al Portal HABILITADO para ${cnt.fullName} (${cnt.email}).`
+      );
+      setTimeout(() => setCopiedNotification(null), 4000);
+    } catch (err) {
+      console.error('Error toggling user portal access:', err);
+    }
+  };
+
+  const handleResetPortalUserPassword = async (cnt: CrmContact) => {
+    const newPassword = `portal${Math.floor(1000 + Math.random() * 9000)}`;
+    const updatedContact: CrmContact = {
+      ...cnt,
+      password: newPassword,
+      portalAccessStatus: 'active',
+      updatedAt: new Date().toISOString(),
+    };
+    setContacts((prev) => prev.map((c) => (c.id === cnt.id ? updatedContact : c)));
+    try {
+      await fetch(`/api/crm/contacts/${cnt.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-passkey': passkey,
+        },
+        body: JSON.stringify(updatedContact),
+      });
+      setCopiedNotification(
+        `Clave de Portal blanqueada para ${cnt.fullName} (${cnt.email}) -> Nueva clave: ${newPassword}`
+      );
+      setTimeout(() => setCopiedNotification(null), 5000);
+    } catch (err) {
+      console.error('Error resetting user password:', err);
+    }
+  };
+
   const handleStageChange = async (oppId: string, newStage: OpportunityStage) => {
     const updated = opportunities.map((o) => {
       if (o.id === oppId) {
@@ -1134,15 +1191,34 @@ export const CrmDashboard: React.FC<CrmDashboardProps> = ({
 
             <button
               type="button"
-              onClick={() => setActiveTab('directory')}
+              onClick={() => {
+                setActiveTab('directory');
+                setDirectorySubView('contacts');
+              }}
               className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-2 cursor-pointer transition-all whitespace-nowrap ${
-                activeTab === 'directory'
+                activeTab === 'directory' && directorySubView === 'contacts'
+                  ? 'bg-[#291B64] text-white shadow-2xs'
+                  : 'text-indigo-900 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200'
+              }`}
+            >
+              <UserCheck className="w-4 h-4" />
+              <span>Usuarios del Portal & Accesos ({contacts.length})</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setActiveTab('directory');
+                setDirectorySubView('companies');
+              }}
+              className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-2 cursor-pointer transition-all whitespace-nowrap ${
+                activeTab === 'directory' && directorySubView === 'companies'
                   ? 'bg-[#291B64] text-white shadow-2xs'
                   : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
               }`}
             >
               <Building2 className="w-4 h-4" />
-              <span>Red de Nodos: Empresas ({companies.length}) & Contactos ({contacts.length})</span>
+              <span>Red de Nodos: Empresas ({companies.length})</span>
             </button>
 
             <button
@@ -1302,6 +1378,30 @@ export const CrmDashboard: React.FC<CrmDashboardProps> = ({
                 </div>
 
                 <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-mono">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      handleExecuteArnCommand(
+                        undefined,
+                        'Registrar usuario para Sofía Méndez de Grupo Sur S.A., correo sofia@gruposur.com.ar, clave: sur2026'
+                      )
+                    }
+                    className="px-2.5 py-1 bg-indigo-500/30 hover:bg-indigo-500/45 border border-indigo-400/40 text-indigo-200 transition-colors cursor-pointer whitespace-nowrap"
+                  >
+                    + Agente IA: Registrar Usuario Portal
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      handleExecuteArnCommand(
+                        undefined,
+                        'Auditar usuarios registrados en el Portal de Clientes y verificar accesos activos'
+                      )
+                    }
+                    className="px-2.5 py-1 bg-white/10 hover:bg-white/20 text-emerald-300 transition-colors cursor-pointer whitespace-nowrap"
+                  >
+                    Agente IA: Auditar Usuarios Portal
+                  </button>
                   <button
                     type="button"
                     onClick={() =>
@@ -2446,130 +2546,170 @@ export const CrmDashboard: React.FC<CrmDashboardProps> = ({
               </div>
             )}
 
-            {/* SUB-VIEW 2: CONTACTOS INDIVIDUALES Y TODOS LOS USUARIOS DEL PORTAL */}
+            {/* SUB-VIEW 2: SISTEMA DE USUARIOS REGISTRADOS EN EL PORTAL CLIENTES */}
             {directorySubView === 'contacts' && (
-              <div className="border border-slate-200/90 rounded-2xl bg-white overflow-hidden shadow-2xs">
-                <table className="w-full text-left text-xs border-collapse">
-                  <thead>
-                    <tr className="bg-slate-100/80 text-slate-700 font-mono text-[11px] uppercase tracking-wider border-b border-slate-200">
-                      <th className="py-3 px-4">Contacto / Rol</th>
-                      <th className="py-3 px-4">Modalidad / Corporación</th>
-                      <th className="py-3 px-4">Credenciales Portal Clientes</th>
-                      <th className="py-3 px-4 text-center">Estado de Servicio</th>
-                      <th className="py-3 px-4 text-right">Acciones CRM & Pipeline</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 text-slate-700">
-                    {contacts
-                      .filter((cnt) => {
-                        const matchesSearch =
-                          !searchQuery ||
-                          cnt.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          cnt.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          cnt.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          (cnt.companyName && cnt.companyName.toLowerCase().includes(searchQuery.toLowerCase()));
+              <div className="space-y-3">
+                <div className="p-3.5 rounded-2xl bg-indigo-50/70 border border-indigo-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                  <div className="space-y-0.5">
+                    <div className="font-mono text-[11px] font-bold text-indigo-900 uppercase">
+                      SISTEMA DE USUARIOS DEL PORTAL CLIENTES (#PORTAL) · ADMINISTRABLE POR PANEL Y AGENTE IA
+                    </div>
+                    <p className="text-slate-600">
+                      Cada usuario registrado con su correo electrónico inicia acá su proceso ARN 40/40/20. Podés habilitar/suspender su acceso en 1 clic, blanquear su clave o indicarle al Agente IA: <em>&ldquo;Registrar usuario...&rdquo;</em>, <em>&ldquo;Bloquear acceso para email@...&rdquo;</em> o <em>&ldquo;Reactivar usuario email@...&rdquo;</em>.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0 font-mono text-[11px]">
+                    <span className="px-2.5 py-1 rounded-lg bg-emerald-100 text-emerald-900 font-bold">
+                      Activos: {contacts.filter((c) => c.portalAccessStatus !== 'revoked').length}
+                    </span>
+                    <span className="px-2.5 py-1 rounded-lg bg-rose-100 text-rose-900 font-bold">
+                      Bloqueados: {contacts.filter((c) => c.portalAccessStatus === 'revoked').length}
+                    </span>
+                  </div>
+                </div>
 
-                        const matchesType =
-                          contactFilterType === 'all' ||
-                          (contactFilterType === 'corporate_member' && cnt.contactType === 'corporate_member') ||
-                          (contactFilterType === 'individual' && cnt.contactType === 'individual') ||
-                          (contactFilterType === 'active_service' && cnt.hasActiveService) ||
-                          (contactFilterType === 'registered_only' && !cnt.hasActiveService);
+                <div className="border border-slate-200/90 rounded-2xl bg-white overflow-hidden shadow-2xs">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead>
+                      <tr className="bg-slate-100/80 text-slate-700 font-mono text-[11px] uppercase tracking-wider border-b border-slate-200">
+                        <th className="py-3 px-4">Usuario Registrado / Rol</th>
+                        <th className="py-3 px-4">Modalidad / Empresa</th>
+                        <th className="py-3 px-4">Correo (Login) & Clave Portal</th>
+                        <th className="py-3 px-4 text-center">Acceso & Proceso ARN</th>
+                        <th className="py-3 px-4 text-right">Administración de Cuenta & IA</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 text-slate-700">
+                      {contacts
+                        .filter((cnt) => {
+                          const matchesSearch =
+                            !searchQuery ||
+                            cnt.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                            cnt.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                            cnt.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                            (cnt.companyName && cnt.companyName.toLowerCase().includes(searchQuery.toLowerCase()));
 
-                        return matchesSearch && matchesType;
-                      })
-                      .map((cnt) => (
-                        <tr key={cnt.id} className="hover:bg-slate-50/70">
-                          <td className="py-3.5 px-4">
-                            <div className="font-bold text-slate-900">{cnt.fullName}</div>
-                            <div className="text-[11px] text-slate-500">
-                              {cnt.roleTitle} {cnt.phone ? `· ${cnt.phone}` : ''}
-                            </div>
-                          </td>
-                          <td className="py-3.5 px-4">
-                            {cnt.contactType === 'corporate_member' && cnt.companyName ? (
-                              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-900 font-semibold text-[11px] border border-indigo-200/70">
-                                <Building2 className="w-3.5 h-3.5 text-indigo-600" />
-                                <span>{cnt.companyName}</span>
-                              </div>
-                            ) : (
-                              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 text-slate-800 font-semibold text-[11px]">
-                                <User className="w-3.5 h-3.5 text-slate-600" />
-                                <span>Contacto Individual</span>
-                              </div>
-                            )}
-                          </td>
-                          <td className="py-3.5 px-4 font-mono text-[11px]">
-                            <div className="text-slate-900">
-                              Usuario: <strong className="text-blue-800">{cnt.username}</strong> · Clave:{' '}
-                              <span className="text-slate-600">{cnt.password}</span>
-                            </div>
-                            <div className="text-slate-400">{cnt.email}</div>
-                          </td>
-                          <td className="py-3.5 px-4 text-center">
-                            <span
-                              className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
-                                cnt.hasActiveService
-                                  ? 'bg-emerald-100 text-emerald-800'
-                                  : 'bg-amber-100 text-amber-800'
-                              }`}
+                          const matchesType =
+                            contactFilterType === 'all' ||
+                            (contactFilterType === 'corporate_member' && cnt.contactType === 'corporate_member') ||
+                            (contactFilterType === 'individual' && cnt.contactType === 'individual') ||
+                            (contactFilterType === 'active_service' && cnt.hasActiveService) ||
+                            (contactFilterType === 'registered_only' && !cnt.hasActiveService);
+
+                          return matchesSearch && matchesType;
+                        })
+                        .map((cnt) => {
+                          const isRevoked = cnt.portalAccessStatus === 'revoked';
+                          return (
+                            <tr
+                              key={cnt.id}
+                              className={`hover:bg-slate-50/70 ${isRevoked ? 'bg-rose-50/30 opacity-85' : ''}`}
                             >
-                              {cnt.hasActiveService
-                                ? 'Cliente c/ Servicio Activo'
-                                : 'Usuario Portal (Sin Servicio)'}
-                            </span>
-                          </td>
-                          <td className="py-3.5 px-4 text-right space-x-1.5 whitespace-nowrap">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setSelectedOpp({
-                                  id: `opp-${Date.now()}`,
-                                  title: `Propuesta Técnica - ${cnt.companyName || cnt.fullName}`,
-                                  clientName: cnt.fullName,
-                                  clientEmail: cnt.email,
-                                  clientPhone: cnt.phone || '',
-                                  company: cnt.companyName || '',
-                                  companyId: cnt.companyId,
-                                  contactId: cnt.id,
-                                  serviceCategory: 'software_architecture',
-                                  stage: 'lead',
-                                  value: 3000,
-                                  currency: 'USD',
-                                  probability: 45,
-                                  source: 'manual',
-                                  createdAt: new Date().toISOString(),
-                                  updatedAt: new Date().toISOString(),
-                                });
-                                setIsOppModalOpen(true);
-                              }}
-                              className="px-2.5 py-1 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 font-semibold text-[11px] inline-flex items-center gap-1 cursor-pointer"
-                              title="Crear Oportunidad en Pipeline para este contacto"
-                            >
-                              <TrendingUp className="w-3 h-3" />
-                              <span>+ Pipeline</span>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleOpenNewContactForm(cnt.companyId, cnt)}
-                              className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-900 cursor-pointer"
-                              title="Editar contacto"
-                            >
-                              <Edit className="w-3.5 h-3.5" />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteContact(cnt.id)}
-                              className="p-1.5 rounded-lg hover:bg-rose-50 text-slate-400 hover:text-rose-600 cursor-pointer"
-                              title="Eliminar contacto"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                  </tbody>
-                </table>
+                              <td className="py-3.5 px-4">
+                                <div className="font-bold text-slate-900">{cnt.fullName}</div>
+                                <div className="text-[11px] text-slate-500">
+                                  {cnt.roleTitle} {cnt.phone ? `· ${cnt.phone}` : ''}
+                                </div>
+                              </td>
+                              <td className="py-3.5 px-4">
+                                {cnt.contactType === 'corporate_member' && cnt.companyName ? (
+                                  <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-900 font-semibold text-[11px] border border-indigo-200/70">
+                                    <Building2 className="w-3.5 h-3.5 text-indigo-600" />
+                                    <span>{cnt.companyName}</span>
+                                  </div>
+                                ) : (
+                                  <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 text-slate-800 font-semibold text-[11px]">
+                                    <User className="w-3.5 h-3.5 text-slate-600" />
+                                    <span>Contacto Individual</span>
+                                  </div>
+                                )}
+                              </td>
+                              <td className="py-3.5 px-4 font-mono text-[11px]">
+                                <div className="text-slate-900 font-semibold">{cnt.email}</div>
+                                <div className="text-slate-500">
+                                  Usuario: <strong className="text-blue-800">{cnt.username}</strong> · Clave:{' '}
+                                  <span className="text-slate-700 font-bold">{cnt.password}</span>
+                                </div>
+                              </td>
+                              <td className="py-3.5 px-4 text-center space-y-1">
+                                <div>
+                                  <span
+                                    className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                                      isRevoked
+                                        ? 'bg-rose-100 text-rose-800 border border-rose-300'
+                                        : 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                                    }`}
+                                  >
+                                    {isRevoked ? 'Acceso Suspendido' : 'Acceso Portal Activo'}
+                                  </span>
+                                </div>
+                                <div className="text-[10px] font-mono text-slate-500">
+                                  {cnt.hasActiveService ? 'Proyecto 40/40/20 Activo' : 'Registrado para Cotizar'}
+                                </div>
+                              </td>
+                              <td className="py-3.5 px-4 text-right space-x-1.5 whitespace-nowrap">
+                                <button
+                                  type="button"
+                                  onClick={() => handleTogglePortalUserAccess(cnt)}
+                                  className={`px-2.5 py-1 rounded-lg font-semibold text-[11px] inline-flex items-center gap-1 cursor-pointer transition-colors ${
+                                    isRevoked
+                                      ? 'bg-emerald-600 text-white hover:bg-emerald-500'
+                                      : 'bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200'
+                                  }`}
+                                  title={
+                                    isRevoked
+                                      ? 'Reactivar acceso al Portal Clientes'
+                                      : 'Suspender/Bloquear acceso al Portal Clientes'
+                                  }
+                                >
+                                  <span>{isRevoked ? 'Habilitar Acceso' : 'Bloquear Acceso'}</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleResetPortalUserPassword(cnt)}
+                                  className="px-2 py-1 rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 font-mono text-[11px] inline-flex items-center gap-1 cursor-pointer"
+                                  title="Generar nueva contraseña de acceso al Portal"
+                                >
+                                  <span>Blanquear Clave</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setActiveTab('kanban');
+                                    handleExecuteArnCommand(
+                                      undefined,
+                                      `Emitir presupuesto 40/40/20 para ${cnt.fullName} de ${cnt.companyName || 'Contacto Individual'}, correo ${cnt.email}, somos 12 empleados, servicio Odoo v18 ERP`
+                                    );
+                                  }}
+                                  className="px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-800 hover:bg-indigo-100 font-semibold text-[11px] inline-flex items-center gap-1 cursor-pointer border border-indigo-200"
+                                  title="Iniciar proceso de cotización 40/40/20 con el Agente IA para este usuario"
+                                >
+                                  <Sparkles className="w-3 h-3 text-indigo-600" />
+                                  <span>Proceso IA 40/40/20</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenNewContactForm(cnt.companyId, cnt)}
+                                  className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-900 cursor-pointer"
+                                  title="Editar usuario"
+                                >
+                                  <Edit className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteContact(cnt.id)}
+                                  className="p-1.5 rounded-lg hover:bg-rose-50 text-slate-400 hover:text-rose-600 cursor-pointer"
+                                  title="Eliminar usuario"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             )}
           </div>

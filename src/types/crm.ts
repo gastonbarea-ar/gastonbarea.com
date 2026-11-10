@@ -79,7 +79,7 @@ export interface CrmContact {
   contactType: 'corporate_member' | 'individual';
   companyId?: string;
   companyName?: string;
-  portalAccessStatus: 'active' | 'invited' | 'pending';
+  portalAccessStatus: 'active' | 'invited' | 'pending' | 'revoked';
   hasActiveService: boolean; // False when user is registered in Portal without a contracted product/service
   linkedProjectId?: string;
   notes?: string;
