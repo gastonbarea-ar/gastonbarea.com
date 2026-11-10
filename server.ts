@@ -61,6 +61,10 @@ import {
   matchServiceFromStock,
   ParsedArnCommand,
 } from './src/utils/arnEngine.ts';
+import {
+  runArnAutonomousAgent,
+  ArnAgentTrace,
+} from './src/services/arnAgentOrchestrator.ts';
 
 dotenv.config();
 
@@ -200,6 +204,15 @@ app.get(['/api/health', '/health', '/api/infrastructure/status'], async (_req, r
         domain: getEmailConfigStatus().domain,
       },
       whatsappBusiness: getWhatsAppPublicStatus(),
+      agentOrchestrator: {
+        architecture: 'StateGraph-TS-4-Node',
+        costTier: '$0 Free Tier (Gemini API + Groq Cloud + StateGraph TS)',
+        geminiFunctionCalling: Boolean(apiKey),
+        groqFailoverConfigured: Boolean(process.env.GROQ_API_KEY),
+        n8nWebhookBridgeConfigured: Boolean(
+          process.env.N8N_WEBHOOK_URL || process.env.WHATSAPP_WEBHOOK_URL
+        ),
+      },
     },
     timestamp: new Date().toISOString(),
   });
@@ -4910,10 +4923,41 @@ app.post('/api/arn/command', requireAdminAuth, async (req, res) => {
     bookings: cachedClientBookings,
   });
 
+  // Generate 4-Stage Agentic Trace for full observability in Admin Omnibar (without duplicate LLM call)
+  let agentTrace: ArnAgentTrace | null = null;
+  let finalResponse = '';
+  try {
+    const traceRun = await runArnAutonomousAgent({
+      prompt: String(commandText),
+      callerRole: 'admin_arn',
+      overrideEmployeeCount: parsed.employeeCount,
+      preferredStockId: parsed.stockServiceId,
+      aiClient: null, // Avoid double Gemini call since resolveArnCommandWithAi already ran above
+      store: {
+        opportunities: cachedOpportunities,
+        companies: cachedCrmCompanies,
+        contacts: cachedCrmContacts,
+        quotes: cachedQuotes,
+        projects: cachedClientProjects,
+        inquiries: cachedClientInquiries,
+        tickets: cachedSupportTickets,
+        bookings: cachedClientBookings,
+        serviceStock: cachedServiceStock,
+        onPersistQuoteAndOpportunity: () => {},
+      },
+    });
+    agentTrace = traceRun.agentTrace;
+    finalResponse = traceRun.finalResponse;
+  } catch (traceErr) {
+    console.warn('[ARN Agent Trace Non-blocking]:', traceErr);
+  }
+
   return res.json({
     success: true,
     parsed,
     actionsExecuted,
+    finalResponse,
+    agentTrace,
     opportunity: oppPayload,
     quote: createdQuote,
     project: kickoffProject,
@@ -4929,6 +4973,254 @@ app.post('/api/arn/command', requireAdminAuth, async (req, res) => {
     },
   });
 });
+
+function buildAdminArnStoreAdapter() {
+  return {
+    opportunities: cachedOpportunities,
+    companies: cachedCrmCompanies,
+    contacts: cachedCrmContacts,
+    quotes: cachedQuotes,
+    projects: cachedClientProjects,
+    inquiries: cachedClientInquiries,
+    tickets: cachedSupportTickets,
+    bookings: cachedClientBookings,
+    serviceStock: cachedServiceStock,
+    onUpsertCompanyAndContact: (p: any) =>
+      syncContactAndCompanyFromOpportunity({
+        clientName: p.clientName,
+        clientEmail: p.clientEmail,
+        clientPhone: p.clientPhone,
+        company: p.company,
+        stage: (p.stage as any) || 'proposal_sent',
+        employeeCount: p.employeeCount,
+        employeeRangeLabel: p.employeeRangeLabel,
+      }),
+    onPersistQuoteAndOpportunity: async ({ quote, opportunity }: any) => {
+      cachedQuotes.unshift(quote);
+      const idx = cachedOpportunities.findIndex((o) => o.id === opportunity.id);
+      if (idx !== -1) {
+        cachedOpportunities[idx] = opportunity;
+      } else {
+        cachedOpportunities.unshift(opportunity);
+      }
+      if (supabase) {
+        try {
+          await supabase.from('crm_opportunities').upsert({
+            id: opportunity.id,
+            title: opportunity.title,
+            client_name: opportunity.clientName,
+            client_email: opportunity.clientEmail,
+            company: opportunity.company,
+            service_category: opportunity.serviceCategory,
+            stage: opportunity.stage,
+            value: opportunity.value,
+            currency: opportunity.currency,
+            probability: opportunity.probability,
+            notes: opportunity.notes,
+            updated_at: new Date().toISOString(),
+          });
+        } catch {
+          // non-blocking
+        }
+      }
+    },
+    onActivateKickoffProject: async ({ quote, phone }: any) => {
+      return autoProvisionKickoffProject({
+        clientName: quote.clientName,
+        clientEmail: quote.clientEmail,
+        clientPhone: phone,
+        companyName: quote.clientCompany,
+        projectTitle: quote.title,
+        serviceCategory: quote.serviceCategory,
+        totalAmount: quote.total,
+        currency: quote.currency,
+        quoteNumber: quote.quoteNumber,
+      });
+    },
+  };
+}
+
+// 13A-2. Admin Autonomous Agent Loop Executor (4-Node StateGraph: Evaluate -> Memory -> Tools -> Verify)
+app.post('/api/arn/agent-execute', requireAdminAuth, async (req, res) => {
+  const { prompt, employeeCount, stockServiceId } = req.body || {};
+  if (!prompt || !String(prompt).trim()) {
+    return res
+      .status(400)
+      .json({ error: 'Ingresá el objetivo para el Agente Autónomo ARN.' });
+  }
+
+  try {
+    const result = await runArnAutonomousAgent({
+      prompt: String(prompt),
+      callerRole: 'admin_arn',
+      overrideEmployeeCount: employeeCount ? Number(employeeCount) : undefined,
+      preferredStockId: stockServiceId ? String(stockServiceId) : undefined,
+      aiClient: ai,
+      store: buildAdminArnStoreAdapter(),
+    });
+
+    const arnNodes = computeArnRelationshipNodes({
+      opportunities: cachedOpportunities,
+      companies: cachedCrmCompanies,
+      contacts: cachedCrmContacts,
+      quotes: cachedQuotes,
+      projects: cachedClientProjects,
+      bookings: cachedClientBookings,
+    });
+
+    return res.json({
+      ...result,
+      arnNodes,
+      data: {
+        opportunities: cachedOpportunities,
+        companies: cachedCrmCompanies,
+        contacts: cachedCrmContacts,
+        quotes: cachedQuotes,
+        payments: cachedPayments,
+        serviceStock: cachedServiceStock,
+      },
+    });
+  } catch (err: any) {
+    return res.status(500).json({
+      success: false,
+      error: err?.message || 'Error ejecutando el ciclo del Agente Autónomo ARN.',
+    });
+  }
+});
+
+// 13A-3. Authenticated Client Portal Autonomous Agent (/api/client-portal/agent-assist)
+// Strictly scoped to the logged-in client's account (#portal) — zero public access
+app.post('/api/client-portal/agent-assist', async (req, res) => {
+  const clientSession = getClientFromRequest(req);
+  if (!clientSession) {
+    return res.status(401).json({
+      success: false,
+      error:
+        'Acceso exclusivo para usuarios registrados con sesión activa en el Portal de Clientes (#portal).',
+    });
+  }
+
+  const { prompt, employeeCount, stockServiceId } = req.body || {};
+  if (!prompt || !String(prompt).trim()) {
+    return res.status(400).json({
+      success: false,
+      error: 'Escribí tu consulta o ajuste sobre tu presupuesto 40/40/20 o proyecto.',
+    });
+  }
+
+  try {
+    const result = await runArnAutonomousAgent({
+      prompt: String(prompt),
+      callerRole: 'authenticated_client',
+      authenticatedClient: {
+        email: clientSession.email,
+        name: clientSession.name,
+        company: clientSession.company,
+        companyId: clientSession.companyId,
+      },
+      overrideEmployeeCount: employeeCount ? Number(employeeCount) : undefined,
+      preferredStockId: stockServiceId ? String(stockServiceId) : undefined,
+      aiClient: ai,
+      store: {
+        ...buildAdminArnStoreAdapter(),
+        onPersistQuoteAndOpportunity: async ({ quote, opportunity }) => {
+          const existingQIdx = cachedQuotes.findIndex(
+            (q) =>
+              q.clientEmail.toLowerCase() === clientSession.email.toLowerCase() &&
+              q.status !== 'accepted'
+          );
+          if (existingQIdx !== -1) {
+            cachedQuotes[existingQIdx] = quote;
+          } else {
+            cachedQuotes.unshift(quote);
+          }
+
+          const existingOIdx = cachedOpportunities.findIndex((o) => o.id === opportunity.id);
+          if (existingOIdx !== -1) {
+            cachedOpportunities[existingOIdx] = opportunity;
+          } else {
+            cachedOpportunities.unshift(opportunity);
+          }
+        },
+        onCreateSupportTicket: (ticket) => {
+          cachedSupportTickets.unshift(ticket);
+        },
+        onCreateBooking: (booking) => {
+          cachedClientBookings.unshift(booking);
+        },
+      },
+    });
+
+    const relatedOpportunities = cachedOpportunities.filter(
+      (o) => o.clientEmail.toLowerCase() === clientSession.email.toLowerCase()
+    );
+    const relatedQuotes = cachedQuotes.filter(
+      (q) => q.clientEmail.toLowerCase() === clientSession.email.toLowerCase()
+    );
+    const tickets = cachedSupportTickets.filter(
+      (t) => t.clientEmail.toLowerCase() === clientSession.email.toLowerCase()
+    );
+    const bookings = cachedClientBookings.filter(
+      (b) => b.clientEmail.toLowerCase() === clientSession.email.toLowerCase()
+    );
+
+    return res.json({
+      ...result,
+      relatedOpportunities,
+      relatedQuotes,
+      tickets,
+      bookings,
+    });
+  } catch (err: any) {
+    return res.status(500).json({
+      success: false,
+      error: err?.message || 'Error al procesar tu solicitud en el Agente del Portal.',
+    });
+  }
+});
+
+// 13A-4. n8n Community Edition (Self-Hosted Docker) Bidirectional Webhook Bridge
+app.post('/api/arn/agent-webhook', async (req, res) => {
+  const expectedSecret = process.env.WEBHOOK_SECRET || 'super-secret-webhook-token';
+  const providedSecret =
+    (req.headers['x-webhook-secret'] as string) ||
+    (req.headers['x-admin-passkey'] as string) ||
+    req.body?.webhookSecret;
+  const adminToken =
+    (req.headers['x-admin-token'] as string) ||
+    req.headers.authorization?.replace(/^Bearer\s+/i, '');
+  const isAuthorized =
+    Boolean(resolveAdminSession(adminToken)) ||
+    providedSecret === expectedSecret ||
+    providedSecret === (process.env.ADMIN_PASSKEY || 'gaston2026');
+
+  if (!isAuthorized) {
+    return res.status(401).json({
+      success: false,
+      error: 'Webhook no autorizado. Incluí x-webhook-secret o token de administrador.',
+    });
+  }
+
+  const { prompt, employeeCount, stockServiceId } = req.body || {};
+  if (!prompt || !String(prompt).trim()) {
+    return res.status(400).json({
+      success: false,
+      error: 'El payload de n8n requiere un campo "prompt" con la instrucción a ejecutar.',
+    });
+  }
+
+  const result = await runArnAutonomousAgent({
+    prompt: String(prompt),
+    callerRole: 'admin_arn',
+    overrideEmployeeCount: employeeCount ? Number(employeeCount) : undefined,
+    preferredStockId: stockServiceId ? String(stockServiceId) : undefined,
+    aiClient: ai,
+    store: buildAdminArnStoreAdapter(),
+  });
+
+  return res.json(result);
+});
+
 
 // 13B. Admin 1-Click Autonomous Node Action (/api/arn/autopilot)
 app.post('/api/arn/autopilot', requireAdminAuth, async (req, res) => {

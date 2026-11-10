@@ -233,6 +233,8 @@ export const CrmDashboard: React.FC<CrmDashboardProps> = ({
   const [arnViewMode, setArnViewMode] = useState<'radar' | 'kanban'>('radar');
   const [arnExecutionLog, setArnExecutionLog] = useState<{
     actionsExecuted: string[];
+    finalResponse?: string;
+    agentTrace?: any;
     quote?: Quote | null;
     opportunity?: Opportunity | null;
   } | null>(null);
@@ -913,11 +915,13 @@ export const CrmDashboard: React.FC<CrmDashboardProps> = ({
         }
         setArnExecutionLog({
           actionsExecuted: json.actionsExecuted || [],
+          finalResponse: json.finalResponse || '',
+          agentTrace: json.agentTrace || null,
           quote: json.quote || null,
           opportunity: json.opportunity || null,
         });
         setArnCommandInput('');
-        setCopiedNotification('¡Comando ARN ejecutado! Nodos, propuesta 40/40/20 y Portal Clientes sincronizados sin formularios.');
+        setCopiedNotification('¡Agente Autónomo ARN (4 Fases) ejecutado! Nodos, propuesta 40/40/20 y Portal Clientes sincronizados.');
         setTimeout(() => setCopiedNotification(null), 4500);
       }
     } catch (err) {
@@ -1285,13 +1289,15 @@ export const CrmDashboard: React.FC<CrmDashboardProps> = ({
             {/* OMNIBARRA COPILOTO ARN: VOZ, TEXTO NATURAL & INGESTA WHATSAPP SIN FORMULARIOS */}
             <div className="p-4 sm:p-5 bg-[#0F172A] text-white border border-slate-800 space-y-3">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                <div className="flex items-center gap-2 text-xs">
-                  <Sparkles className="w-4 h-4 text-emerald-400 shrink-0" />
-                  <span className="font-bold text-white">
-                    Omnibarra Copiloto ARN (Cero Formularios)
-                  </span>
-                  <span className="text-slate-400 hidden md:inline">
-                    · Escribí, dictá por voz o pegá un mensaje de WhatsApp para crear/actualizar empresa, contacto, propuesta 40/40/20 y proyecto automáticamente
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="flex items-center gap-2 text-xs">
+                    <Sparkles className="w-4 h-4 text-emerald-400 shrink-0" />
+                    <span className="font-bold text-white">
+                      Agente IA Autónomo ARN (Ciclo ReAct 4 Fases · Cero Formularios)
+                    </span>
+                  </div>
+                  <span className="px-2 py-0.5 bg-emerald-500/15 border border-emerald-400/40 text-emerald-300 font-mono text-[10px]">
+                    Stack $0: Gemini API + Groq Failover + StateGraph TS + n8n Ready
                   </span>
                 </div>
 
@@ -1301,24 +1307,24 @@ export const CrmDashboard: React.FC<CrmDashboardProps> = ({
                     onClick={() =>
                       handleExecuteArnCommand(
                         undefined,
-                        'Hablé con Valeria de Bodega Austral, correo valeria@bodegaaustral.com, necesitan Odoo v18 ERP e inventario por USD 5400, armar propuesta 40/40/20'
+                        'Hablé con Valeria de Bodega Austral, correo valeria@bodegaaustral.com, somos 18 empleados, necesitan Odoo v18 ERP e inventario, armar propuesta 40/40/20 y verificar reunión Meet'
                       )
                     }
                     className="px-2.5 py-1 bg-white/10 hover:bg-white/20 text-slate-200 transition-colors cursor-pointer whitespace-nowrap"
                   >
-                    Ej. 1: Cotizar Odoo 40/40/20
+                    Ej. 1: Agente Cotiza 18 emp. + Meet
                   </button>
                   <button
                     type="button"
                     onClick={() =>
                       handleExecuteArnCommand(
                         undefined,
-                        'Hablé con Lucas de Frigorífico Patagonia, correo lucas@frigopatagonia.com.ar, aprobar e iniciar proyecto kickoff de trazabilidad IoT por USD 6800'
+                        'Hablé con Lucas de Frigorífico Patagonia, correo lucas@frigopatagonia.com.ar, empresa de 60 empleados, aprobar e iniciar proyecto kickoff de trazabilidad IoT 40/40/20'
                       )
                     }
                     className="px-2.5 py-1 bg-white/10 hover:bg-white/20 text-slate-200 transition-colors cursor-pointer whitespace-nowrap"
                   >
-                    Ej. 2: Kickoff Directo 40/40/20
+                    Ej. 2: Agente Kickoff Escala Grande
                   </button>
                 </div>
               </div>
@@ -1328,7 +1334,7 @@ export const CrmDashboard: React.FC<CrmDashboardProps> = ({
                   type="text"
                   value={arnCommandInput}
                   onChange={(e) => setArnCommandInput(e.target.value)}
-                  placeholder='Ej: "Hablé con Martín de AgroSur (martin@agrosur.com), quieren trazabilidad IoT y Odoo por USD 6200, armale propuesta 40/40/20"...'
+                  placeholder='Ej: "Hablé con Martín de AgroSur (martin@agrosur.com), son 25 empleados, quieren trazabilidad IoT y Odoo, armale propuesta 40/40/20 y agendá Meet"...'
                   className="flex-1 px-4 py-2.5 bg-slate-900 border border-slate-700 text-xs sm:text-sm text-white placeholder:text-slate-400 focus:outline-none focus:border-emerald-400"
                 />
                 <div className="flex items-center gap-2 shrink-0">
@@ -1355,17 +1361,24 @@ export const CrmDashboard: React.FC<CrmDashboardProps> = ({
                     ) : (
                       <Sparkles className="w-3.5 h-3.5" />
                     )}
-                    <span>Ejecutar en ARN</span>
+                    <span>Ejecutar Agente ARN</span>
                   </button>
                 </div>
               </form>
 
               {arnExecutionLog && (
-                <div className="p-3.5 bg-slate-900 border border-emerald-500/40 text-xs space-y-2">
+                <div className="p-4 bg-slate-900 border border-emerald-500/40 text-xs space-y-3">
                   <div className="flex items-center justify-between">
-                    <span className="font-mono font-bold text-emerald-400 uppercase text-[11px]">
-                      ✓ Ejecución Autónoma ARN Completada (Cero Formularios)
-                    </span>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-mono font-bold text-emerald-400 uppercase text-[11px]">
+                        ✓ Ciclo Agéntico de 4 Fases Completado y Verificado
+                      </span>
+                      {arnExecutionLog.agentTrace && (
+                        <span className="px-2 py-0.5 bg-slate-800 border border-slate-700 text-slate-300 font-mono text-[10px]">
+                          Motor: {arnExecutionLog.agentTrace.llmEngineUsed} · Iteraciones: {arnExecutionLog.agentTrace.loopIterations}
+                        </span>
+                      )}
+                    </div>
                     <button
                       type="button"
                       onClick={() => setArnExecutionLog(null)}
@@ -1374,6 +1387,50 @@ export const CrmDashboard: React.FC<CrmDashboardProps> = ({
                       Ocultar ×
                     </button>
                   </div>
+
+                  {/* Visual 4-Node Agentic Loop Breakdown */}
+                  {arnExecutionLog.agentTrace && (
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-2.5 pt-1">
+                      <div className="p-2.5 bg-slate-950/80 border border-slate-800 space-y-1">
+                        <div className="text-[10px] font-mono font-bold uppercase text-emerald-400">
+                          1. Evaluar Objetivo
+                        </div>
+                        <div className="text-[11px] text-slate-300">
+                          {arnExecutionLog.agentTrace.step1_evaluateObjective?.subtasks?.length || 0} subtareas lógicas desglosadas ({arnExecutionLog.agentTrace.step1_evaluateObjective?.detectedIntent})
+                        </div>
+                      </div>
+
+                      <div className="p-2.5 bg-slate-950/80 border border-slate-800 space-y-1">
+                        <div className="text-[10px] font-mono font-bold uppercase text-cyan-400">
+                          2. Contexto y Memoria
+                        </div>
+                        <div className="text-[11px] text-slate-300">
+                          Stock [{arnExecutionLog.agentTrace.step2_contextAndMemory?.matchedStockCode}] · {arnExecutionLog.agentTrace.step2_contextAndMemory?.companyScaleLabel} ({arnExecutionLog.agentTrace.step2_contextAndMemory?.detectedEmployeeCount} emp.)
+                        </div>
+                      </div>
+
+                      <div className="p-2.5 bg-slate-950/80 border border-slate-800 space-y-1">
+                        <div className="text-[10px] font-mono font-bold uppercase text-amber-400">
+                          3. Herramientas Ejecutadas
+                        </div>
+                        <div className="text-[11px] text-slate-300 font-mono">
+                          {(arnExecutionLog.agentTrace.step3_toolsExecuted || [])
+                            .map((t: any) => t.toolName)
+                            .join(', ')}
+                        </div>
+                      </div>
+
+                      <div className="p-2.5 bg-slate-950/80 border border-emerald-500/30 space-y-1">
+                        <div className="text-[10px] font-mono font-bold uppercase text-emerald-400">
+                          4. Verificación 40/40/20
+                        </div>
+                        <div className="text-[11px] text-slate-200">
+                          {arnExecutionLog.agentTrace.step4_resultVerification?.auditSummary}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   <div className="space-y-1 text-slate-200">
                     {arnExecutionLog.actionsExecuted.map((act, idx) => (
                       <div key={idx} className="flex items-start gap-2">
@@ -1417,6 +1474,7 @@ export const CrmDashboard: React.FC<CrmDashboardProps> = ({
                 </div>
               )}
             </div>
+
           </>
         )}
       </div>

@@ -191,10 +191,50 @@ export const ClientPortalModal: React.FC<ClientPortalModalProps> = ({ isOpen = t
   const [isApprovingQuoteId, setIsApprovingQuoteId] = useState<string | null>(null);
   const [quoteApprovalFeedback, setQuoteApprovalFeedback] = useState<string>('');
 
-  // Zero-Form Conversational ARN Intake state
-  const [arnIntakeMessage, setArnIntakeMessage] = useState<string>('');
-  const [arnIntakeChannel, setArnIntakeChannel] = useState<string>('');
-  const [isSubmittingArnIntake, setIsSubmittingArnIntake] = useState<boolean>(false);
+  // Authenticated Client Portal Autonomous AI Agent (4-Stage StateGraph)
+  const [portalAgentPrompt, setPortalAgentPrompt] = useState<string>('');
+  const [isRunningPortalAgent, setIsRunningPortalAgent] = useState<boolean>(false);
+  const [portalAgentResult, setPortalAgentResult] = useState<{
+    finalResponse: string;
+    actionsExecuted: string[];
+    agentTrace: any;
+  } | null>(null);
+
+  const handleRunPortalAgent = async (e?: React.FormEvent, presetPrompt?: string) => {
+    if (e) e.preventDefault();
+    const textToRun = (presetPrompt ?? portalAgentPrompt).trim();
+    if (!textToRun || isRunningPortalAgent || !token) return;
+
+    setIsRunningPortalAgent(true);
+    try {
+      const res = await fetch('/api/client-portal/agent-assist', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-client-token': token,
+          'x-client-email': clientSession?.email || '',
+        },
+        body: JSON.stringify({ prompt: textToRun }),
+      });
+      const json = await res.json();
+      if (res.ok && json.success) {
+        if (Array.isArray(json.relatedQuotes)) setRelatedQuotes(json.relatedQuotes);
+        if (Array.isArray(json.relatedOpportunities)) setRelatedOpportunities(json.relatedOpportunities);
+        if (Array.isArray(json.tickets)) setTickets(json.tickets);
+        if (Array.isArray(json.bookings)) setBookings(json.bookings);
+        setPortalAgentResult({
+          finalResponse: json.finalResponse || '',
+          actionsExecuted: json.actionsExecuted || [],
+          agentTrace: json.agentTrace || null,
+        });
+        setPortalAgentPrompt('');
+      }
+    } catch (err) {
+      console.error('Error running portal autonomous agent:', err);
+    } finally {
+      setIsRunningPortalAgent(false);
+    }
+  };
 
   // Check existing session and load booking availability
   useEffect(() => {
@@ -965,54 +1005,6 @@ export const ClientPortalModal: React.FC<ClientPortalModalProps> = ({ isOpen = t
       console.error('Error reporting milestone payment:', err);
     } finally {
       setIsReportingPayment(false);
-    }
-  };
-
-  // Zero-Form Conversational ARN Intake -> Profiles user, creates 40/40/20 Quote & logs into Portal in 1 click
-  const handleArnConversationalIntake = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if ((!arnIntakeMessage.trim() && !arnIntakeChannel.trim()) || isSubmittingArnIntake) return;
-    setIsSubmittingArnIntake(true);
-    setAuthError('');
-
-    try {
-      const res = await fetch('/api/arn/intake', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: arnIntakeMessage.trim(),
-          contactChannel: arnIntakeChannel.trim() || clientSession?.email || emailInput,
-        }),
-      });
-      const data = await res.json();
-      if (res.ok && data.success) {
-        if (data.token && data.client && !token) {
-          setToken(data.token);
-          setClientSession(data.client);
-          localStorage.setItem('gb_client_token', data.token);
-          localStorage.setItem('gb_client_user', JSON.stringify(data.client));
-        }
-        if (data.opportunity) {
-          setRelatedOpportunities((prev) => [data.opportunity, ...prev]);
-        }
-        if (data.quote) {
-          setRelatedQuotes((prev) => [data.quote, ...prev]);
-        }
-        if (data.message) {
-          setQuoteApprovalFeedback(data.message);
-        }
-        setArnIntakeMessage('');
-        setActiveTab('project');
-        if (data.token && data.client) {
-          loadDashboardData(data.token, data.client);
-        }
-      } else if (data.error) {
-        setAuthError(data.error);
-      }
-    } catch (err) {
-      console.error('Error in ARN conversational intake:', err);
-    } finally {
-      setIsSubmittingArnIntake(false);
     }
   };
 
@@ -2004,12 +1996,143 @@ export const ClientPortalModal: React.FC<ClientPortalModalProps> = ({ isOpen = t
 
             {/* Workspace Body */}
             <div className="flex-1 p-4 sm:p-8 lg:p-10 max-w-6xl w-full mx-auto space-y-6">
-              {/* ALWAYS-VISIBLE ARN STOCK SELECTOR FOR LOGGED-IN CLIENTS */}
+              {/* ALWAYS-VISIBLE ARN STOCK SELECTOR & 4-NODE AUTONOMOUS AGENT FOR LOGGED-IN CLIENTS */}
               {activeTab === 'project' && (
-                <ArnClientIntakeWidget
-                  variant="portal-compact"
-                  onOpenPortalWithSession={() => loadDashboardData(token, clientSession)}
-                />
+                <div className="space-y-4">
+                  <ArnClientIntakeWidget
+                    variant="portal-compact"
+                    onOpenPortalWithSession={() => loadDashboardData(token, clientSession)}
+                  />
+
+                  {/* AGENTE AUTÓNOMO DE PRESUPUESTO 40/40/20 Y PROYECTO (EXCLUSIVO SESIÓN INICIADA) */}
+                  <div className="p-4 sm:p-5 bg-[#0F172A] text-white border border-slate-800 space-y-3">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Sparkles className="w-4 h-4 text-emerald-400 shrink-0" />
+                        <span className="text-xs font-bold text-white">
+                          Agente IA Autónomo de tu Portal (Ciclo 4 Fases · Tratamiento Privado 40/40/20)
+                        </span>
+                        <span className="px-2 py-0.5 bg-emerald-500/15 border border-emerald-400/40 text-emerald-300 font-mono text-[10px]">
+                          1. Evalúa Objetivo → 2. Memoria CRM → 3. Ejecuta Stock ARN → 4. Verifica 40/40/20
+                        </span>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-mono">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            handleRunPortalAgent(
+                              undefined,
+                              'Actualizá mi presupuesto 40/40/20 para una dotación de 20 empleados con Odoo v18 ERP y decime cómo quedan los 3 hitos'
+                            )
+                          }
+                          className="px-2.5 py-1 bg-white/10 hover:bg-white/20 text-slate-200 transition-colors cursor-pointer"
+                        >
+                          Ej. 1: Recalcular para 20 empleados
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            handleRunPortalAgent(
+                              undefined,
+                              'Auditá el estado de mis hitos de pago 40/40/20 y agendame una sesión Google Meet de seguimiento'
+                            )
+                          }
+                          className="px-2.5 py-1 bg-white/10 hover:bg-white/20 text-slate-200 transition-colors cursor-pointer"
+                        >
+                          Ej. 2: Auditar Saldos + Agendar Meet
+                        </button>
+                      </div>
+                    </div>
+
+                    <form onSubmit={handleRunPortalAgent} className="flex flex-col sm:flex-row items-stretch gap-2">
+                      <input
+                        type="text"
+                        value={portalAgentPrompt}
+                        onChange={(e) => setPortalAgentPrompt(e.target.value)}
+                        placeholder='Pedile al Agente de tu Portal: "Actualizá mi presupuesto 40/40/20 para 15 empleados", "Auditá el saldo del primer hito", "Agendá sesión Meet"...'
+                        className="flex-1 px-4 py-2.5 bg-slate-900 border border-slate-700 text-xs sm:text-sm text-white placeholder:text-slate-400 focus:outline-none focus:border-emerald-400"
+                      />
+                      <button
+                        type="submit"
+                        disabled={isRunningPortalAgent || !portalAgentPrompt.trim()}
+                        className="px-5 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 whitespace-nowrap"
+                      >
+                        {isRunningPortalAgent ? (
+                          <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <Sparkles className="w-3.5 h-3.5" />
+                        )}
+                        <span>Ejecutar Agente en mi Cuenta</span>
+                      </button>
+                    </form>
+
+                    {portalAgentResult && (
+                      <div className="p-3.5 bg-slate-900 border border-emerald-500/40 text-xs space-y-2.5">
+                        <div className="flex items-center justify-between">
+                          <span className="font-mono font-bold text-emerald-400 uppercase text-[11px]">
+                            ✓ Agente Autónomo Verificó y Actualizó tu Portal
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setPortalAgentResult(null)}
+                            className="text-slate-400 hover:text-white text-[11px] cursor-pointer"
+                          >
+                            Cerrar ×
+                          </button>
+                        </div>
+
+                        {portalAgentResult.agentTrace && (
+                          <div className="grid grid-cols-1 sm:grid-cols-4 gap-2">
+                            <div className="p-2 bg-slate-950 border border-slate-800">
+                              <div className="text-[10px] font-mono font-bold uppercase text-emerald-400">
+                                1. Objetivo
+                              </div>
+                              <div className="text-[11px] text-slate-300 mt-0.5">
+                                {portalAgentResult.agentTrace.step1_evaluateObjective?.subtasks?.length || 0} subtareas lógicas
+                              </div>
+                            </div>
+                            <div className="p-2 bg-slate-950 border border-slate-800">
+                              <div className="text-[10px] font-mono font-bold uppercase text-cyan-400">
+                                2. Memoria y Escala
+                              </div>
+                              <div className="text-[11px] text-slate-300 mt-0.5">
+                                {portalAgentResult.agentTrace.step2_contextAndMemory?.companyScaleLabel} ({portalAgentResult.agentTrace.step2_contextAndMemory?.detectedEmployeeCount} emp.)
+                              </div>
+                            </div>
+                            <div className="p-2 bg-slate-950 border border-slate-800">
+                              <div className="text-[10px] font-mono font-bold uppercase text-amber-400">
+                                3. Herramientas
+                              </div>
+                              <div className="text-[11px] text-slate-300 font-mono mt-0.5">
+                                {(portalAgentResult.agentTrace.step3_toolsExecuted || [])
+                                  .map((t: any) => t.toolName)
+                                  .join(', ')}
+                              </div>
+                            </div>
+                            <div className="p-2 bg-slate-950 border border-emerald-500/30">
+                              <div className="text-[10px] font-mono font-bold uppercase text-emerald-400">
+                                4. Verificación
+                              </div>
+                              <div className="text-[11px] text-slate-200 mt-0.5">
+                                {portalAgentResult.agentTrace.step4_resultVerification?.auditSummary}
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        <div className="space-y-1 text-slate-200">
+                          {portalAgentResult.actionsExecuted.map((act, idx) => (
+                            <div key={idx} className="flex items-start gap-2">
+                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
+                              <span>{act}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
               )}
 
               {/* TAB 1A: USUARIO REGISTRADO SIN PROYECTO ACTIVO CONTRATADO */}
