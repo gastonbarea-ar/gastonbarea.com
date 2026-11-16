@@ -25,14 +25,17 @@
   }
 }
 
-/* Organic Movement and Dynamic Flow Animations (Grounding: No Floating/Bobbing Cards) */
+/* ============================================================================
+   CINÉTICA EJECUTIVA · GPU-COMPOSITED MOTION & ARCHITECTURAL LIGHTING
+   ============================================================================ */
+
 @keyframes pulse-glow {
   0%, 100% {
-    opacity: 0.35;
+    opacity: 0.38;
     transform: scale(1);
   }
   50% {
-    opacity: 0.65;
+    opacity: 0.68;
     transform: scale(1.04);
   }
 }
@@ -46,6 +49,15 @@
   }
   100% {
     background-position: 0% 50%;
+  }
+}
+
+@keyframes eq-bar {
+  0%, 100% {
+    transform: scaleY(0.35);
+  }
+  50% {
+    transform: scaleY(1);
   }
 }
 
@@ -74,17 +86,8 @@
   animation-play-state: paused;
 }
 
-@keyframes shimmer {
-  0% {
-    transform: translateX(-100%);
-  }
-  100% {
-    transform: translateX(100%);
-  }
-}
-
 .animate-pulse-glow {
-  animation: pulse-glow 5s ease-in-out infinite;
+  animation: pulse-glow 6s ease-in-out infinite;
 }
 
 .animate-gradient-x {
@@ -94,10 +97,51 @@
 
 .animate-flow-line {
   stroke-dasharray: 6 6;
-  animation: flow-dash 1.6s linear infinite;
+  animation: flow-dash 1.8s linear infinite;
 }
 
-/* Integrated Architecture Console & Grounded Bento */
+.eq-bar-1 {
+  animation: eq-bar 0.85s ease-in-out infinite;
+  transform-origin: bottom;
+}
+.eq-bar-2 {
+  animation: eq-bar 0.65s ease-in-out 0.15s infinite;
+  transform-origin: bottom;
+}
+.eq-bar-3 {
+  animation: eq-bar 0.95s ease-in-out 0.3s infinite;
+  transform-origin: bottom;
+}
+
+/* Subtle Architectural Engineering Grid Overlay */
+.bg-arch-grid-dark {
+  background-image:
+    linear-gradient(to right, rgba(255, 255, 255, 0.045) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.045) 1px, transparent 1px);
+  background-size: 48px 48px;
+}
+
+.bg-arch-grid-light {
+  background-image:
+    linear-gradient(to right, rgba(15, 23, 42, 0.04) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(15, 23, 42, 0.04) 1px, transparent 1px);
+  background-size: 48px 48px;
+}
+
+/* Specular Studio Surfaces */
+.studio-card-dark {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.055) 0%, rgba(255, 255, 255, 0.02) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.08), 0 18px 40px -20px rgba(0, 0, 0, 0.7);
+}
+
+.studio-card-light {
+  background: #FFFFFF;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  box-shadow: 0 10px 30px -15px rgba(15, 23, 42, 0.08), 0 1px 3px 0 rgba(15, 23, 42, 0.04);
+}
+
+/* Integrated Architecture Console & Grounded Bento (Admin & Inner Sections Compatibility) */
 .integrated-console {
   background: #FFFFFF;
   border: 1px solid rgba(15, 36, 66, 0.12);
@@ -109,7 +153,6 @@
   border-color: rgba(15, 36, 66, 0.08);
 }
 
-/* Apple Pro Theme */
 .apple-card {
   background: #FFFFFF;
   border: 1px solid rgba(15, 36, 66, 0.12);
@@ -126,6 +169,19 @@
 .apple-inset {
   background: #F8FAFC;
   border: 1px solid rgba(15, 36, 66, 0.06);
+}
+
+/* Accessibility: Honor reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .animate-pulse-glow,
+  .animate-gradient-x,
+  .animate-flow-line,
+  .animate-marquee,
+  .eq-bar-1,
+  .eq-bar-2,
+  .eq-bar-3 {
+    animation: none !important;
+  }
 }
 
 /* Custom subtle scrollbar */

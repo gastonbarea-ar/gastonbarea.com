@@ -389,8 +389,9 @@ export default function App() {
         onClientPortalClick={() => handleNavigatePage('portal-clientes')}
       />
 
-      {/* Persistent AI Solution Guide & ARN 1-Click Dock */}
+      {/* Persistent AI Solution Guide & ARN Dock (appears cleanly on scroll or inner pages) */}
       <AiWebNavigatorDock
+        activePage={activePage}
         onNavigateToSolution={handleNavigateToSolution}
         onScheduleClick={openScheduleModal}
         onClientPortalClick={() => handleNavigatePage('portal-clientes')}

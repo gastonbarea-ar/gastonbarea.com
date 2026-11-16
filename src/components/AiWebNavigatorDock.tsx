@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Compass,
   Send,
@@ -9,7 +9,9 @@ import {
   Zap,
   UserCheck,
 } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
 import { ArnClientIntakeWidget } from './ArnClientIntakeWidget';
+import type { PageSectionId } from './Header';
 
 interface MatchedSolution {
   serviceCode: string;
@@ -21,6 +23,7 @@ interface MatchedSolution {
 }
 
 interface AiWebNavigatorDockProps {
+  activePage?: PageSectionId;
   onNavigateToSolution: (sectionId: string, serviceCode?: string) => void;
   onScheduleClick: (context?: string) => void;
   onClientPortalClick?: () => void;
@@ -28,6 +31,7 @@ interface AiWebNavigatorDockProps {
 }
 
 export const AiWebNavigatorDock: React.FC<AiWebNavigatorDockProps> = ({
+  activePage = 'inicio',
   onNavigateToSolution,
   onScheduleClick,
   onClientPortalClick,
@@ -39,6 +43,21 @@ export const AiWebNavigatorDock: React.FC<AiWebNavigatorDockProps> = ({
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [reply, setReply] = useState<string>('');
   const [matched, setMatched] = useState<MatchedSolution | null>(null);
+  const [isVisibleByScroll, setIsVisibleByScroll] = useState<boolean>(false);
+
+  // Show dock immediately on inner pages; on Home reveal smoothly once user scrolls past Hero video
+  useEffect(() => {
+    const checkVisibility = () => {
+      if (activePage !== 'inicio') {
+        setIsVisibleByScroll(true);
+        return;
+      }
+      setIsVisibleByScroll(window.scrollY > 280);
+    };
+    checkVisibility();
+    window.addEventListener('scroll', checkVisibility, { passive: true });
+    return () => window.removeEventListener('scroll', checkVisibility);
+  }, [activePage]);
 
   const handleSearchSolution = async (customText?: string) => {
     const text = (customText ?? query).trim();
@@ -71,150 +90,165 @@ export const AiWebNavigatorDock: React.FC<AiWebNavigatorDockProps> = ({
     }
   };
 
+  if (!isVisibleByScroll && !isOpen) {
+    return null;
+  }
+
   return (
-    <div className="fixed bottom-0 sm:bottom-4 inset-x-0 z-40 sm:px-4 pointer-events-none flex flex-col items-center">
-      {/* Expanded Interactive Sheet (ARN Zero-Form Intake OR AI Solution Guide) */}
-      {isOpen && (
-        <div className="pointer-events-auto w-full max-w-3xl sm:mb-2.5 max-h-[82vh] overflow-y-auto rounded-none bg-[#10121A]/98 backdrop-blur-2xl text-white border-t sm:border border-emerald-400/30 p-4 sm:p-5 shadow-2xl space-y-4 text-left">
-          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 pb-3">
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setActiveDockMode('arn')}
-                className={`px-3 py-1.5 text-xs font-mono font-bold transition-colors cursor-pointer inline-flex items-center gap-1.5 ${
-                  activeDockMode === 'arn'
-                    ? 'bg-emerald-400 text-emerald-950'
-                    : 'bg-white/10 text-neutral-300 hover:text-white'
-                }`}
-              >
-                <Zap className="w-3.5 h-3.5" />
-                <span>ARN · Cotizar en 1-Clic (Cero Formularios)</span>
-              </button>
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+      className="fixed bottom-0 sm:bottom-4 inset-x-0 z-40 sm:px-4 pointer-events-none flex flex-col items-center"
+    >
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 12 }}
+            transition={{ duration: 0.2 }}
+            className="pointer-events-auto w-full max-w-3xl sm:mb-2.5 max-h-[82vh] overflow-y-auto rounded-t-2xl sm:rounded-2xl bg-[#0F111A]/96 backdrop-blur-2xl text-white border-t sm:border border-emerald-400/30 p-4 sm:p-5 shadow-2xl space-y-4 text-left"
+          >
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 pb-3">
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setActiveDockMode('arn')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-mono font-bold transition-colors cursor-pointer inline-flex items-center gap-1.5 ${
+                    activeDockMode === 'arn'
+                      ? 'bg-emerald-400 text-emerald-950'
+                      : 'bg-white/10 text-neutral-300 hover:text-white'
+                  }`}
+                >
+                  <Zap className="w-3.5 h-3.5" />
+                  <span>ARN · Portal & Cotizador</span>
+                </button>
 
-              <button
-                type="button"
-                onClick={() => setActiveDockMode('guide')}
-                className={`px-3 py-1.5 text-xs font-mono font-semibold transition-colors cursor-pointer inline-flex items-center gap-1.5 ${
-                  activeDockMode === 'guide'
-                    ? 'bg-[#291B64] text-white'
-                    : 'bg-white/10 text-neutral-300 hover:text-white'
-                }`}
-              >
-                <Compass className="w-3.5 h-3.5" />
-                <span>Guía IA Web</span>
-              </button>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => setIsOpen(false)}
-              className="p-1.5 text-neutral-400 hover:text-white rounded-none cursor-pointer"
-              aria-label="Cerrar consola"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          </div>
-
-          {activeDockMode === 'arn' ? (
-            <ArnClientIntakeWidget
-              variant="portal-compact"
-              onOpenPortalWithSession={() => {
-                setIsOpen(false);
-                if (onClientPortalClick) {
-                  onClientPortalClick();
-                } else {
-                  window.location.hash = '#portal';
-                }
-              }}
-              onScheduleClick={(ctx) => {
-                setIsOpen(false);
-                onScheduleClick(ctx);
-              }}
-              onWhatsAppClick={(txt) => {
-                setIsOpen(false);
-                if (onWhatsAppClick) onWhatsAppClick(txt);
-              }}
-            />
-          ) : (
-            <div className="space-y-4">
-              {/* Quick Filters inside Dock */}
-              <div className="flex flex-wrap gap-1.5">
-                {[
-                  { label: 'IA Services & Gemelo Digital', q: 'Integrar IA Services o Gemelo Digital en mi empresa' },
-                  { label: 'Bioeconomía & IoT', q: 'Proyecto de bioeconomía y trazabilidad productiva' },
-                  { label: 'Odoo ERP & B2B2C', q: 'Implementar Odoo ERP v18 y E-Commerce B2B2C' },
-                  { label: 'Dirección PMO 14 Años', q: 'Dirección ejecutiva de proyectos con clientes PMO' },
-                ].map((item, i) => (
-                  <button
-                    key={i}
-                    type="button"
-                    onClick={() => handleSearchSolution(item.q)}
-                    className="px-2.5 py-1.5 text-xs font-medium bg-white/10 hover:bg-white hover:text-[#0A0A0C] rounded-none transition-colors cursor-pointer whitespace-nowrap"
-                  >
-                    {item.label}
-                  </button>
-                ))}
+                <button
+                  type="button"
+                  onClick={() => setActiveDockMode('guide')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-mono font-semibold transition-colors cursor-pointer inline-flex items-center gap-1.5 ${
+                    activeDockMode === 'guide'
+                      ? 'bg-[#291B64] text-white'
+                      : 'bg-white/10 text-neutral-300 hover:text-white'
+                  }`}
+                >
+                  <Compass className="w-3.5 h-3.5" />
+                  <span>Guía IA Web</span>
+                </button>
               </div>
 
-              {isLoading ? (
-                <div className="py-4 flex items-center gap-2 text-xs font-mono text-neutral-300">
-                  <RefreshCw className="w-4 h-4 animate-spin text-emerald-400" />
-                  <span>Analizando tu consulta para ubicarte en la solución exacta...</span>
-                </div>
-              ) : reply ? (
-                <div className="space-y-3">
-                  <p className="text-xs sm:text-sm text-neutral-200 leading-relaxed whitespace-pre-line">
-                    {reply}
-                  </p>
-                  {matched && (
-                    <div className="p-3.5 rounded-none bg-white/10 border border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                      <div>
-                        <div className="text-[11px] font-mono text-emerald-400">
-                          {matched.serviceTitle} ({matched.timeline})
-                        </div>
-                        <div className="text-xs text-neutral-300 mt-0.5 line-clamp-1">
-                          {matched.summary}
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2 shrink-0">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setIsOpen(false);
-                            onNavigateToSolution(matched.sectionId, matched.serviceCode);
-                          }}
-                          className="px-3.5 py-2 text-xs font-semibold text-white bg-[#291B64] hover:bg-[#382586] rounded-none transition-colors inline-flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
-                        >
-                          <span>{matched.ctaLabel}</span>
-                          <ArrowRight className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setIsOpen(false);
-                            onScheduleClick(`Consulta guiada por IA: ${matched.serviceTitle}`);
-                          }}
-                          className="p-2 text-white bg-white/10 hover:bg-white/20 rounded-none transition-colors cursor-pointer"
-                          title="Agendar Google Meet Pro"
-                        >
-                          <Video className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <p className="text-xs text-neutral-400">
-                  Escribí abajo qué problema tecnológico, de IA o de bioeconomía buscás resolver y la web te llevará directo a la solución.
-                </p>
-              )}
+              <button
+                type="button"
+                onClick={() => setIsOpen(false)}
+                className="p-1.5 rounded-lg text-neutral-400 hover:text-white hover:bg-white/10 cursor-pointer"
+                aria-label="Cerrar consola"
+              >
+                <X className="w-5 h-5" />
+              </button>
             </div>
-          )}
-        </div>
-      )}
 
-      {/* MOBILE STICKY BOTTOM BAR (< 640px) — Ergonomic Thumb Bar with 48px Touch Targets */}
-      <div className="sm:hidden pointer-events-auto w-full bg-[#0B0D14]/98 backdrop-blur-xl text-white border-t border-white/15 grid grid-cols-3 divide-x divide-white/10 shadow-2xl">
+            {activeDockMode === 'arn' ? (
+              <ArnClientIntakeWidget
+                variant="portal-compact"
+                onOpenPortalWithSession={() => {
+                  setIsOpen(false);
+                  if (onClientPortalClick) {
+                    onClientPortalClick();
+                  } else {
+                    window.location.hash = '#portal';
+                  }
+                }}
+                onScheduleClick={(ctx) => {
+                  setIsOpen(false);
+                  onScheduleClick(ctx);
+                }}
+                onWhatsAppClick={(txt) => {
+                  setIsOpen(false);
+                  if (onWhatsAppClick) onWhatsAppClick(txt);
+                }}
+              />
+            ) : (
+              <div className="space-y-4">
+                <div className="flex flex-wrap gap-1.5">
+                  {[
+                    { label: 'IA Services & Gemelo Digital', q: 'Integrar IA Services o Gemelo Digital en mi empresa' },
+                    { label: 'Bioeconomía & IoT', q: 'Proyecto de bioeconomía y trazabilidad productiva' },
+                    { label: 'Odoo ERP & B2B2C', q: 'Implementar Odoo ERP v18 y E-Commerce B2B2C' },
+                    { label: 'Dirección PMO 14 Años', q: 'Dirección ejecutiva de proyectos con clientes PMO' },
+                  ].map((item, i) => (
+                    <button
+                      key={i}
+                      type="button"
+                      onClick={() => handleSearchSolution(item.q)}
+                      className="px-3 py-1.5 rounded-lg text-xs font-medium bg-white/10 hover:bg-white hover:text-[#0A0A0C] transition-colors cursor-pointer whitespace-nowrap"
+                    >
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
+
+                {isLoading ? (
+                  <div className="py-4 flex items-center gap-2 text-xs font-mono text-neutral-300">
+                    <RefreshCw className="w-4 h-4 animate-spin text-emerald-400" />
+                    <span>Analizando tu consulta para ubicarte en la solución exacta...</span>
+                  </div>
+                ) : reply ? (
+                  <div className="space-y-3">
+                    <p className="text-xs sm:text-sm text-neutral-200 leading-relaxed whitespace-pre-line">
+                      {reply}
+                    </p>
+                    {matched && (
+                      <div className="p-3.5 rounded-xl bg-white/10 border border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div>
+                          <div className="text-[11px] font-mono text-emerald-400">
+                            {matched.serviceTitle} ({matched.timeline})
+                          </div>
+                          <div className="text-xs text-neutral-300 mt-0.5 line-clamp-1">
+                            {matched.summary}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setIsOpen(false);
+                              onNavigateToSolution(matched.sectionId, matched.serviceCode);
+                            }}
+                            className="px-3.5 py-2 rounded-lg text-xs font-semibold text-white bg-[#291B64] hover:bg-[#382586] transition-colors inline-flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
+                          >
+                            <span>{matched.ctaLabel}</span>
+                            <ArrowRight className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setIsOpen(false);
+                              onScheduleClick(`Consulta guiada por IA: ${matched.serviceTitle}`);
+                            }}
+                            className="p-2 rounded-lg text-white bg-white/10 hover:bg-white/20 transition-colors cursor-pointer"
+                            title="Agendar Google Meet Pro"
+                          >
+                            <Video className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-xs text-neutral-400">
+                    Escribí abajo qué problema tecnológico, de IA o de bioeconomía buscás resolver y la web te llevará directo a la solución.
+                  </p>
+                )}
+              </div>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* MOBILE STICKY BOTTOM BAR (< 640px) */}
+      <div className="sm:hidden pointer-events-auto w-full bg-[#0B0D14]/96 backdrop-blur-xl text-white border-t border-white/15 grid grid-cols-3 divide-x divide-white/10 shadow-2xl">
         <button
           type="button"
           onClick={() => {
@@ -224,7 +258,7 @@ export const AiWebNavigatorDock: React.FC<AiWebNavigatorDockProps> = ({
           className="min-h-[52px] px-2 py-2 flex flex-col items-center justify-center gap-0.5 bg-emerald-400 text-emerald-950 font-mono font-bold text-[11px] cursor-pointer"
         >
           <Zap className="w-4 h-4 shrink-0" />
-          <span>ARN 1-Clic</span>
+          <span>ARN Portal</span>
         </button>
 
         <button
@@ -256,7 +290,7 @@ export const AiWebNavigatorDock: React.FC<AiWebNavigatorDockProps> = ({
         </button>
       </div>
 
-      {/* DESKTOP COMMAND BAR (>= 640px) */}
+      {/* DESKTOP FLOATING COMMAND BAR (>= 640px) */}
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -266,7 +300,7 @@ export const AiWebNavigatorDock: React.FC<AiWebNavigatorDockProps> = ({
             setIsOpen(!isOpen);
           }
         }}
-        className="hidden sm:flex pointer-events-auto w-full max-w-2xl rounded-none bg-[#1D1D1F]/95 backdrop-blur-xl text-white border border-white/15 px-3.5 py-2 shadow-lg items-center gap-2.5"
+        className="hidden sm:flex pointer-events-auto w-full max-w-2xl rounded-2xl bg-[#11131D]/92 backdrop-blur-2xl text-white border border-white/15 px-3.5 py-2 shadow-2xl items-center gap-2.5"
       >
         <button
           type="button"
@@ -274,10 +308,10 @@ export const AiWebNavigatorDock: React.FC<AiWebNavigatorDockProps> = ({
             setActiveDockMode('arn');
             setIsOpen(!isOpen || activeDockMode !== 'arn');
           }}
-          className="px-2.5 py-1 bg-emerald-400 hover:bg-emerald-300 text-emerald-950 text-xs font-mono font-bold inline-flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0"
+          className="px-3 py-1.5 rounded-xl bg-emerald-400 hover:bg-emerald-300 text-emerald-950 text-xs font-mono font-bold inline-flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0 transition-colors"
         >
           <Zap className="w-3.5 h-3.5" />
-          <span>ARN 1-Clic (Cero Formularios)</span>
+          <span>ARN Portal</span>
         </button>
 
         <span className="text-white/20" aria-hidden="true">
@@ -292,18 +326,18 @@ export const AiWebNavigatorDock: React.FC<AiWebNavigatorDockProps> = ({
             setIsOpen(true);
           }}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="O preguntale a la Guía IA qué solución necesitás..."
+          placeholder="Preguntale a la Guía IA qué solución necesitás..."
           className="flex-1 text-xs sm:text-[13px] bg-transparent text-white placeholder:text-neutral-400 focus:outline-none min-w-0"
         />
 
         <button
           type="submit"
-          className="px-3.5 py-1 text-xs font-semibold text-white bg-[#291B64] hover:bg-[#382586] rounded-none transition-colors inline-flex items-center gap-1 cursor-pointer whitespace-nowrap shrink-0"
+          className="px-3.5 py-1.5 rounded-xl text-xs font-semibold text-white bg-[#291B64] hover:bg-[#382586] transition-colors inline-flex items-center gap-1 cursor-pointer whitespace-nowrap shrink-0"
         >
           <span>Ir</span>
           <Send className="w-3 h-3" />
         </button>
       </form>
-    </div>
+    </motion.div>
   );
 };

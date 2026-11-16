@@ -6,14 +6,13 @@ import {
   ArrowRight,
   Video,
   UserCheck,
-  MessageSquare,
   Youtube,
-  BookOpen,
   ChevronDown,
   Sparkles,
   FolderKanban,
   LayoutDashboard,
 } from 'lucide-react';
+import { motion, useScroll, useSpring } from 'motion/react';
 import { SITE_CONFIG } from '../data/siteConfig';
 import type { PageSectionId } from '../lib/domainLogic';
 
@@ -33,7 +32,7 @@ interface SubSolutionItem {
   label: string;
   sublabel: string;
   href: string;
-  badge?: string;
+  tag?: string;
 }
 
 export const SOLUCIONES_SUBMENU: SubSolutionItem[] = [
@@ -42,7 +41,7 @@ export const SOLUCIONES_SUBMENU: SubSolutionItem[] = [
     label: 'IA Services & Gemelos Digitales',
     sublabel: 'Agentes RAG, BI y Estructurador de Proyectos en Vivo',
     href: '#ia-services',
-    badge: 'IA EN VIVO',
+    tag: 'IA en Vivo',
   },
   {
     code: '02',
@@ -65,7 +64,7 @@ export const SOLUCIONES_SUBMENU: SubSolutionItem[] = [
   {
     code: '05',
     label: 'Odoo Community ERP v18 & B2B2C',
-    sublabel: ' Producción MRP, inventario multidepósito y comercio mayorista',
+    sublabel: 'Producción MRP, inventario multidepósito y comercio mayorista',
     href: '#odoo-v18',
   },
   {
@@ -94,14 +93,14 @@ const FWA_MENU_SECTIONS: FwaMenuItem[] = [
     id: 'inicio',
     label: 'Inicio · Gemelo Digital',
     href: '#inicio',
-    category: 'Experiencia en Video Full-Width · Bloques Personalizados & Buscador IA',
+    category: 'Experiencia en Video Full-Width · Bloques Interactivos & Buscador IA',
     description:
-      'Portada principal diseñada por bloques personalizados: escenario audiovisual desde el canal de YouTube de Gastón Barea, buscador de soluciones con IA y recorrido ejecutivo.',
+      'Portada ejecutiva cinética: escenario audiovisual en alta definición, buscador inteligente de arquitectura y recorrido Bento interactivo.',
     metrics: 'Canal @gastonbarea · IA en Vivo',
     featuredItems: [
       'Showreel interactivo full-width de proyectos tecnológicos y bioeconomía',
       'Buscador inteligente que enruta cada consulta a su solución web',
-      'Recorrido por bloques personalizados sin recarga visual',
+      'Recorrido por bloques Bento interactivos con respuesta en tiempo real',
     ],
   },
   {
@@ -192,7 +191,6 @@ const FWA_MENU_SECTIONS: FwaMenuItem[] = [
 export const Header: React.FC<HeaderProps> = ({
   activePage = 'inicio',
   onScheduleClick,
-  onWhatsAppClick,
   onNavigate,
   onAdminClick,
   onClientPortalClick,
@@ -203,7 +201,13 @@ export const Header: React.FC<HeaderProps> = ({
   const [isScrolledPastVideo, setIsScrolledPastVideo] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Detect scroll to transition header from integrated video overlay to crisp white bar
+  const { scrollYProgress } = useScroll();
+  const smoothProgress = useSpring(scrollYProgress, {
+    stiffness: 240,
+    damping: 32,
+    restDelta: 0.001,
+  });
+
   useEffect(() => {
     const handleScroll = () => {
       const threshold = window.innerHeight * 0.55;
@@ -214,7 +218,6 @@ export const Header: React.FC<HeaderProps> = ({
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // Close menus on ESC key or outside click for dropdown
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
@@ -235,7 +238,6 @@ export const Header: React.FC<HeaderProps> = ({
     };
   }, []);
 
-  // Lock body scroll when full-screen FWA menu is open
   useEffect(() => {
     if (fwaMenuOpen) {
       document.body.style.overflow = 'hidden';
@@ -257,25 +259,21 @@ export const Header: React.FC<HeaderProps> = ({
   };
 
   const activePreview = FWA_MENU_SECTIONS[hoveredIndex] || FWA_MENU_SECTIONS[0];
-
-  // Dark glass header when on Inicio above the video stage or when FWA menu is open
   const isOverDarkStage = (activePage === 'inicio' && !isScrolledPastVideo) || fwaMenuOpen;
-
   const isSolucionesActive =
     activePage === 'servicios' || activePage === 'ia-services' || activePage === 'bioeconomia';
 
   return (
     <>
-      {/* FULL-WIDTH TOP BAR (3-Zone Contract, frameless clean aesthetic) */}
       <header
         className={`fixed top-0 left-0 right-0 z-50 w-full transition-colors duration-200 border-b ${
           isOverDarkStage
-            ? 'bg-[#08080C]/85 backdrop-blur-xl text-white border-white/10'
-            : 'bg-white/95 backdrop-blur-xl text-[#1D1D1F] border-black/[0.07]'
+            ? 'bg-[#07080D]/80 backdrop-blur-2xl text-white border-white/10'
+            : 'bg-white/92 backdrop-blur-2xl text-[#1D1D1F] border-black/[0.07]'
         }`}
       >
-        <div className="w-full flex items-center justify-between gap-3 sm:gap-6 px-4 sm:px-8 lg:px-12 h-16 sm:h-[68px]">
-          {/* Zone 1: Menu Trigger + Brand Wordmark */}
+        <div className="w-full flex items-center justify-between gap-4 lg:gap-8 px-4 sm:px-8 lg:px-12 h-16 sm:h-[68px]">
+          {/* Zone 1: Menu Trigger + Brand Wordmark (with Human Innovation aligned right below) */}
           <div className="flex items-center gap-3 sm:gap-4 shrink-0">
             <button
               type="button"
@@ -283,7 +281,7 @@ export const Header: React.FC<HeaderProps> = ({
                 setSolucionesDropdownOpen(false);
                 setFwaMenuOpen(!fwaMenuOpen);
               }}
-              className={`px-3 sm:px-3.5 py-2 text-[13px] font-sans font-medium tracking-[-0.01em] transition-all inline-flex items-center gap-2 cursor-pointer border whitespace-nowrap shrink-0 ${
+              className={`px-3 sm:px-3.5 py-2 rounded-lg text-[13px] font-sans font-medium tracking-[-0.01em] transition-all inline-flex items-center gap-2 cursor-pointer border whitespace-nowrap shrink-0 ${
                 fwaMenuOpen
                   ? 'bg-[#291B64] text-white border-[#291B64]'
                   : isOverDarkStage
@@ -300,7 +298,7 @@ export const Header: React.FC<HeaderProps> = ({
             <a
               href="#inicio"
               onClick={(e) => handleNavClick(e, '#inicio')}
-              className="inline-flex flex-col items-end leading-none shrink-0 hover:opacity-80 transition-opacity"
+              className="inline-flex flex-col items-end leading-none shrink-0 hover:opacity-85 transition-opacity"
             >
               <span
                 className={`font-display text-[15px] sm:text-[17px] font-bold tracking-[-0.02em] whitespace-nowrap ${
@@ -319,14 +317,13 @@ export const Header: React.FC<HeaderProps> = ({
             </a>
           </div>
 
-          {/* Zone 2: Direct Multi-Page Section Navigation (Inicio | Soluciones ▾ | Proyectos | Experience | Blog | Contacto) */}
+          {/* Zone 2: Clean Single-Line Navigation */}
           <nav
             aria-label="Navegación principal"
-            className={`hidden lg:flex items-center gap-5 xl:gap-8 text-[13.5px] xl:text-[14px] font-sans font-medium tracking-[-0.01em] ${
+            className={`hidden lg:flex items-center gap-5 xl:gap-7 text-[13.5px] font-sans font-medium tracking-[-0.01em] ${
               isOverDarkStage ? 'text-neutral-300' : 'text-[#515154]'
             }`}
           >
-            {/* 1. Inicio */}
             <a
               href="#inicio"
               onClick={(e) => handleNavClick(e, '#inicio')}
@@ -343,7 +340,6 @@ export const Header: React.FC<HeaderProps> = ({
               Inicio
             </a>
 
-            {/* 2. Soluciones (with nested IA Services & all related engineering services) */}
             <div
               ref={dropdownRef}
               className="relative"
@@ -374,7 +370,7 @@ export const Header: React.FC<HeaderProps> = ({
 
               {solucionesDropdownOpen && (
                 <div className="absolute left-0 top-full pt-3 w-[440px] z-50">
-                  <div className="bg-[#0D0D12] text-white border border-white/15 shadow-2xl p-5 space-y-4 text-left">
+                  <div className="bg-[#0C0D14]/98 backdrop-blur-2xl text-white rounded-2xl border border-white/15 shadow-2xl p-5 space-y-4 text-left">
                     <div className="flex items-center justify-between pb-3 border-b border-white/10">
                       <span className="text-xs font-sans font-semibold tracking-tight text-emerald-400">
                         Soluciones · IA Services & Ingeniería
@@ -395,19 +391,19 @@ export const Header: React.FC<HeaderProps> = ({
                           key={sub.code}
                           href={sub.href}
                           onClick={(e) => handleNavClick(e, sub.href)}
-                          className="group py-3 first:pt-0 last:pb-0 flex items-start justify-between gap-3 hover:bg-white/[0.04] px-2.5 -mx-2.5 transition-colors"
+                          className="group py-3 first:pt-0 last:pb-0 flex items-start justify-between gap-3 hover:bg-white/[0.04] px-2.5 -mx-2.5 rounded-lg transition-colors"
                         >
                           <div className="space-y-0.5 min-w-0">
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs font-sans font-semibold text-emerald-400 tabular-nums">
+                            <div className="flex items-center gap-2 text-xs">
+                              <span className="font-mono font-semibold text-emerald-400 tabular-nums">
                                 {sub.code}.
                               </span>
                               <span className="font-display text-[14px] font-semibold tracking-[-0.01em] text-white group-hover:text-emerald-300 transition-colors truncate">
                                 {sub.label}
                               </span>
-                              {sub.badge && (
-                                <span className="text-[10px] font-sans font-semibold px-2 py-0.5 bg-[#291B64] text-emerald-300">
-                                  {sub.badge}
+                              {sub.tag && (
+                                <span className="text-[11px] font-mono text-emerald-300/90 shrink-0">
+                                  · {sub.tag}
                                 </span>
                               )}
                             </div>
@@ -424,7 +420,7 @@ export const Header: React.FC<HeaderProps> = ({
                       <a
                         href="#ia-services"
                         onClick={(e) => handleNavClick(e, '#ia-services')}
-                        className="px-3.5 py-2 bg-[#291B64] hover:bg-[#382586] text-white text-xs font-sans font-semibold inline-flex items-center gap-1.5 transition-colors"
+                        className="px-4 py-2 rounded-lg bg-[#291B64] hover:bg-[#382586] text-white text-xs font-sans font-semibold inline-flex items-center gap-1.5 transition-colors"
                       >
                         <Sparkles className="w-3.5 h-3.5 text-emerald-300" />
                         <span>Abrir Estructurador IA</span>
@@ -443,7 +439,6 @@ export const Header: React.FC<HeaderProps> = ({
               )}
             </div>
 
-            {/* 3. Proyectos */}
             <a
               href="#proyectos"
               onClick={(e) => handleNavClick(e, '#proyectos')}
@@ -460,7 +455,6 @@ export const Header: React.FC<HeaderProps> = ({
               Proyectos
             </a>
 
-            {/* 4. Experience */}
             <a
               href="#experience"
               onClick={(e) => handleNavClick(e, '#experience')}
@@ -477,7 +471,6 @@ export const Header: React.FC<HeaderProps> = ({
               Experience
             </a>
 
-            {/* 5. Blog */}
             <a
               href="#blog"
               onClick={(e) => handleNavClick(e, '#blog')}
@@ -494,7 +487,6 @@ export const Header: React.FC<HeaderProps> = ({
               Blog
             </a>
 
-            {/* 6. Contacto */}
             <a
               href="#contacto"
               onClick={(e) => handleNavClick(e, '#contacto')}
@@ -512,8 +504,8 @@ export const Header: React.FC<HeaderProps> = ({
             </a>
           </nav>
 
-          {/* Zone 3: Client Portal + Admin Dashboard + Primary Action */}
-          <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
+          {/* Zone 3: Portal Clientes + Centro ARN + Primary CTA */}
+          <div className="flex items-center gap-2 shrink-0">
             {onClientPortalClick && (
               <button
                 type="button"
@@ -522,7 +514,7 @@ export const Header: React.FC<HeaderProps> = ({
                   setSolucionesDropdownOpen(false);
                   onClientPortalClick();
                 }}
-                className={`min-h-[40px] px-2.5 sm:px-3.5 py-2 text-xs sm:text-[13px] font-sans font-semibold tracking-[-0.01em] transition-all inline-flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer border ${
+                className={`min-h-[40px] px-3 sm:px-3.5 py-2 rounded-lg text-xs sm:text-[13px] font-sans font-semibold tracking-[-0.01em] transition-all inline-flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer border ${
                   activePage === 'portal-clientes'
                     ? 'bg-[#291B64] text-white border-[#291B64]'
                     : isOverDarkStage
@@ -545,7 +537,7 @@ export const Header: React.FC<HeaderProps> = ({
                   setSolucionesDropdownOpen(false);
                   onAdminClick();
                 }}
-                className={`min-h-[40px] px-2.5 sm:px-3 py-2 text-xs sm:text-[13px] font-sans font-semibold tracking-[-0.01em] transition-all inline-flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer border ${
+                className={`min-h-[40px] px-2.5 sm:px-3 py-2 rounded-lg text-xs sm:text-[13px] font-sans font-semibold tracking-[-0.01em] transition-all inline-flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer border ${
                   activePage === 'admin'
                     ? 'bg-emerald-600 text-white border-emerald-600'
                     : isOverDarkStage
@@ -567,20 +559,26 @@ export const Header: React.FC<HeaderProps> = ({
                 setSolucionesDropdownOpen(false);
                 onScheduleClick();
               }}
-              className="hidden sm:inline-flex min-h-[40px] px-3.5 sm:px-4 py-2 text-[12.5px] sm:text-[13px] font-sans font-semibold tracking-[-0.01em] text-white bg-[#291B64] hover:bg-[#382586] transition-colors items-center gap-2 whitespace-nowrap shrink-0 cursor-pointer border border-[#291B64]"
+              className="hidden sm:inline-flex min-h-[40px] px-4 py-2 rounded-lg text-[13px] font-sans font-semibold tracking-[-0.01em] text-white bg-[#291B64] hover:bg-[#382586] transition-colors items-center gap-2 whitespace-nowrap shrink-0 cursor-pointer shadow-sm"
             >
-              <Video className="w-3.5 h-3.5 shrink-0" />
-              <span>¡Hablemos! Agendar Meet</span>
+              <Video className="w-3.5 h-3.5 text-emerald-300 shrink-0" />
+              <span>Agendar Meet</span>
             </button>
           </div>
         </div>
+
+        {/* Ultra-thin 2px Scroll Progress Indicator */}
+        <motion.div
+          style={{ scaleX: smoothProgress, transformOrigin: '0% 50%' }}
+          className="h-[2px] w-full bg-gradient-to-r from-[#6344F5] via-emerald-400 to-[#291B64] pointer-events-none"
+        />
       </header>
 
       {/* THE FWA FULL-SCREEN ARCHITECTURAL MEGA-MENU OVERLAY */}
       {fwaMenuOpen && (
-        <div className="fixed inset-0 top-16 z-40 w-full bg-[#0A0A0C] text-white overflow-y-auto border-t border-white/10">
+        <div className="fixed inset-0 top-16 z-40 w-full bg-[#090A10] text-white overflow-y-auto border-t border-white/10">
           <div className="w-full min-h-[calc(100vh-4rem)] grid grid-cols-1 lg:grid-cols-12">
-            {/* LEFT COLUMN (7 COLS): FWA OVERSIZED EDITORIAL INDEX */}
+            {/* LEFT COLUMN (7 COLS): EDITORIAL INDEX */}
             <div className="lg:col-span-7 flex flex-col justify-between border-b lg:border-b-0 lg:border-r border-white/10">
               <div className="divide-y divide-white/[0.07]">
                 {FWA_MENU_SECTIONS.map((item, idx) => {
@@ -596,7 +594,7 @@ export const Header: React.FC<HeaderProps> = ({
                       onFocus={() => setHoveredIndex(idx)}
                       onClick={(e) => handleNavClick(e, item.href)}
                       className={`group px-4 sm:px-8 lg:px-12 py-4 sm:py-6 flex items-center justify-between gap-4 sm:gap-6 transition-colors ${
-                        isActive ? 'bg-[#291B64] text-white' : 'bg-[#0A0A0C] hover:bg-white/[0.03]'
+                        isActive ? 'bg-[#291B64] text-white' : 'bg-[#090A10] hover:bg-white/[0.03]'
                       }`}
                     >
                       <div className="flex items-baseline gap-4 sm:gap-6 text-left min-w-0">
@@ -605,7 +603,7 @@ export const Header: React.FC<HeaderProps> = ({
                             isActive ? 'text-emerald-300' : 'text-neutral-500'
                           }`}
                         >
-                          {item.index}
+                          {item.index}.
                         </span>
                         <div className="space-y-1 min-w-0">
                           <div className="flex items-center gap-3">
@@ -614,7 +612,7 @@ export const Header: React.FC<HeaderProps> = ({
                             </span>
                             {isCurrentPage && (
                               <span className="text-[11px] font-mono text-emerald-400 shrink-0">
-                                · ACTIVO
+                                · Activo
                               </span>
                             )}
                           </div>
@@ -643,10 +641,9 @@ export const Header: React.FC<HeaderProps> = ({
                 })}
               </div>
 
-              {/* Quick Sub-Navigation for Soluciones inside Mobile / FWA View */}
-              <div className="px-4 sm:px-8 lg:px-12 py-5 bg-[#0D0D12] border-t border-white/10 space-y-3">
-                <div className="text-[11px] font-mono text-emerald-400 font-bold">
-                  ACCESO DIRECTO A SOLUCIONES & IA SERVICES:
+              <div className="px-4 sm:px-8 lg:px-12 py-5 bg-[#0C0D14] border-t border-white/10 space-y-3">
+                <div className="text-xs font-mono text-emerald-400 font-semibold">
+                  Acceso directo a soluciones
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                   {SOLUCIONES_SUBMENU.map((sub) => (
@@ -654,7 +651,7 @@ export const Header: React.FC<HeaderProps> = ({
                       key={sub.code}
                       href={sub.href}
                       onClick={(e) => handleNavClick(e, sub.href)}
-                      className="px-3 py-1.5 bg-white/[0.06] hover:bg-[#291B64] text-xs font-mono text-neutral-200 hover:text-white transition-colors"
+                      className="px-3 py-1.5 rounded-lg bg-white/[0.06] hover:bg-[#291B64] text-xs font-mono text-neutral-200 hover:text-white transition-colors"
                     >
                       {sub.code}. {sub.label}
                     </a>
@@ -662,11 +659,10 @@ export const Header: React.FC<HeaderProps> = ({
                 </div>
               </div>
 
-              {/* Bottom Quick Index Strip */}
-              <div className="px-4 sm:px-8 lg:px-12 py-5 bg-[#0E0E12] border-t border-white/10 flex flex-wrap items-center justify-between gap-4 text-xs font-mono text-neutral-400">
+              <div className="px-4 sm:px-8 lg:px-12 py-5 bg-[#0D0E16] border-t border-white/10 flex flex-wrap items-center justify-between gap-4 text-xs font-mono text-neutral-400">
                 <div>
                   <span className="text-white font-bold">GASTONBAREA.COM</span>
-                  <span> · GEMELO DIGITAL INTERACTIVO</span>
+                  <span> · Human Innovation · Gemelo Digital</span>
                 </div>
                 <div className="flex flex-wrap items-center gap-5">
                   <a
@@ -699,10 +695,10 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
 
             {/* RIGHT COLUMN (5 COLS): CLEAN TYPOGRAPHIC PREVIEW */}
-            <div className="lg:col-span-5 p-6 sm:p-10 lg:p-14 bg-[#101015] flex flex-col justify-between space-y-10 text-left">
+            <div className="lg:col-span-5 p-6 sm:p-10 lg:p-14 bg-[#0E1018] flex flex-col justify-between space-y-10 text-left">
               <div className="space-y-6">
                 <div className="flex flex-wrap items-center justify-between gap-2 text-xs font-mono text-emerald-400">
-                  <span>SECCIÓN {activePreview.index} · PÁGINA DEDICADA</span>
+                  <span>Sección {activePreview.index} · Vista Dedicada</span>
                   <span className="text-neutral-400">{activePreview.metrics}</span>
                 </div>
 
@@ -725,7 +721,7 @@ export const Header: React.FC<HeaderProps> = ({
                         key={i}
                         className="text-xs sm:text-sm text-neutral-200 flex items-start gap-3"
                       >
-                        <span className="font-mono text-emerald-400 font-bold shrink-0">
+                        <span className="font-mono text-emerald-400 font-bold shrink-0 tabular-nums">
                           0{i + 1}.
                         </span>
                         <span>{feat}</span>
@@ -741,7 +737,7 @@ export const Header: React.FC<HeaderProps> = ({
                         key={sub.href}
                         href={sub.href}
                         onClick={(e) => handleNavClick(e, sub.href)}
-                        className="px-3.5 py-2 text-xs font-mono font-semibold text-emerald-300 bg-white/[0.06] hover:bg-white/[0.12] inline-flex items-center gap-1.5 transition-colors"
+                        className="px-3.5 py-2 rounded-lg text-xs font-mono font-semibold text-emerald-300 bg-white/[0.06] hover:bg-white/[0.12] inline-flex items-center gap-1.5 transition-colors"
                       >
                         <span>{sub.label}</span>
                         <ArrowUpRight className="w-3.5 h-3.5" />
@@ -754,7 +750,7 @@ export const Header: React.FC<HeaderProps> = ({
                   <a
                     href={activePreview.href}
                     onClick={(e) => handleNavClick(e, activePreview.href)}
-                    className="px-6 py-3.5 text-xs font-mono font-bold text-white bg-[#291B64] hover:bg-[#382586] rounded-none inline-flex items-center gap-2 transition-colors"
+                    className="px-6 py-3.5 rounded-xl text-xs font-mono font-bold text-white bg-[#291B64] hover:bg-[#382586] inline-flex items-center gap-2 transition-colors"
                   >
                     <span>Abrir: {activePreview.label}</span>
                     <ArrowRight className="w-3.5 h-3.5" />
@@ -762,7 +758,6 @@ export const Header: React.FC<HeaderProps> = ({
                 </div>
               </div>
 
-              {/* Direct Platform Utilities */}
               <div className="pt-6 border-t border-white/10 space-y-4">
                 <div className="text-xs font-mono text-neutral-400">
                   Accesos Directos · 30 Años Tech · 14 Años PMO
@@ -775,11 +770,11 @@ export const Header: React.FC<HeaderProps> = ({
                       setFwaMenuOpen(false);
                       onScheduleClick();
                     }}
-                    className="p-3.5 bg-[#291B64] hover:bg-[#382586] text-white text-xs font-semibold flex items-center justify-between gap-2 cursor-pointer transition-colors"
+                    className="p-3.5 rounded-xl bg-[#291B64] hover:bg-[#382586] text-white text-xs font-semibold flex items-center justify-between gap-2 cursor-pointer transition-colors"
                   >
                     <span className="inline-flex items-center gap-2">
                       <Video className="w-4 h-4 text-emerald-300" />
-                      <span>¡Hablemos! Agendar Meet</span>
+                      <span>Agendar Google Meet</span>
                     </span>
                     <ArrowUpRight className="w-3.5 h-3.5" />
                   </button>
@@ -787,7 +782,7 @@ export const Header: React.FC<HeaderProps> = ({
                   <a
                     href="#proyectos"
                     onClick={(e) => handleNavClick(e, '#proyectos')}
-                    className="p-3.5 bg-white/[0.06] hover:bg-white/[0.12] text-white text-xs font-semibold flex items-center justify-between gap-2 transition-colors"
+                    className="p-3.5 rounded-xl bg-white/[0.06] hover:bg-white/[0.12] text-white text-xs font-semibold flex items-center justify-between gap-2 transition-colors"
                   >
                     <span className="inline-flex items-center gap-2">
                       <FolderKanban className="w-4 h-4 text-emerald-400" />
@@ -803,11 +798,11 @@ export const Header: React.FC<HeaderProps> = ({
                         setFwaMenuOpen(false);
                         onClientPortalClick();
                       }}
-                      className="p-3.5 bg-white/[0.06] hover:bg-white/[0.12] text-white text-xs font-semibold flex items-center justify-between gap-2 cursor-pointer transition-colors"
+                      className="p-3.5 rounded-xl bg-white/[0.06] hover:bg-white/[0.12] text-white text-xs font-semibold flex items-center justify-between gap-2 cursor-pointer transition-colors"
                     >
                       <span className="inline-flex items-center gap-2">
                         <UserCheck className="w-4 h-4 text-emerald-400" />
-                        <span>Portal Clientes (Login)</span>
+                        <span>Portal Clientes</span>
                       </span>
                       <ArrowUpRight className="w-3.5 h-3.5" />
                     </button>
@@ -820,11 +815,11 @@ export const Header: React.FC<HeaderProps> = ({
                         setFwaMenuOpen(false);
                         onAdminClick();
                       }}
-                      className="p-3.5 bg-white/[0.06] hover:bg-white/[0.12] text-white text-xs font-semibold flex items-center justify-between gap-2 cursor-pointer transition-colors"
+                      className="p-3.5 rounded-xl bg-white/[0.06] hover:bg-white/[0.12] text-white text-xs font-semibold flex items-center justify-between gap-2 cursor-pointer transition-colors"
                     >
                       <span className="inline-flex items-center gap-2">
                         <LayoutDashboard className="w-4 h-4 text-emerald-400" />
-                        <span>Panel de Control & CRM</span>
+                        <span>Panel de Control</span>
                       </span>
                       <ArrowUpRight className="w-3.5 h-3.5" />
                     </button>
