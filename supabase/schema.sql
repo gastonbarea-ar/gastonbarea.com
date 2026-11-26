@@ -200,7 +200,77 @@ CREATE INDEX IF NOT EXISTS idx_crm_contacts_email ON public.crm_contacts (email)
 CREATE INDEX IF NOT EXISTS idx_crm_contacts_username ON public.crm_contacts (username);
 
 -- ==============================================================================
--- 7. POLÍTICAS DE SEGURIDAD (ROW LEVEL SECURITY - RLS IDEMPOTENTES)
+-- 7. TABLAS DE PERSISTENCIA DEL PORTAL CLIENTES & STOCK ARN (SERVERLESS-SAFE)
+-- ==============================================================================
+CREATE TABLE IF NOT EXISTS public.client_projects (
+    id TEXT PRIMARY KEY,
+    client_email TEXT NOT NULL,
+    client_name TEXT,
+    company TEXT,
+    project_data JSONB NOT NULL DEFAULT '{}'::jsonb,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_client_projects_email ON public.client_projects (client_email);
+CREATE INDEX IF NOT EXISTS idx_client_projects_updated_at ON public.client_projects (updated_at DESC);
+
+CREATE TABLE IF NOT EXISTS public.arn_service_stock (
+    id TEXT PRIMARY KEY,
+    code TEXT,
+    name TEXT NOT NULL,
+    service_category TEXT,
+    active BOOLEAN DEFAULT true,
+    stock_data JSONB NOT NULL DEFAULT '{}'::jsonb,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS public.client_bookings (
+    id TEXT PRIMARY KEY,
+    client_email TEXT NOT NULL,
+    client_name TEXT,
+    company TEXT,
+    date TEXT NOT NULL,
+    time_slot TEXT NOT NULL,
+    status TEXT DEFAULT 'confirmed',
+    booking_data JSONB NOT NULL DEFAULT '{}'::jsonb,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_client_bookings_date ON public.client_bookings (date);
+CREATE INDEX IF NOT EXISTS idx_client_bookings_email ON public.client_bookings (client_email);
+
+CREATE TABLE IF NOT EXISTS public.support_tickets (
+    id TEXT PRIMARY KEY,
+    ticket_number TEXT,
+    client_email TEXT NOT NULL,
+    company TEXT,
+    severity TEXT DEFAULT 'medium',
+    status TEXT DEFAULT 'open',
+    ticket_data JSONB NOT NULL DEFAULT '{}'::jsonb,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_support_tickets_email ON public.support_tickets (client_email);
+CREATE INDEX IF NOT EXISTS idx_support_tickets_status ON public.support_tickets (status);
+
+CREATE TABLE IF NOT EXISTS public.client_inquiries (
+    id TEXT PRIMARY KEY,
+    client_email TEXT NOT NULL,
+    company TEXT,
+    topic TEXT NOT NULL,
+    status TEXT DEFAULT 'pending',
+    inquiry_data JSONB NOT NULL DEFAULT '{}'::jsonb,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_client_inquiries_email ON public.client_inquiries (client_email);
+
+-- ==============================================================================
+-- 8. POLÍTICAS DE SEGURIDAD ENDURECIDAS (ROW LEVEL SECURITY - RLS IDEMPOTENTES)
+-- Nota: El backend Vercel Serverless opera con SUPABASE_SERVICE_ROLE_KEY.
+-- El rol público 'anon' SOLO puede leer blog_posts/site_settings e insertar formularios públicos.
 -- ==============================================================================
 ALTER TABLE public.proposals ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.contact_inquiries ENABLE ROW LEVEL SECURITY;
@@ -212,63 +282,93 @@ ALTER TABLE public.crm_payments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.crm_settings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.crm_companies ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.crm_contacts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.client_projects ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.arn_service_stock ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.client_bookings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.support_tickets ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.client_inquiries ENABLE ROW LEVEL SECURITY;
 
 -- Limpieza previa de políticas para ejecución idempotente
 DROP POLICY IF EXISTS "Permitir inserción anónima de propuestas" ON public.proposals;
 DROP POLICY IF EXISTS "Permitir gestión completa a usuarios autenticados" ON public.proposals;
+DROP POLICY IF EXISTS "Gestión backend service_role proposals" ON public.proposals;
 DROP POLICY IF EXISTS "Permitir inserción anónima de consultas de contacto" ON public.contact_inquiries;
 DROP POLICY IF EXISTS "Permitir gestión de consultas a usuarios autenticados" ON public.contact_inquiries;
+DROP POLICY IF EXISTS "Gestión backend service_role contact_inquiries" ON public.contact_inquiries;
 DROP POLICY IF EXISTS "Permitir lectura pública de artículos" ON public.blog_posts;
 DROP POLICY IF EXISTS "Permitir gestión de artículos únicamente a Gastón" ON public.blog_posts;
+DROP POLICY IF EXISTS "Gestión backend service_role blog_posts" ON public.blog_posts;
 DROP POLICY IF EXISTS "Permitir lectura pública de configuración del sitio" ON public.site_settings;
 DROP POLICY IF EXISTS "Permitir gestión de configuración únicamente a Gastón" ON public.site_settings;
+DROP POLICY IF EXISTS "Gestión backend service_role site_settings" ON public.site_settings;
 DROP POLICY IF EXISTS "Acceso backend a crm_opportunities" ON public.crm_opportunities;
 DROP POLICY IF EXISTS "Acceso backend a crm_quotes" ON public.crm_quotes;
 DROP POLICY IF EXISTS "Acceso backend a crm_payments" ON public.crm_payments;
 DROP POLICY IF EXISTS "Acceso backend a crm_settings" ON public.crm_settings;
 DROP POLICY IF EXISTS "Acceso backend a crm_companies" ON public.crm_companies;
 DROP POLICY IF EXISTS "Acceso backend a crm_contacts" ON public.crm_contacts;
+DROP POLICY IF EXISTS "Acceso backend a client_projects" ON public.client_projects;
+DROP POLICY IF EXISTS "Acceso backend a arn_service_stock" ON public.arn_service_stock;
+DROP POLICY IF EXISTS "Acceso backend a client_bookings" ON public.client_bookings;
+DROP POLICY IF EXISTS "Acceso backend a support_tickets" ON public.support_tickets;
+DROP POLICY IF EXISTS "Acceso backend a client_inquiries" ON public.client_inquiries;
 
--- Políticas de inserción y lectura pública controlada
+-- Formularios públicos: anon solo puede insertar; lectura/gestión restringida a service_role
 CREATE POLICY "Permitir inserción anónima de propuestas"
 ON public.proposals FOR INSERT TO anon WITH CHECK (true);
 
-CREATE POLICY "Permitir gestión completa a usuarios autenticados"
-ON public.proposals FOR ALL TO anon, authenticated, service_role USING (true) WITH CHECK (true);
+CREATE POLICY "Gestión backend service_role proposals"
+ON public.proposals FOR ALL TO service_role USING (true) WITH CHECK (true);
 
 CREATE POLICY "Permitir inserción anónima de consultas de contacto"
 ON public.contact_inquiries FOR INSERT TO anon WITH CHECK (true);
 
-CREATE POLICY "Permitir gestión de consultas a usuarios autenticados"
-ON public.contact_inquiries FOR ALL TO anon, authenticated, service_role USING (true) WITH CHECK (true);
+CREATE POLICY "Gestión backend service_role contact_inquiries"
+ON public.contact_inquiries FOR ALL TO service_role USING (true) WITH CHECK (true);
 
+-- Contenido público: anon solo lectura; escritura restringida a service_role
 CREATE POLICY "Permitir lectura pública de artículos"
 ON public.blog_posts FOR SELECT TO anon, authenticated USING (true);
 
-CREATE POLICY "Permitir gestión de artículos únicamente a Gastón"
-ON public.blog_posts FOR ALL TO anon, authenticated, service_role USING (true) WITH CHECK (true);
+CREATE POLICY "Gestión backend service_role blog_posts"
+ON public.blog_posts FOR ALL TO service_role USING (true) WITH CHECK (true);
 
 CREATE POLICY "Permitir lectura pública de configuración del sitio"
 ON public.site_settings FOR SELECT TO anon, authenticated USING (true);
 
-CREATE POLICY "Permitir gestión de configuración únicamente a Gastón"
-ON public.site_settings FOR ALL TO anon, authenticated, service_role USING (true) WITH CHECK (true);
+CREATE POLICY "Gestión backend service_role site_settings"
+ON public.site_settings FOR ALL TO service_role USING (true) WITH CHECK (true);
 
--- Políticas para tablas de CRM y Portal operadas por el backend Serverless de Vercel
+-- Tablas privadas de CRM, Portal de Clientes y Stock ARN: acceso exclusivo del servidor (service_role)
 CREATE POLICY "Acceso backend a crm_opportunities"
-ON public.crm_opportunities FOR ALL TO anon, authenticated, service_role USING (true) WITH CHECK (true);
+ON public.crm_opportunities FOR ALL TO service_role USING (true) WITH CHECK (true);
 
 CREATE POLICY "Acceso backend a crm_quotes"
-ON public.crm_quotes FOR ALL TO anon, authenticated, service_role USING (true) WITH CHECK (true);
+ON public.crm_quotes FOR ALL TO service_role USING (true) WITH CHECK (true);
 
 CREATE POLICY "Acceso backend a crm_payments"
-ON public.crm_payments FOR ALL TO anon, authenticated, service_role USING (true) WITH CHECK (true);
+ON public.crm_payments FOR ALL TO service_role USING (true) WITH CHECK (true);
 
 CREATE POLICY "Acceso backend a crm_settings"
-ON public.crm_settings FOR ALL TO anon, authenticated, service_role USING (true) WITH CHECK (true);
+ON public.crm_settings FOR ALL TO service_role USING (true) WITH CHECK (true);
 
 CREATE POLICY "Acceso backend a crm_companies"
-ON public.crm_companies FOR ALL TO anon, authenticated, service_role USING (true) WITH CHECK (true);
+ON public.crm_companies FOR ALL TO service_role USING (true) WITH CHECK (true);
 
 CREATE POLICY "Acceso backend a crm_contacts"
-ON public.crm_contacts FOR ALL TO anon, authenticated, service_role USING (true) WITH CHECK (true);
+ON public.crm_contacts FOR ALL TO service_role USING (true) WITH CHECK (true);
+
+CREATE POLICY "Acceso backend a client_projects"
+ON public.client_projects FOR ALL TO service_role USING (true) WITH CHECK (true);
+
+CREATE POLICY "Acceso backend a arn_service_stock"
+ON public.arn_service_stock FOR ALL TO service_role USING (true) WITH CHECK (true);
+
+CREATE POLICY "Acceso backend a client_bookings"
+ON public.client_bookings FOR ALL TO service_role USING (true) WITH CHECK (true);
+
+CREATE POLICY "Acceso backend a support_tickets"
+ON public.support_tickets FOR ALL TO service_role USING (true) WITH CHECK (true);
+
+CREATE POLICY "Acceso backend a client_inquiries"
+ON public.client_inquiries FOR ALL TO service_role USING (true) WITH CHECK (true);

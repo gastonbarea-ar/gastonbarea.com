@@ -96,7 +96,7 @@ export const ArnClientIntakeWidget: React.FC<ArnClientIntakeWidgetProps> = ({
     return '';
   });
   const [phone, setPhone] = useState<string>('');
-  const [password, setPassword] = useState<string>('cliente2026');
+  const [password, setPassword] = useState<string>('');
 
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [isListeningVoice, setIsListeningVoice] = useState<boolean>(false);

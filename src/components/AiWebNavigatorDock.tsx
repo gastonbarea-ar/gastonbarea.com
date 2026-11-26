@@ -8,9 +8,9 @@ import {
   Video,
   Zap,
   UserCheck,
+  Lock,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { ArnClientIntakeWidget } from './ArnClientIntakeWidget';
 import type { PageSectionId } from './Header';
 
 interface MatchedSolution {
@@ -35,15 +35,22 @@ export const AiWebNavigatorDock: React.FC<AiWebNavigatorDockProps> = ({
   onNavigateToSolution,
   onScheduleClick,
   onClientPortalClick,
-  onWhatsAppClick,
 }) => {
   const [isOpen, setIsOpen] = useState<boolean>(false);
-  const [activeDockMode, setActiveDockMode] = useState<'arn' | 'guide'>('arn');
   const [query, setQuery] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [reply, setReply] = useState<string>('');
   const [matched, setMatched] = useState<MatchedSolution | null>(null);
   const [isVisibleByScroll, setIsVisibleByScroll] = useState<boolean>(false);
+
+  const openPortalGate = () => {
+    setIsOpen(false);
+    if (onClientPortalClick) {
+      onClientPortalClick();
+    } else {
+      window.location.hash = '#portal';
+    }
+  };
 
   // Show dock immediately on inner pages; on Home reveal smoothly once user scrolls past Hero video
   useEffect(() => {
@@ -64,7 +71,6 @@ export const AiWebNavigatorDock: React.FC<AiWebNavigatorDockProps> = ({
     if (!text || isLoading) return;
     if (!customText) setQuery('');
     setIsLoading(true);
-    setActiveDockMode('guide');
     setIsOpen(true);
 
     try {
@@ -112,30 +118,18 @@ export const AiWebNavigatorDock: React.FC<AiWebNavigatorDockProps> = ({
           >
             <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 pb-3">
               <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setActiveDockMode('arn')}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-mono font-bold transition-colors cursor-pointer inline-flex items-center gap-1.5 ${
-                    activeDockMode === 'arn'
-                      ? 'bg-emerald-400 text-emerald-950'
-                      : 'bg-white/10 text-neutral-300 hover:text-white'
-                  }`}
-                >
-                  <Zap className="w-3.5 h-3.5" />
-                  <span>ARN · Portal & Cotizador</span>
-                </button>
+                <span className="px-3 py-1.5 rounded-lg text-xs font-mono font-semibold bg-[#291B64] text-white inline-flex items-center gap-1.5">
+                  <Compass className="w-3.5 h-3.5" />
+                  <span>Guía IA Web</span>
+                </span>
 
                 <button
                   type="button"
-                  onClick={() => setActiveDockMode('guide')}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-mono font-semibold transition-colors cursor-pointer inline-flex items-center gap-1.5 ${
-                    activeDockMode === 'guide'
-                      ? 'bg-[#291B64] text-white'
-                      : 'bg-white/10 text-neutral-300 hover:text-white'
-                  }`}
+                  onClick={openPortalGate}
+                  className="px-3 py-1.5 rounded-lg text-xs font-mono font-bold bg-emerald-400/15 hover:bg-emerald-400 text-emerald-300 hover:text-emerald-950 border border-emerald-400/30 transition-colors cursor-pointer inline-flex items-center gap-1.5"
                 >
-                  <Compass className="w-3.5 h-3.5" />
-                  <span>Guía IA Web</span>
+                  <Lock className="w-3 h-3" />
+                  <span>Cotizador ARN en Mi Portal</span>
                 </button>
               </div>
 
@@ -149,100 +143,78 @@ export const AiWebNavigatorDock: React.FC<AiWebNavigatorDockProps> = ({
               </button>
             </div>
 
-            {activeDockMode === 'arn' ? (
-              <ArnClientIntakeWidget
-                variant="portal-compact"
-                onOpenPortalWithSession={() => {
-                  setIsOpen(false);
-                  if (onClientPortalClick) {
-                    onClientPortalClick();
-                  } else {
-                    window.location.hash = '#portal';
-                  }
-                }}
-                onScheduleClick={(ctx) => {
-                  setIsOpen(false);
-                  onScheduleClick(ctx);
-                }}
-                onWhatsAppClick={(txt) => {
-                  setIsOpen(false);
-                  if (onWhatsAppClick) onWhatsAppClick(txt);
-                }}
-              />
-            ) : (
-              <div className="space-y-4">
-                <div className="flex flex-wrap gap-1.5">
-                  {[
-                    { label: 'IA Services & Gemelo Digital', q: 'Integrar IA Services o Gemelo Digital en mi empresa' },
-                    { label: 'Bioeconomía & IoT', q: 'Proyecto de bioeconomía y trazabilidad productiva' },
-                    { label: 'Odoo ERP & B2B2C', q: 'Implementar Odoo ERP v18 y E-Commerce B2B2C' },
-                    { label: 'Dirección PMO 14 Años', q: 'Dirección ejecutiva de proyectos con clientes PMO' },
-                  ].map((item, i) => (
-                    <button
-                      key={i}
-                      type="button"
-                      onClick={() => handleSearchSolution(item.q)}
-                      className="px-3 py-1.5 rounded-lg text-xs font-medium bg-white/10 hover:bg-white hover:text-[#0A0A0C] transition-colors cursor-pointer whitespace-nowrap"
-                    >
-                      {item.label}
-                    </button>
-                  ))}
-                </div>
+            <div className="space-y-4">
+              <div className="flex flex-wrap gap-1.5">
+                {[
+                  { label: 'IA Services & Gemelo Digital', q: 'Integrar IA Services o Gemelo Digital en mi empresa' },
+                  { label: 'Bioeconomía & IoT', q: 'Proyecto de bioeconomía y trazabilidad productiva' },
+                  { label: 'Odoo ERP & B2B2C', q: 'Implementar Odoo ERP v18 y E-Commerce B2B2C' },
+                  { label: 'Dirección PMO 14 Años', q: 'Dirección ejecutiva de proyectos con clientes PMO' },
+                ].map((item, i) => (
+                  <button
+                    key={i}
+                    type="button"
+                    onClick={() => handleSearchSolution(item.q)}
+                    className="px-3 py-1.5 rounded-lg text-xs font-medium bg-white/10 hover:bg-white hover:text-[#0A0A0C] transition-colors cursor-pointer whitespace-nowrap"
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
 
-                {isLoading ? (
-                  <div className="py-4 flex items-center gap-2 text-xs font-mono text-neutral-300">
-                    <RefreshCw className="w-4 h-4 animate-spin text-emerald-400" />
-                    <span>Analizando tu consulta para ubicarte en la solución exacta...</span>
-                  </div>
-                ) : reply ? (
-                  <div className="space-y-3">
-                    <p className="text-xs sm:text-sm text-neutral-200 leading-relaxed whitespace-pre-line">
-                      {reply}
-                    </p>
-                    {matched && (
-                      <div className="p-3.5 rounded-xl bg-white/10 border border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                        <div>
-                          <div className="text-[11px] font-mono text-emerald-400">
-                            {matched.serviceTitle} ({matched.timeline})
-                          </div>
-                          <div className="text-xs text-neutral-300 mt-0.5 line-clamp-1">
-                            {matched.summary}
-                          </div>
+              {isLoading ? (
+                <div className="py-4 flex items-center gap-2 text-xs font-mono text-neutral-300">
+                  <RefreshCw className="w-4 h-4 animate-spin text-emerald-400" />
+                  <span>Analizando tu consulta para ubicarte en la solución exacta...</span>
+                </div>
+              ) : reply ? (
+                <div className="space-y-3">
+                  <p className="text-xs sm:text-sm text-neutral-200 leading-relaxed whitespace-pre-line">
+                    {reply}
+                  </p>
+                  {matched && (
+                    <div className="p-3.5 rounded-xl bg-white/10 border border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div>
+                        <div className="text-[11px] font-mono text-emerald-400">
+                          {matched.serviceTitle} ({matched.timeline})
                         </div>
-                        <div className="flex items-center gap-2 shrink-0">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setIsOpen(false);
-                              onNavigateToSolution(matched.sectionId, matched.serviceCode);
-                            }}
-                            className="px-3.5 py-2 rounded-lg text-xs font-semibold text-white bg-[#291B64] hover:bg-[#382586] transition-colors inline-flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
-                          >
-                            <span>{matched.ctaLabel}</span>
-                            <ArrowRight className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setIsOpen(false);
-                              onScheduleClick(`Consulta guiada por IA: ${matched.serviceTitle}`);
-                            }}
-                            className="p-2 rounded-lg text-white bg-white/10 hover:bg-white/20 transition-colors cursor-pointer"
-                            title="Agendar Google Meet Pro"
-                          >
-                            <Video className="w-4 h-4" />
-                          </button>
+                        <div className="text-xs text-neutral-300 mt-0.5 line-clamp-1">
+                          {matched.summary}
                         </div>
                       </div>
-                    )}
-                  </div>
-                ) : (
-                  <p className="text-xs text-neutral-400">
-                    Escribí abajo qué problema tecnológico, de IA o de bioeconomía buscás resolver y la web te llevará directo a la solución.
-                  </p>
-                )}
-              </div>
-            )}
+                      <div className="flex items-center gap-2 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsOpen(false);
+                            onNavigateToSolution(matched.sectionId, matched.serviceCode);
+                          }}
+                          className="px-3.5 py-2 rounded-lg text-xs font-semibold text-white bg-[#291B64] hover:bg-[#382586] transition-colors inline-flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
+                        >
+                          <span>{matched.ctaLabel}</span>
+                          <ArrowRight className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsOpen(false);
+                            onScheduleClick(`Consulta guiada por IA: ${matched.serviceTitle}`);
+                          }}
+                          className="p-2 rounded-lg text-white bg-white/10 hover:bg-white/20 transition-colors cursor-pointer"
+                          title="Agendar Google Meet Pro"
+                        >
+                          <Video className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <p className="text-xs text-neutral-400">
+                  Escribí abajo qué problema tecnológico, de IA o de bioeconomía buscás resolver y la web te llevará directo a la solución. Para cotizar con ARN, ingresá o registrate en tu Portal de Clientes.
+                </p>
+              )}
+            </div>
           </motion.div>
         )}
       </AnimatePresence>
@@ -251,30 +223,20 @@ export const AiWebNavigatorDock: React.FC<AiWebNavigatorDockProps> = ({
       <div className="sm:hidden pointer-events-auto w-full bg-[#0B0D14]/96 backdrop-blur-xl text-white border-t border-white/15 grid grid-cols-3 divide-x divide-white/10 shadow-2xl">
         <button
           type="button"
-          onClick={() => {
-            setActiveDockMode('arn');
-            setIsOpen(!isOpen || activeDockMode !== 'arn');
-          }}
-          className="min-h-[52px] px-2 py-2 flex flex-col items-center justify-center gap-0.5 bg-emerald-400 text-emerald-950 font-mono font-bold text-[11px] cursor-pointer"
+          onClick={() => setIsOpen(!isOpen)}
+          className="min-h-[52px] px-2 py-2 flex flex-col items-center justify-center gap-0.5 hover:bg-white/10 text-white font-mono font-semibold text-[11px] cursor-pointer"
         >
-          <Zap className="w-4 h-4 shrink-0" />
-          <span>ARN Portal</span>
+          <Compass className="w-4 h-4 text-sky-400 shrink-0" />
+          <span>Guía IA</span>
         </button>
 
         <button
           type="button"
-          onClick={() => {
-            setIsOpen(false);
-            if (onClientPortalClick) {
-              onClientPortalClick();
-            } else {
-              window.location.hash = '#portal';
-            }
-          }}
-          className="min-h-[52px] px-2 py-2 flex flex-col items-center justify-center gap-0.5 hover:bg-white/10 text-white font-mono font-semibold text-[11px] cursor-pointer"
+          onClick={openPortalGate}
+          className="min-h-[52px] px-2 py-2 flex flex-col items-center justify-center gap-0.5 bg-emerald-400 text-emerald-950 font-mono font-bold text-[11px] cursor-pointer"
         >
-          <UserCheck className="w-4 h-4 text-emerald-400 shrink-0" />
-          <span>Mi Portal</span>
+          <UserCheck className="w-4 h-4 shrink-0" />
+          <span>Mi Portal ARN</span>
         </button>
 
         <button
@@ -304,10 +266,7 @@ export const AiWebNavigatorDock: React.FC<AiWebNavigatorDockProps> = ({
       >
         <button
           type="button"
-          onClick={() => {
-            setActiveDockMode('arn');
-            setIsOpen(!isOpen || activeDockMode !== 'arn');
-          }}
+          onClick={openPortalGate}
           className="px-3 py-1.5 rounded-xl bg-emerald-400 hover:bg-emerald-300 text-emerald-950 text-xs font-mono font-bold inline-flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0 transition-colors"
         >
           <Zap className="w-3.5 h-3.5" />
@@ -321,10 +280,7 @@ export const AiWebNavigatorDock: React.FC<AiWebNavigatorDockProps> = ({
         <input
           type="text"
           value={query}
-          onFocus={() => {
-            setActiveDockMode('guide');
-            setIsOpen(true);
-          }}
+          onFocus={() => setIsOpen(true)}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Preguntale a la Guía IA qué solución necesitás..."
           className="flex-1 text-xs sm:text-[13px] bg-transparent text-white placeholder:text-neutral-400 focus:outline-none min-w-0"

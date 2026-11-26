@@ -612,7 +612,7 @@ export const CrmDashboard: React.FC<CrmDashboardProps> = ({
       setCntFullName(contactToEdit.fullName);
       setCntEmail(contactToEdit.email);
       setCntUsername(contactToEdit.username);
-      setCntPassword(contactToEdit.password || 'cliente2026');
+      setCntPassword('');
       setCntPhone(contactToEdit.phone || '');
       setCntRoleTitle(contactToEdit.roleTitle);
       setCntType(contactToEdit.contactType);
@@ -624,7 +624,7 @@ export const CrmDashboard: React.FC<CrmDashboardProps> = ({
       setCntFullName('');
       setCntEmail('');
       setCntUsername('');
-      setCntPassword('cliente2026');
+      setCntPassword('');
       setCntPhone('');
       setCntRoleTitle(preselectedCompanyId ? 'Representante Corporativo' : 'Consultor / Contacto Individual');
       setCntType(preselectedCompanyId ? 'corporate_member' : 'individual');
@@ -654,7 +654,7 @@ export const CrmDashboard: React.FC<CrmDashboardProps> = ({
       fullName: cntFullName.trim(),
       email: cleanEmail,
       username: cleanUsername,
-      password: cntPassword.trim() || 'cliente2026',
+      password: cntPassword.trim(),
       phone: cntPhone.trim(),
       roleTitle:
         cntRoleTitle.trim() ||
@@ -2297,10 +2297,10 @@ export const CrmDashboard: React.FC<CrmDashboardProps> = ({
                         Contraseña Asignada
                       </label>
                       <input
-                        type="text"
+                        type="password"
                         value={cntPassword}
                         onChange={(e) => setCntPassword(e.target.value)}
-                        placeholder="cliente2026"
+                        placeholder={editingContact ? 'Vacío para conservar actual' : 'Clave inicial opcional'}
                         className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-xl text-xs font-mono text-slate-900"
                       />
                     </div>

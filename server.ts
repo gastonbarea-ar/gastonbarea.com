@@ -76,9 +76,45 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 
-// Security Headers, CORS & Preflight Handling for cloud preview and production runtimes
+// Security Headers, CORS Allowlist & Preflight Handling for cloud preview and production runtimes
+const ALLOWED_EXACT_ORIGINS = new Set(
+  [
+    'https://gastonbarea.com',
+    'https://www.gastonbarea.com',
+    'https://gastonbarea.com.ar',
+    'https://www.gastonbarea.com.ar',
+    'http://localhost:3000',
+    'http://localhost:5173',
+    'http://127.0.0.1:3000',
+    'http://127.0.0.1:5173',
+    process.env.APP_URL,
+  ].filter(Boolean) as string[]
+);
+
+function isAllowedOrigin(origin?: string): boolean {
+  if (!origin) return true;
+  if (ALLOWED_EXACT_ORIGINS.has(origin)) return true;
+  try {
+    const parsed = new URL(origin);
+    if (
+      parsed.hostname.endsWith('.gastonbarea.com') ||
+      parsed.hostname.endsWith('.vercel.app') ||
+      parsed.hostname.endsWith('.run.app')
+    ) {
+      return true;
+    }
+  } catch {
+    return false;
+  }
+  return false;
+}
+
 app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Origin', '*');
+  const origin = req.headers.origin;
+  if (origin && isAllowedOrigin(origin)) {
+    res.header('Access-Control-Allow-Origin', origin);
+    res.header('Vary', 'Origin');
+  }
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
   res.header(
     'Access-Control-Allow-Headers',
@@ -270,6 +306,182 @@ interface AdminSession {
 const activeAdminSessions = new Map<string, AdminSession>();
 const activeOtpCodes = new Map<string, { code: string; expiresAt: number; attempts: number }>();
 const loginAttemptTracker = new Map<string, { count: number; lockedUntil: number }>();
+
+// Cryptographic Security Helpers (Constant-Time Compare, Scrypt Password Hashing & Signed Client Tokens)
+function safeEqualStrings(a?: string, b?: string): boolean {
+  if (typeof a !== 'string' || typeof b !== 'string') return false;
+  const bufA = Buffer.from(a);
+  const bufB = Buffer.from(b);
+  if (bufA.length !== bufB.length) return false;
+  return crypto.timingSafeEqual(bufA, bufB);
+}
+
+function hashPassword(plain: string): string {
+  if (!plain) return '';
+  if (plain.startsWith('scrypt$')) return plain;
+  const salt = crypto.randomBytes(16).toString('hex');
+  const derived = crypto.scryptSync(plain, salt, 64).toString('hex');
+  return `scrypt$${salt}$${derived}`;
+}
+
+function verifyPassword(plain: string, stored?: string): boolean {
+  if (!plain || !stored) return false;
+  if (stored.startsWith('scrypt$')) {
+    const parts = stored.split('$');
+    if (parts.length !== 3) return false;
+    const [, salt, hashHex] = parts;
+    const derived = crypto.scryptSync(plain, salt, 64).toString('hex');
+    return safeEqualStrings(derived, hashHex);
+  }
+  return safeEqualStrings(plain, stored);
+}
+
+function stripContactPassword<T extends { password?: string }>(contact: T): Omit<T, 'password'> {
+  const { password: _omitted, ...safe } = contact;
+  return safe;
+}
+
+// Zero-Downtime Supabase Persistence Layer (Dedicated Tables + Automatic crm_settings Fallback)
+function isMissingTableError(error: any): boolean {
+  if (!error) return false;
+  const msg = String(error.message || '');
+  return (
+    error.code === '42P01' ||
+    error.code === 'PGRST205' ||
+    msg.includes('does not exist') ||
+    msg.includes('schema cache')
+  );
+}
+
+async function persistCollectionStore<T>(
+  tableName: string,
+  settingsFallbackKey: string,
+  items: T[],
+  rowMapper: (item: T) => Record<string, any>
+): Promise<void> {
+  if (!supabase) return;
+  try {
+    // Mirror full snapshot to crm_settings so data always persists even before SQL migration is run
+    await supabase.from('crm_settings').upsert({
+      id: settingsFallbackKey,
+      config: { items, updatedAt: new Date().toISOString() },
+      updated_at: new Date().toISOString(),
+    });
+    if (items.length > 0) {
+      const { error } = await supabase.from(tableName).upsert(items.map(rowMapper));
+      if (error && !isMissingTableError(error)) {
+        console.warn(`[Supabase Sync ${tableName}] warning:`, error.message);
+      }
+    }
+  } catch (err) {
+    console.warn(`[Supabase Persist ${tableName}] non-blocking:`, err);
+  }
+}
+
+async function deleteFromCollectionStore<T>(
+  tableName: string,
+  settingsFallbackKey: string,
+  deletedId: string,
+  remainingItems: T[]
+): Promise<void> {
+  if (!supabase) return;
+  try {
+    await supabase.from('crm_settings').upsert({
+      id: settingsFallbackKey,
+      config: { items: remainingItems, updatedAt: new Date().toISOString() },
+      updated_at: new Date().toISOString(),
+    });
+    const { error } = await supabase.from(tableName).delete().eq('id', deletedId);
+    if (error && !isMissingTableError(error)) {
+      console.warn(`[Supabase Delete ${tableName}] warning:`, error.message);
+    }
+  } catch (err) {
+    console.warn(`[Supabase Delete ${tableName}] non-blocking:`, err);
+  }
+}
+
+let lastPortalHydrationAt = 0;
+async function hydratePortalAndStockFromSupabase(force = false): Promise<void> {
+  if (!supabase) return;
+  if (!force && Date.now() - lastPortalHydrationAt < 15000) return;
+  lastPortalHydrationAt = Date.now();
+
+  try {
+    await ensureSupabaseSeeded();
+    const [
+      projRes,
+      stockRes,
+      bookRes,
+      tickRes,
+      inqRes,
+      settingsFallbackRes,
+    ] = await Promise.all([
+      supabase.from('client_projects').select('project_data').order('updated_at', { ascending: false }),
+      supabase.from('arn_service_stock').select('stock_data').order('updated_at', { ascending: false }),
+      supabase.from('client_bookings').select('booking_data').order('created_at', { ascending: false }),
+      supabase.from('support_tickets').select('ticket_data').order('created_at', { ascending: false }),
+      supabase.from('client_inquiries').select('inquiry_data').order('updated_at', { ascending: false }),
+      supabase
+        .from('crm_settings')
+        .select('id, config')
+        .in('id', [
+          'store_client_projects',
+          'store_arn_service_stock',
+          'store_client_bookings',
+          'store_support_tickets',
+          'store_client_inquiries',
+          'booking_availability',
+        ]),
+    ]);
+
+    const fallbackMap = new Map<string, any>();
+    if (!settingsFallbackRes.error && Array.isArray(settingsFallbackRes.data)) {
+      for (const row of settingsFallbackRes.data) {
+        fallbackMap.set(row.id, row.config);
+      }
+    }
+
+    if (!projRes.error && Array.isArray(projRes.data) && projRes.data.length > 0) {
+      cachedClientProjects = projRes.data.map((r: any) => r.project_data).filter(Boolean);
+    } else if (Array.isArray(fallbackMap.get('store_client_projects')?.items)) {
+      cachedClientProjects = fallbackMap.get('store_client_projects').items;
+    }
+
+    if (!stockRes.error && Array.isArray(stockRes.data) && stockRes.data.length > 0) {
+      cachedServiceStock = stockRes.data.map((r: any) => r.stock_data).filter(Boolean);
+    } else if (Array.isArray(fallbackMap.get('store_arn_service_stock')?.items)) {
+      cachedServiceStock = fallbackMap.get('store_arn_service_stock').items;
+    }
+
+    if (!bookRes.error && Array.isArray(bookRes.data) && bookRes.data.length > 0) {
+      cachedClientBookings = bookRes.data.map((r: any) => r.booking_data).filter(Boolean);
+    } else if (Array.isArray(fallbackMap.get('store_client_bookings')?.items)) {
+      cachedClientBookings = fallbackMap.get('store_client_bookings').items;
+    }
+
+    if (!tickRes.error && Array.isArray(tickRes.data) && tickRes.data.length > 0) {
+      cachedSupportTickets = tickRes.data.map((r: any) => r.ticket_data).filter(Boolean);
+    } else if (Array.isArray(fallbackMap.get('store_support_tickets')?.items)) {
+      cachedSupportTickets = fallbackMap.get('store_support_tickets').items;
+    }
+
+    if (!inqRes.error && Array.isArray(inqRes.data) && inqRes.data.length > 0) {
+      cachedClientInquiries = inqRes.data.map((r: any) => r.inquiry_data).filter(Boolean);
+    } else if (Array.isArray(fallbackMap.get('store_client_inquiries')?.items)) {
+      cachedClientInquiries = fallbackMap.get('store_client_inquiries').items;
+    }
+
+    const savedBookingAvail = fallbackMap.get('booking_availability');
+    if (savedBookingAvail && Array.isArray(savedBookingAvail.slots)) {
+      cachedBookingAvailability = {
+        ...cachedBookingAvailability,
+        ...savedBookingAvail,
+      };
+    }
+  } catch (err) {
+    console.warn('[Supabase Portal/Stock Hydration] non-blocking:', err);
+  }
+}
 
 // Automatic One-Time Initial Seed for Empty Supabase Tables
 let supabaseSeedAttempted = false;
@@ -475,13 +687,53 @@ const ADMIN_TOKEN_SECRET =
 
 function issueSignedAdminToken(): string {
   const issuedAt = Date.now();
-  const nonce = Math.random().toString(36).substring(2, 10);
+  const nonce = crypto.randomBytes(8).toString('hex');
   const sig = crypto
     .createHmac('sha256', ADMIN_TOKEN_SECRET)
     .update(`${issuedAt}_${nonce}`)
     .digest('hex')
-    .slice(0, 24);
+    .slice(0, 32);
   return `gb_sec_${issuedAt}_${nonce}_${sig}`;
+}
+
+function issueSignedClientToken(email: string, ttlMs = 7 * 24 * 60 * 60 * 1000): string {
+  const payload = Buffer.from(
+    JSON.stringify({
+      email: email.toLowerCase().trim(),
+      exp: Date.now() + ttlMs,
+      nonce: crypto.randomBytes(6).toString('hex'),
+    })
+  ).toString('base64url');
+  const sig = crypto
+    .createHmac('sha256', ADMIN_TOKEN_SECRET)
+    .update(`cli_${payload}`)
+    .digest('base64url')
+    .slice(0, 32);
+  return `gb_cli2_${payload}.${sig}`;
+}
+
+function verifySignedClientToken(token?: string): { email: string; expiresAt: number } | null {
+  if (!token || !token.startsWith('gb_cli2_')) return null;
+  const body = token.slice('gb_cli2_'.length);
+  const dotIdx = body.lastIndexOf('.');
+  if (dotIdx <= 0) return null;
+  const payload = body.slice(0, dotIdx);
+  const providedSig = body.slice(dotIdx + 1);
+  const expectedSig = crypto
+    .createHmac('sha256', ADMIN_TOKEN_SECRET)
+    .update(`cli_${payload}`)
+    .digest('base64url')
+    .slice(0, 32);
+  if (!safeEqualStrings(providedSig, expectedSig)) return null;
+  try {
+    const decoded = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'));
+    if (!decoded?.email || typeof decoded.exp !== 'number' || Date.now() >= decoded.exp) {
+      return null;
+    }
+    return { email: String(decoded.email).toLowerCase().trim(), expiresAt: decoded.exp };
+  } catch {
+    return null;
+  }
 }
 
 // Helper to resolve AdminSession (supports both in-memory & HMAC-signed stateless Vercel Serverless tokens)
@@ -502,13 +754,15 @@ function resolveAdminSession(token?: string): AdminSession | null {
     const issuedAt = Number(parts[2]);
     const nonce = parts[3] || '';
     const providedSig = parts[4] || '';
-    if (!Number.isNaN(issuedAt) && issuedAt > 0 && nonce) {
-      const expectedSig = crypto
+    if (!Number.isNaN(issuedAt) && issuedAt > 0 && nonce && providedSig) {
+      const fullHmac = crypto
         .createHmac('sha256', ADMIN_TOKEN_SECRET)
         .update(`${issuedAt}_${nonce}`)
-        .digest('hex')
-        .slice(0, 24);
-      const isSignedValid = providedSig ? providedSig === expectedSig : nonce.length >= 8;
+        .digest('hex');
+      const expectedSig = fullHmac.slice(0, providedSig.length);
+      const isSignedValid =
+        (providedSig.length === 24 || providedSig.length === 32) &&
+        safeEqualStrings(providedSig, expectedSig);
       const expiresAt = issuedAt + 72 * 60 * 60 * 1000;
       if (isSignedValid && Date.now() < expiresAt) {
         const statelessSession: AdminSession = {
@@ -540,9 +794,9 @@ function requireAdminAuth(req: express.Request, res: express.Response, next: exp
     return next();
   }
 
-  // 2. Compatibility fallback with Master Passkey
-  const provided = req.headers['x-admin-passkey'] || req.query.passkey || req.body?.passkey;
-  if (provided === masterPasskey || provided === 'admin') {
+  // 2. Compatibility fallback with configured Master Passkey only
+  const provided = String(req.headers['x-admin-passkey'] || req.query.passkey || req.body?.passkey || '');
+  if (provided && safeEqualStrings(provided, masterPasskey)) {
     return next();
   }
 
@@ -1423,7 +1677,7 @@ app.post('/api/admin/auth/login', (req, res) => {
   ];
   const masterPasskey = process.env.ADMIN_PASSKEY || 'gaston2026';
   const isValidIdentifier = validIdentifiers.includes(identifier);
-  const isValidPassword = password === masterPasskey || password === 'admin2026' || password === 'admin';
+  const isValidPassword = typeof password === 'string' && safeEqualStrings(password, masterPasskey);
 
   if (!isValidIdentifier || !isValidPassword) {
     return res.status(401).json({
@@ -1490,7 +1744,7 @@ app.post('/api/admin/auth/verify-step-1', (req, res) => {
 
   const normalizedEmail = (email || '').toLowerCase().trim();
   const isValidEmail = validEmails.includes(normalizedEmail) || normalizedEmail === 'gaston';
-  const isValidPassword = password === masterPasskey || password === 'admin';
+  const isValidPassword = typeof password === 'string' && safeEqualStrings(password, masterPasskey);
 
   if (!isValidEmail || !isValidPassword) {
     const currentAttempts = (tracker?.count || 0) + 1;
@@ -1535,13 +1789,11 @@ app.post('/api/admin/auth/verify-step-2', (req, res) => {
   const clientIp = (req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress || '127.0.0.1';
 
   const otpData = activeOtpCodes.get(normalizedEmail);
-  const masterBackupPin = '749216'; // Security emergency fallback pin
-  const masterPasskey = process.env.ADMIN_PASSKEY || 'gaston2026';
+  const isOtpValid = Boolean(
+    otpData && typeof code === 'string' && safeEqualStrings(otpData.code, code) && Date.now() <= otpData.expiresAt
+  );
 
-  const isMasterOverride = code === masterBackupPin || code === masterPasskey;
-  const isOtpValid = otpData && otpData.code === code && Date.now() <= otpData.expiresAt;
-
-  if (!isMasterOverride && !isOtpValid) {
+  if (!isOtpValid) {
     if (otpData) {
       otpData.attempts += 1;
       if (otpData.attempts >= 4) {
@@ -1651,7 +1903,7 @@ app.post('/api/admin/auth/logout', (req, res) => {
 app.post('/api/admin/auth', (req, res) => {
   const { passkey } = req.body || {};
   const masterPasskey = process.env.ADMIN_PASSKEY || 'gaston2026';
-  if (passkey === masterPasskey || passkey === 'admin') {
+  if (typeof passkey === 'string' && safeEqualStrings(passkey, masterPasskey)) {
     const sessionToken = issueSignedAdminToken();
     activeAdminSessions.set(sessionToken, {
       token: sessionToken,
@@ -1871,6 +2123,7 @@ app.get('/api/crm/overview', requireAdminAuth, async (_req, res) => {
   if (supabase) {
     try {
       await ensureSupabaseSeeded();
+      await hydratePortalAndStockFromSupabase();
       const [oppsRes, quotesRes, paysRes, configRes, compsRes, cntsRes] = await Promise.all([
         supabase.from('crm_opportunities').select('*').order('created_at', { ascending: false }),
         supabase.from('crm_quotes').select('*').order('created_at', { ascending: false }),
@@ -2023,7 +2276,7 @@ app.get('/api/crm/overview', requireAdminAuth, async (_req, res) => {
       payments: cachedPayments,
       paymentConfig: cachedPaymentConfig,
       companies: cachedCrmCompanies,
-      contacts: cachedCrmContacts,
+      contacts: cachedCrmContacts.map((c) => stripContactPassword(c)),
       serviceStock: cachedServiceStock,
       metrics: {
         totalOpportunities: cachedOpportunities.length,
@@ -2309,12 +2562,17 @@ app.post('/api/crm/contacts', requireAdminAuth, async (req, res) => {
     }
   }
 
+  const rawInitialPassword =
+    body.password && String(body.password).trim()
+      ? String(body.password).trim()
+      : crypto.randomBytes(8).toString('hex');
+
   const newContact = {
     id: body.id || `cnt-${Date.now()}`,
     fullName: String(body.fullName).trim(),
     email: cleanEmail,
     username: cleanUsername,
-    password: body.password ? String(body.password).trim() : 'cliente2026',
+    password: hashPassword(rawInitialPassword),
     phone: body.phone || '',
     roleTitle:
       body.roleTitle ||
@@ -2357,7 +2615,7 @@ app.post('/api/crm/contacts', requireAdminAuth, async (req, res) => {
     }
   }
 
-  return res.json({ success: true, contact: newContact });
+  return res.json({ success: true, contact: stripContactPassword(newContact) });
 });
 
 app.put('/api/crm/contacts/:id', requireAdminAuth, async (req, res) => {
@@ -2374,9 +2632,15 @@ app.put('/api/crm/contacts/:id', requireAdminAuth, async (req, res) => {
     if (comp) resolvedCompanyName = comp.name;
   }
 
+  const nextPassword =
+    typeof body.password === 'string' && body.password.trim().length > 0
+      ? hashPassword(body.password.trim())
+      : cachedCrmContacts[idx].password;
+
   const updated = {
     ...cachedCrmContacts[idx],
     ...body,
+    password: nextPassword,
     companyName: resolvedCompanyName,
     updatedAt: new Date().toISOString(),
   };
@@ -2418,7 +2682,7 @@ app.put('/api/crm/contacts/:id', requireAdminAuth, async (req, res) => {
     }
   }
 
-  return res.json({ success: true, contact: updated });
+  return res.json({ success: true, contact: stripContactPassword(updated) });
 });
 
 app.delete('/api/crm/contacts/:id', requireAdminAuth, async (req, res) => {
@@ -3111,14 +3375,19 @@ async function autoProvisionKickoffProject(params: {
 
   if (supabase) {
     try {
-      await supabase.from('client_projects').upsert({
-        id: newProject.id,
-        client_email: newProject.clientEmail,
-        client_name: newProject.clientName,
-        company: newProject.company,
-        project_data: newProject,
-        updated_at: new Date().toISOString(),
-      });
+      await persistCollectionStore(
+        'client_projects',
+        'store_client_projects',
+        cachedClientProjects,
+        (p: any) => ({
+          id: p.id,
+          client_email: p.clientEmail,
+          client_name: p.clientName,
+          company: p.company,
+          project_data: p,
+          updated_at: new Date().toISOString(),
+        })
+      );
       if (cleanEmail) {
         await supabase
           .from('crm_contacts')
@@ -3369,14 +3638,19 @@ app.post('/api/client/projects/:projectId/milestones/:milestoneId/report-payment
         notes: newPayment.notes,
         created_at: newPayment.createdAt,
       });
-      await supabase.from('client_projects').upsert({
-        id: project.id,
-        client_email: project.clientEmail,
-        client_name: project.clientName,
-        company: project.company,
-        project_data: project,
-        updated_at: new Date().toISOString(),
-      });
+      await persistCollectionStore(
+        'client_projects',
+        'store_client_projects',
+        cachedClientProjects,
+        (p: any) => ({
+          id: p.id,
+          client_email: p.clientEmail,
+          client_name: p.clientName,
+          company: p.company,
+          project_data: p,
+          updated_at: new Date().toISOString(),
+        })
+      );
     } catch (err) {
       console.warn('[Report Milestone Payment] Supabase sync warning:', err);
     }
@@ -3610,9 +3884,12 @@ app.post('/api/webhooks/whatsapp', async (req, res) => {
 // CLIENT PORTAL API ENDPOINTS
 // ==========================================
 
-// Helper to authenticate client requests
+// Helper to authenticate client requests (In-Memory + Stateless HMAC-Signed Vercel Serverless Tokens)
 function getClientFromRequest(req: express.Request) {
-  const token = (req.headers['x-client-token'] as string) || (req.headers.authorization?.replace(/^Bearer\s+/i, ''));
+  const token =
+    (req.headers['x-client-token'] as string) ||
+    req.headers.authorization?.replace(/^Bearer\s+/i, '');
+
   if (token && activeClientSessions.has(token)) {
     const session = activeClientSessions.get(token)!;
     if (Date.now() < session.expiresAt) {
@@ -3629,53 +3906,46 @@ function getClientFromRequest(req: express.Request) {
     }
   }
 
-  // Fallback for query email or header email
-  const email = (req.headers['x-client-email'] as string) || (req.query.email as string);
-  if (email) {
-    const normalizedEmail = email.toLowerCase().trim();
-    const matchedContact = cachedCrmContacts.find((c) => c.email.toLowerCase() === normalizedEmail);
-    if (matchedContact) {
-      if (matchedContact.portalAccessStatus === 'revoked') {
-        return null;
-      }
-      return {
-        id: matchedContact.id,
-        email: matchedContact.email,
-        username: matchedContact.username,
-        name: matchedContact.fullName,
-        company:
-          matchedContact.companyName ||
-          (matchedContact.contactType === 'individual' ? 'Contacto Individual' : 'Organización'),
-        companyId: matchedContact.companyId,
-        role: matchedContact.roleTitle,
-        contactType: matchedContact.contactType,
-        hasActiveService: matchedContact.hasActiveService,
-        linkedProjectId: matchedContact.linkedProjectId,
-        expiresAt: Date.now() + 24 * 60 * 60 * 1000,
-      };
+  // Stateless HMAC-signed client token verification (survives Vercel Serverless cold starts)
+  const verified = verifySignedClientToken(token);
+  if (verified) {
+    const normalizedEmail = verified.email;
+    const matchedContact = cachedCrmContacts.find(
+      (c) => c.email.toLowerCase() === normalizedEmail
+    );
+    if (matchedContact && matchedContact.portalAccessStatus === 'revoked') {
+      return null;
     }
 
-    const match = cachedClientProjects.find((p) => p.clientEmail.toLowerCase() === normalizedEmail);
-    if (match) {
-      return {
-        email: match.clientEmail,
-        name: match.clientName,
-        company: match.company,
-        contactType: 'corporate_member' as const,
-        hasActiveService: true,
-        linkedProjectId: match.id,
-        expiresAt: Date.now() + 24 * 60 * 60 * 1000,
-      };
-    }
-    return {
+    const matchProj = cachedClientProjects.find(
+      (p) =>
+        (matchedContact?.linkedProjectId && p.id === matchedContact.linkedProjectId) ||
+        p.clientEmail.toLowerCase() === normalizedEmail
+    );
+
+    const rebuiltSession = {
+      id: matchedContact?.id,
       email: normalizedEmail,
-      name: 'Usuario Registrado',
-      company: 'Contacto Individual',
-      contactType: 'individual' as const,
-      hasActiveService: false,
-      expiresAt: Date.now() + 24 * 60 * 60 * 1000,
+      username: matchedContact?.username || normalizedEmail.split('@')[0],
+      name: matchedContact?.fullName || matchProj?.clientName || 'Usuario Registrado',
+      company:
+        matchedContact?.companyName ||
+        matchProj?.company ||
+        (matchedContact?.contactType === 'individual' ? 'Contacto Individual' : 'Organización'),
+      companyId: matchedContact?.companyId,
+      role: matchedContact?.roleTitle || 'Usuario Registrado',
+      contactType: matchedContact?.contactType || (matchProj ? ('corporate_member' as const) : ('individual' as const)),
+      hasActiveService: matchedContact ? matchedContact.hasActiveService : Boolean(matchProj),
+      linkedProjectId: matchedContact?.linkedProjectId || matchProj?.id,
+      expiresAt: verified.expiresAt,
     };
+
+    if (token) {
+      activeClientSessions.set(token, rebuiltSession);
+    }
+    return rebuiltSession;
   }
+
   return null;
 }
 
@@ -3739,11 +4009,9 @@ app.post('/api/client/auth/login', async (req, res) => {
     (acc) => acc.username.toLowerCase() === identifier || acc.email.toLowerCase() === identifier
   );
 
-  const validMasterPasswords = ['cliente2026', 'client2026', 'gaston2026', 'distribuidora2026', 'nova2026'];
   const isPasswordValid =
-    (matchedContact && matchedContact.password === cleanPassword) ||
-    (matchedAccount && matchedAccount.password === cleanPassword) ||
-    validMasterPasswords.includes(cleanPassword);
+    (matchedContact && verifyPassword(cleanPassword, matchedContact.password)) ||
+    (!matchedContact && matchedAccount && verifyPassword(cleanPassword, matchedAccount.password));
 
   if (!isPasswordValid) {
     return res.status(401).json({
@@ -3752,13 +4020,27 @@ app.post('/api/client/auth/login', async (req, res) => {
     });
   }
 
+  // Transparently upgrade legacy plaintext password to scrypt hash on successful login
+  if (matchedContact && matchedContact.password && !matchedContact.password.startsWith('scrypt$')) {
+    const upgradedHash = hashPassword(cleanPassword);
+    matchedContact.password = upgradedHash;
+    if (supabase) {
+      void (async () => {
+        try {
+          await supabase
+            .from('crm_contacts')
+            .update({ password: upgradedHash, updated_at: new Date().toISOString() })
+            .eq('id', matchedContact.id);
+        } catch {
+          // non-blocking
+        }
+      })();
+    }
+  }
+
   const resolvedEmail = matchedContact
     ? matchedContact.email.toLowerCase()
-    : matchedAccount
-    ? matchedAccount.email.toLowerCase()
-    : identifier.includes('@')
-    ? identifier
-    : 'martin@distribuidorasur.com.ar';
+    : matchedAccount!.email.toLowerCase();
 
   const existingProject = cachedClientProjects.find(
     (p) =>
@@ -3766,7 +4048,7 @@ app.post('/api/client/auth/login', async (req, res) => {
       p.clientEmail.toLowerCase() === resolvedEmail
   );
 
-  const clientToken = `gb_cli_${Date.now()}_${Math.random().toString(36).substring(2)}`;
+  const clientToken = issueSignedClientToken(resolvedEmail);
   const session = {
     id: matchedContact?.id || matchedAccount?.id,
     email: resolvedEmail,
@@ -3812,12 +4094,19 @@ app.post('/api/client/auth/register', async (req, res) => {
 
   const cleanName = (fullName || '').trim();
   const cleanEmail = (email || '').trim().toLowerCase();
-  const cleanPassword = (password || '').trim() || 'cliente2026';
+  const cleanPassword = (password || '').trim();
 
   if (!cleanName || !cleanEmail || !cleanEmail.includes('@')) {
     return res.status(400).json({
       success: false,
       error: 'Por favor completá tu nombre completo y un correo electrónico válido.',
+    });
+  }
+
+  if (cleanPassword.length < 6) {
+    return res.status(400).json({
+      success: false,
+      error: 'Definí una contraseña de al menos 6 caracteres para proteger tu cuenta.',
     });
   }
 
@@ -3908,7 +4197,7 @@ app.post('/api/client/auth/register', async (req, res) => {
     fullName: cleanName,
     email: cleanEmail,
     username: cleanUsername,
-    password: cleanPassword,
+    password: hashPassword(cleanPassword),
     phone: phone || '',
     roleTitle:
       roleTitle ||
@@ -3954,7 +4243,7 @@ app.post('/api/client/auth/register', async (req, res) => {
     }
   }
 
-  const clientToken = `gb_cli_${Date.now()}_${Math.random().toString(36).substring(2)}`;
+  const clientToken = issueSignedClientToken(newContact.email);
   const session = {
     id: newContact.id,
     email: newContact.email,
@@ -4030,11 +4319,9 @@ app.post('/api/client/auth/verify-code', (req, res) => {
   const normalizedEmail = (email || '').toLowerCase().trim();
 
   const otpData = activeClientOtpCodes.get(normalizedEmail);
-  const masterPin = 'client2026';
-  const isValid =
-    (otpData && otpData.code === code && Date.now() <= otpData.expiresAt) ||
-    code === masterPin ||
-    code === 'gaston2026';
+  const isValid = Boolean(
+    otpData && typeof code === 'string' && safeEqualStrings(otpData.code, code) && Date.now() <= otpData.expiresAt
+  );
 
   if (!isValid) {
     return res.status(401).json({ success: false, error: 'Código de acceso incorrecto o expirado.' });
@@ -4042,7 +4329,7 @@ app.post('/api/client/auth/verify-code', (req, res) => {
 
   activeClientOtpCodes.delete(normalizedEmail);
 
-  const clientToken = `gb_cli_${Date.now()}_${Math.random().toString(36).substring(2)}`;
+  const clientToken = issueSignedClientToken(normalizedEmail);
   const matchedContact = cachedCrmContacts.find((c) => c.email.toLowerCase() === normalizedEmail);
   const project = cachedClientProjects.find(
     (p) =>
@@ -4086,7 +4373,8 @@ app.get('/api/client/auth/verify-session', (req, res) => {
 });
 
 // 4. Client Dashboard Overview (Project, Corporate Group, Inquiries, Tickets, Bookings)
-app.get('/api/client/dashboard', (req, res) => {
+app.get('/api/client/dashboard', async (req, res) => {
+  await hydratePortalAndStockFromSupabase();
   const client = getClientFromRequest(req);
   if (!client) {
     return res.status(401).json({ error: 'Acceso no autorizado al portal' });
@@ -4182,8 +4470,11 @@ app.get('/api/client/dashboard', (req, res) => {
 });
 
 // 5. Client: Create Advisory Inquiry
-app.post('/api/client/inquiries', (req, res) => {
+app.post('/api/client/inquiries', async (req, res) => {
   const client = getClientFromRequest(req);
+  if (!client) {
+    return res.status(401).json({ error: 'Iniciá sesión en tu Portal para enviar consultas.' });
+  }
   const { topic, category, question } = req.body || {};
 
   if (!topic || !question) {
@@ -4192,9 +4483,9 @@ app.post('/api/client/inquiries', (req, res) => {
 
   const newInquiry = {
     id: `inq-${Date.now()}`,
-    clientEmail: client?.email || req.body.clientEmail || 'cliente@empresa.com',
-    clientName: client?.name || req.body.clientName || 'Cliente',
-    company: client?.company || 'Empresa',
+    clientEmail: client.email,
+    clientName: client.name || 'Cliente',
+    company: client.company || 'Empresa',
     topic,
     category: category || 'architecture',
     question,
@@ -4203,7 +4494,7 @@ app.post('/api/client/inquiries', (req, res) => {
       {
         id: `msg-${Date.now()}`,
         sender: 'client' as const,
-        senderName: client?.name || 'Cliente',
+        senderName: client.name || 'Cliente',
         text: question,
         createdAt: new Date().toISOString(),
       },
@@ -4213,15 +4504,34 @@ app.post('/api/client/inquiries', (req, res) => {
   };
 
   cachedClientInquiries.unshift(newInquiry);
+  await persistCollectionStore(
+    'client_inquiries',
+    'store_client_inquiries',
+    cachedClientInquiries,
+    (inq: any) => ({
+      id: inq.id,
+      client_email: inq.clientEmail,
+      company: inq.company,
+      topic: inq.topic,
+      status: inq.status,
+      inquiry_data: inq,
+      created_at: inq.createdAt,
+      updated_at: inq.updatedAt,
+    })
+  );
   return res.json({ success: true, inquiry: newInquiry });
 });
 
 // 6. Client: Add Message to Inquiry Thread
-app.post('/api/client/inquiries/:id/messages', (req, res) => {
+app.post('/api/client/inquiries/:id/messages', async (req, res) => {
   const { id } = req.params;
   const { text } = req.body || {};
   const client = getClientFromRequest(req);
+  if (!client) {
+    return res.status(401).json({ error: 'Sesión requerida para responder en el hilo.' });
+  }
 
+  await hydratePortalAndStockFromSupabase();
   const inquiry = cachedClientInquiries.find((i) => i.id === id);
   if (!inquiry) {
     return res.status(404).json({ error: 'Consulta no encontrada' });
@@ -4230,7 +4540,7 @@ app.post('/api/client/inquiries/:id/messages', (req, res) => {
   const newMessage = {
     id: `msg-${Date.now()}`,
     sender: 'client' as const,
-    senderName: client?.name || 'Cliente',
+    senderName: client.name || 'Cliente',
     text,
     createdAt: new Date().toISOString(),
   };
@@ -4239,12 +4549,31 @@ app.post('/api/client/inquiries/:id/messages', (req, res) => {
   inquiry.status = 'pending';
   inquiry.updatedAt = new Date().toISOString();
 
+  await persistCollectionStore(
+    'client_inquiries',
+    'store_client_inquiries',
+    cachedClientInquiries,
+    (inq: any) => ({
+      id: inq.id,
+      client_email: inq.clientEmail,
+      company: inq.company,
+      topic: inq.topic,
+      status: inq.status,
+      inquiry_data: inq,
+      created_at: inq.createdAt,
+      updated_at: inq.updatedAt,
+    })
+  );
+
   return res.json({ success: true, message: newMessage });
 });
 
 // 7. Client: Open Support Ticket
-app.post('/api/client/tickets', (req, res) => {
+app.post('/api/client/tickets', async (req, res) => {
   const client = getClientFromRequest(req);
+  if (!client) {
+    return res.status(401).json({ error: 'Iniciá sesión en tu Portal para abrir tickets de soporte.' });
+  }
   const { subject, severity, systemArea, description } = req.body || {};
 
   if (!subject || !description) {
@@ -4261,9 +4590,9 @@ app.post('/api/client/tickets', (req, res) => {
   const newTicket = {
     id: `tick-${Date.now()}`,
     ticketNumber: `TICK-${Math.floor(1000 + Math.random() * 9000)}`,
-    clientEmail: client?.email || req.body.clientEmail || 'cliente@empresa.com',
-    clientName: client?.name || req.body.clientName || 'Cliente',
-    company: client?.company || 'Empresa',
+    clientEmail: client.email,
+    clientName: client.name || 'Cliente',
+    company: client.company || 'Empresa',
     subject,
     severity: severity || 'medium',
     systemArea: systemArea || 'servers',
@@ -4274,6 +4603,21 @@ app.post('/api/client/tickets', (req, res) => {
   };
 
   cachedSupportTickets.unshift(newTicket);
+  await persistCollectionStore(
+    'support_tickets',
+    'store_support_tickets',
+    cachedSupportTickets,
+    (t: any) => ({
+      id: t.id,
+      ticket_number: t.ticketNumber,
+      client_email: t.clientEmail,
+      company: t.company,
+      severity: t.severity,
+      status: t.status,
+      ticket_data: t,
+      created_at: t.createdAt,
+    })
+  );
   return res.json({ success: true, ticket: newTicket });
 });
 
@@ -4298,7 +4642,8 @@ function computeOccupiedSlotsByDate(): Record<string, string[]> {
 }
 
 // 8A. Public & Portal: Get Real-Time Booking Availability & Occupied Slots
-app.get('/api/bookings/availability', (_req, res) => {
+app.get('/api/bookings/availability', async (_req, res) => {
+  await hydratePortalAndStockFromSupabase();
   return res.json({
     success: true,
     config: cachedBookingAvailability,
@@ -4307,7 +4652,7 @@ app.get('/api/bookings/availability', (_req, res) => {
 });
 
 // 8B. Admin Side: Update Booking Availability Rules, Slots, Blocked Dates & Meet Link
-app.put('/api/admin/bookings/availability', requireAdminAuth, (req, res) => {
+app.put('/api/admin/bookings/availability', requireAdminAuth, async (req, res) => {
   const { notificationEmail, googleMeetUrl, enabledWeekdays, slots, blockedDates } =
     req.body || {};
 
@@ -4338,6 +4683,18 @@ app.put('/api/admin/bookings/availability', requireAdminAuth, (req, res) => {
     cachedBookingAvailability.blockedDates = blockedDates
       .map((d: any) => String(d).trim())
       .filter(Boolean);
+  }
+
+  if (supabase) {
+    try {
+      await supabase.from('crm_settings').upsert({
+        id: 'booking_availability',
+        config: cachedBookingAvailability,
+        updated_at: new Date().toISOString(),
+      });
+    } catch (err) {
+      console.warn('[Booking Availability Persist] warning:', err);
+    }
   }
 
   return res.json({
@@ -4502,6 +4859,22 @@ app.post('/api/client/bookings', async (req, res) => {
   };
 
   cachedClientBookings.unshift(newBooking);
+  await persistCollectionStore(
+    'client_bookings',
+    'store_client_bookings',
+    cachedClientBookings,
+    (b: any) => ({
+      id: b.id,
+      client_email: b.clientEmail,
+      client_name: b.clientName,
+      company: b.company,
+      date: b.date,
+      time_slot: b.timeSlot,
+      status: b.status || 'confirmed',
+      booking_data: b,
+      created_at: b.createdAt,
+    })
+  );
 
   const whatsappText = `Hola Gastón, acabo de agendar nuestra videollamada "${getBookingTypeLabel(
     resolvedType
@@ -4521,7 +4894,8 @@ app.post('/api/client/bookings', async (req, res) => {
 });
 
 // 9. Admin Side: View all client inquiries & tickets
-app.get('/api/admin/client-portal/overview', requireAdminAuth, (_req, res) => {
+app.get('/api/admin/client-portal/overview', requireAdminAuth, async (_req, res) => {
+  await hydratePortalAndStockFromSupabase();
   return res.json({
     success: true,
     projects: cachedClientProjects,
@@ -4532,10 +4906,11 @@ app.get('/api/admin/client-portal/overview', requireAdminAuth, (_req, res) => {
 });
 
 // 10. Admin Side: Reply to Client Inquiry
-app.post('/api/admin/client-portal/inquiries/:id/reply', requireAdminAuth, (req, res) => {
+app.post('/api/admin/client-portal/inquiries/:id/reply', requireAdminAuth, async (req, res) => {
   const { id } = req.params;
   const { replyText } = req.body || {};
 
+  await hydratePortalAndStockFromSupabase();
   const inquiry = cachedClientInquiries.find((i) => i.id === id);
   if (!inquiry) {
     return res.status(404).json({ error: 'Consulta no encontrada' });
@@ -4553,14 +4928,31 @@ app.post('/api/admin/client-portal/inquiries/:id/reply', requireAdminAuth, (req,
   inquiry.status = 'answered';
   inquiry.updatedAt = new Date().toISOString();
 
+  await persistCollectionStore(
+    'client_inquiries',
+    'store_client_inquiries',
+    cachedClientInquiries,
+    (inq: any) => ({
+      id: inq.id,
+      client_email: inq.clientEmail,
+      company: inq.company,
+      topic: inq.topic,
+      status: inq.status,
+      inquiry_data: inq,
+      created_at: inq.createdAt,
+      updated_at: inq.updatedAt,
+    })
+  );
+
   return res.json({ success: true, inquiry, message: replyMessage });
 });
 
 // 11. Admin Side: Update Ticket Status
-app.patch('/api/admin/client-portal/tickets/:id', requireAdminAuth, (req, res) => {
+app.patch('/api/admin/client-portal/tickets/:id', requireAdminAuth, async (req, res) => {
   const { id } = req.params;
   const { status, resolutionNotes } = req.body || {};
 
+  await hydratePortalAndStockFromSupabase();
   const ticket = cachedSupportTickets.find((t) => t.id === id);
   if (!ticket) {
     return res.status(404).json({ error: 'Ticket no encontrado' });
@@ -4571,6 +4963,22 @@ app.patch('/api/admin/client-portal/tickets/:id', requireAdminAuth, (req, res) =
   if (status === 'closed' || status === 'fix_deployed') {
     ticket.resolvedAt = new Date().toISOString();
   }
+
+  await persistCollectionStore(
+    'support_tickets',
+    'store_support_tickets',
+    cachedSupportTickets,
+    (t: any) => ({
+      id: t.id,
+      ticket_number: t.ticketNumber,
+      client_email: t.clientEmail,
+      company: t.company,
+      severity: t.severity,
+      status: t.status,
+      ticket_data: t,
+      created_at: t.createdAt,
+    })
+  );
 
   return res.json({ success: true, ticket });
 });
@@ -4641,14 +5049,19 @@ app.patch('/api/admin/client-portal/projects/:id', requireAdminAuth, async (req,
 
   if (supabase) {
     try {
-      await supabase.from('client_projects').upsert({
-        id: project.id,
-        client_email: project.clientEmail,
-        client_name: project.clientName,
-        company: project.company,
-        project_data: project,
-        updated_at: new Date().toISOString(),
-      });
+      await persistCollectionStore(
+        'client_projects',
+        'store_client_projects',
+        cachedClientProjects,
+        (p: any) => ({
+          id: p.id,
+          client_email: p.clientEmail,
+          client_name: p.clientName,
+          company: p.company,
+          project_data: p,
+          updated_at: new Date().toISOString(),
+        })
+      );
     } catch (err) {
       console.warn('[Admin Project Patch] Supabase sync warning:', err);
     }
@@ -4658,12 +5071,20 @@ app.patch('/api/admin/client-portal/projects/:id', requireAdminAuth, async (req,
 });
 
 // 11C. Admin Side: Manage or Release Consulting Bookings (Complete, Reschedule, or Free Slot)
-app.patch('/api/admin/client-portal/bookings/:id', requireAdminAuth, (req, res) => {
+app.patch('/api/admin/client-portal/bookings/:id', requireAdminAuth, async (req, res) => {
   const { id } = req.params;
   const { status, date, timeSlot, releaseSlot } = req.body || {};
 
+  await hydratePortalAndStockFromSupabase();
+
   if (releaseSlot) {
     cachedClientBookings = cachedClientBookings.filter((b) => b.id !== id);
+    await deleteFromCollectionStore(
+      'client_bookings',
+      'store_client_bookings',
+      id,
+      cachedClientBookings
+    );
     return res.json({
       success: true,
       bookings: cachedClientBookings,
@@ -4683,6 +5104,23 @@ app.patch('/api/admin/client-portal/bookings/:id', requireAdminAuth, (req, res) 
     ...(timeSlot ? { timeSlot } : {}),
   };
   cachedClientBookings[bIdx] = updated;
+
+  await persistCollectionStore(
+    'client_bookings',
+    'store_client_bookings',
+    cachedClientBookings,
+    (b: any) => ({
+      id: b.id,
+      client_email: b.clientEmail,
+      client_name: b.clientName,
+      company: b.company,
+      date: b.date,
+      time_slot: b.timeSlot,
+      status: b.status || 'confirmed',
+      booking_data: b,
+      created_at: b.createdAt,
+    })
+  );
 
   return res.json({
     success: true,
@@ -4900,20 +5338,23 @@ async function resolveArnCommandWithAi(
 }
 
 // 13.0 ARN Service Stock Catalog Endpoints (Micro / PyME / Grande controllable pricing)
-app.get('/api/arn/service-stock', (_req, res) => {
+app.get('/api/arn/service-stock', async (_req, res) => {
+  await hydratePortalAndStockFromSupabase();
   return res.json({
     success: true,
     serviceStock: cachedServiceStock,
   });
 });
 
-app.post('/api/arn/service-stock', requireAdminAuth, (req, res) => {
+app.post('/api/arn/service-stock', requireAdminAuth, async (req, res) => {
   const payload = req.body || {};
   if (!payload.name || !payload.scales) {
     return res
       .status(400)
       .json({ error: 'Completá el nombre del servicio y sus 3 escalas (Micro, PyME, Grande).' });
   }
+
+  await hydratePortalAndStockFromSupabase();
 
   const newStockItem = {
     ...payload,
@@ -4924,6 +5365,20 @@ app.post('/api/arn/service-stock', requireAdminAuth, (req, res) => {
   };
 
   cachedServiceStock.unshift(newStockItem);
+  await persistCollectionStore(
+    'arn_service_stock',
+    'store_arn_service_stock',
+    cachedServiceStock,
+    (s: any) => ({
+      id: s.id,
+      code: s.code,
+      name: s.name,
+      service_category: s.serviceCategory,
+      active: s.active !== false,
+      stock_data: s,
+      updated_at: s.updatedAt || new Date().toISOString(),
+    })
+  );
   return res.json({
     success: true,
     item: newStockItem,
@@ -4931,8 +5386,9 @@ app.post('/api/arn/service-stock', requireAdminAuth, (req, res) => {
   });
 });
 
-app.put('/api/arn/service-stock/:id', requireAdminAuth, (req, res) => {
+app.put('/api/arn/service-stock/:id', requireAdminAuth, async (req, res) => {
   const { id } = req.params;
+  await hydratePortalAndStockFromSupabase();
   const idx = cachedServiceStock.findIndex((s) => s.id === id);
   if (idx === -1) {
     return res.status(404).json({ error: 'Servicio no encontrado en el Stock ARN.' });
@@ -4960,6 +5416,20 @@ app.put('/api/arn/service-stock/:id', requireAdminAuth, (req, res) => {
   };
 
   cachedServiceStock[idx] = updated;
+  await persistCollectionStore(
+    'arn_service_stock',
+    'store_arn_service_stock',
+    cachedServiceStock,
+    (s: any) => ({
+      id: s.id,
+      code: s.code,
+      name: s.name,
+      service_category: s.serviceCategory,
+      active: s.active !== false,
+      stock_data: s,
+      updated_at: s.updatedAt || new Date().toISOString(),
+    })
+  );
   return res.json({
     success: true,
     item: updated,
@@ -4967,9 +5437,16 @@ app.put('/api/arn/service-stock/:id', requireAdminAuth, (req, res) => {
   });
 });
 
-app.delete('/api/arn/service-stock/:id', requireAdminAuth, (req, res) => {
+app.delete('/api/arn/service-stock/:id', requireAdminAuth, async (req, res) => {
   const { id } = req.params;
+  await hydratePortalAndStockFromSupabase();
   cachedServiceStock = cachedServiceStock.filter((s) => s.id !== id);
+  await deleteFromCollectionStore(
+    'arn_service_stock',
+    'store_arn_service_stock',
+    id,
+    cachedServiceStock
+  );
   return res.json({
     success: true,
     serviceStock: cachedServiceStock,
@@ -5911,8 +6388,100 @@ app.post('/api/arn/intake', async (req, res) => {
   cachedOpportunities.unshift(newOpp);
   cachedQuotes.unshift(autoQuote);
 
-  // 4. Create instant Client Portal session token
-  const token = `gb_cli_arn_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  // Persist ARN intake records (company, hashed contact, opportunity & quote) into Supabase
+  if (supabase) {
+    try {
+      const createdComp = companyId ? cachedCrmCompanies.find((c) => c.id === companyId) : null;
+      const createdContact = contactId ? cachedCrmContacts.find((c) => c.id === contactId) : null;
+      if (createdContact && createdContact.password && !createdContact.password.startsWith('scrypt$')) {
+        createdContact.password = hashPassword(createdContact.password);
+      }
+      await Promise.all([
+        createdComp
+          ? supabase.from('crm_companies').upsert({
+              id: createdComp.id,
+              name: createdComp.name,
+              tax_id: createdComp.taxId || null,
+              industry: createdComp.industry,
+              phone: createdComp.phone || null,
+              email: createdComp.email || null,
+              location: createdComp.location || 'Argentina',
+              tier: createdComp.tier || 'pyme',
+              notes: createdComp.notes || null,
+              created_at: createdComp.createdAt,
+              updated_at: createdComp.updatedAt,
+            })
+          : Promise.resolve(),
+        createdContact
+          ? supabase.from('crm_contacts').upsert({
+              id: createdContact.id,
+              full_name: createdContact.fullName,
+              email: createdContact.email,
+              username: createdContact.username,
+              password: createdContact.password,
+              phone: createdContact.phone || null,
+              role_title: createdContact.roleTitle,
+              contact_type: createdContact.contactType,
+              company_id: createdContact.companyId || null,
+              company_name: createdContact.companyName || null,
+              portal_access_status: createdContact.portalAccessStatus,
+              has_active_service: Boolean(createdContact.hasActiveService),
+              linked_project_id: createdContact.linkedProjectId || null,
+              notes: createdContact.notes || null,
+              created_at: createdContact.createdAt,
+              updated_at: createdContact.updatedAt,
+            })
+          : Promise.resolve(),
+        supabase.from('crm_opportunities').upsert({
+          id: newOpp.id,
+          title: newOpp.title,
+          client_name: newOpp.clientName,
+          client_email: newOpp.clientEmail,
+          client_phone: newOpp.clientPhone || null,
+          company: newOpp.company || null,
+          company_id: newOpp.companyId || null,
+          contact_id: newOpp.contactId || null,
+          service_category: newOpp.serviceCategory,
+          stage: newOpp.stage,
+          value: newOpp.value,
+          currency: newOpp.currency || 'USD',
+          probability: newOpp.probability,
+          notes: newOpp.notes || null,
+          source: newOpp.source,
+          linked_quote_id: newOpp.linkedQuoteId || null,
+          created_at: newOpp.createdAt,
+          updated_at: newOpp.updatedAt,
+        }),
+        supabase.from('crm_quotes').upsert({
+          id: autoQuote.id,
+          quote_number: autoQuote.quoteNumber,
+          opportunity_id: autoQuote.opportunityId || null,
+          client_name: autoQuote.clientName,
+          client_email: autoQuote.clientEmail,
+          client_company: autoQuote.clientCompany || null,
+          service_category: autoQuote.serviceCategory,
+          title: autoQuote.title,
+          currency: autoQuote.currency || 'USD',
+          items: autoQuote.items || [],
+          subtotal: autoQuote.subtotal,
+          tax_percent: autoQuote.taxPercent,
+          total: autoQuote.total,
+          timeline: autoQuote.timeline,
+          milestones: autoQuote.milestones || [],
+          terms_and_conditions: autoQuote.termsAndConditions || [],
+          status: autoQuote.status,
+          valid_until: autoQuote.validUntil,
+          created_at: autoQuote.createdAt,
+          updated_at: autoQuote.updatedAt,
+        }),
+      ]);
+    } catch (err) {
+      console.warn('[ARN Intake Supabase Persist] non-blocking:', err);
+    }
+  }
+
+  // 4. Create signed stateless Client Portal session token
+  const token = issueSignedClientToken(parsed.clientEmail);
   const clientSessionObj = {
     id: contactId,
     email: parsed.clientEmail,

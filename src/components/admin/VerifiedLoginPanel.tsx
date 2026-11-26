@@ -44,8 +44,8 @@ export const VerifiedLoginPanel: React.FC<VerifiedLoginPanelProps> = ({
   const [step, setStep] = useState<1 | 2>(1);
 
   // Form Fields
-  const [usernameOrEmail, setUsernameOrEmail] = useState<string>('gaston.barea');
-  const [password, setPassword] = useState<string>('gaston2026');
+  const [usernameOrEmail, setUsernameOrEmail] = useState<string>('');
+  const [password, setPassword] = useState<string>('');
   const [showPassword, setShowPassword] = useState<boolean>(false);
   const [rememberMe, setRememberMe] = useState<boolean>(true);
 
@@ -103,7 +103,7 @@ export const VerifiedLoginPanel: React.FC<VerifiedLoginPanelProps> = ({
         setSuccessNotice('¡Sesión iniciada correctamente!');
         localStorage.setItem('gb_blog_auth', 'true');
         localStorage.setItem('gb_admin_token', data.token);
-        localStorage.setItem('gb_master_passkey', cleanPassword || 'gaston2026');
+        localStorage.setItem('gb_master_passkey', cleanPassword);
         localStorage.setItem('gb_verified_user', JSON.stringify(data.user));
         onAuthenticated(data.token, data.user);
         return;
@@ -111,35 +111,7 @@ export const VerifiedLoginPanel: React.FC<VerifiedLoginPanelProps> = ({
         setErrorMessage(data.error || 'Usuario o contraseña inválidos.');
       }
     } catch {
-      // Local fallback for static preview
-      const validUsers = [
-        'gastonbarea.com@gmail.com',
-        'gaston.barea',
-        'gaston',
-        'admin',
-        'admin@gastonbarea.com',
-      ];
-      const validPass = ['gaston2026', 'admin2026', 'admin'];
-      if (
-        validUsers.includes(cleanIdentity.toLowerCase()) &&
-        validPass.includes(cleanPassword)
-      ) {
-        const fallbackUser: VerifiedUser = {
-          username: 'gaston.barea',
-          email: 'gastonbarea.com@gmail.com',
-          name: 'Gastón Barea',
-          role: 'Super Admin & PMO Director',
-          verifiedAt: new Date().toISOString(),
-          expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-        };
-        localStorage.setItem('gb_blog_auth', 'true');
-        localStorage.setItem('gb_admin_token', 'local_verified_token');
-        localStorage.setItem('gb_master_passkey', cleanPassword);
-        localStorage.setItem('gb_verified_user', JSON.stringify(fallbackUser));
-        onAuthenticated('local_verified_token', fallbackUser);
-        return;
-      }
-      setErrorMessage('Usuario o contraseña incorrectos.');
+      setErrorMessage('No se pudo conectar con el servidor de autenticación. Intentá nuevamente.');
     } finally {
       setIsLoading(false);
     }
@@ -179,14 +151,7 @@ export const VerifiedLoginPanel: React.FC<VerifiedLoginPanelProps> = ({
         }
       }
     } catch {
-      if (password === 'gaston2026' || password === 'admin') {
-        const dummyCode = '749216';
-        setOtpHint(dummyCode);
-        setMaskedEmail(normalizedEmail);
-        setStep(2);
-      } else {
-        setErrorMessage('Error al conectar con el servidor de autenticación.');
-      }
+      setErrorMessage('Error al conectar con el servidor de autenticación.');
     } finally {
       setIsLoading(false);
     }
@@ -259,7 +224,9 @@ export const VerifiedLoginPanel: React.FC<VerifiedLoginPanelProps> = ({
         setSuccessNotice('¡Acceso Verificado Correctamente!');
         localStorage.setItem('gb_blog_auth', 'true');
         localStorage.setItem('gb_admin_token', data.token);
-        localStorage.setItem('gb_master_passkey', password || 'gaston2026');
+        if (password) {
+          localStorage.setItem('gb_master_passkey', password);
+        }
         localStorage.setItem('gb_verified_user', JSON.stringify(data.user));
 
         setTimeout(() => {
@@ -269,21 +236,7 @@ export const VerifiedLoginPanel: React.FC<VerifiedLoginPanelProps> = ({
         setErrorMessage(data.error || 'Código incorrecto o expirado.');
       }
     } catch {
-      if (code === otpHint || code === '749216' || code === 'gaston2026') {
-        const dummyUser: VerifiedUser = {
-          username: 'gaston.barea',
-          email: normalizedEmail,
-          name: 'Gastón Barea',
-          role: 'Super Admin & PMO Director',
-          verifiedAt: new Date().toISOString(),
-          expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-        };
-        localStorage.setItem('gb_blog_auth', 'true');
-        localStorage.setItem('gb_admin_token', 'local_verified_token');
-        onAuthenticated('local_verified_token', dummyUser);
-      } else {
-        setErrorMessage('Error al validar el código con el servidor.');
-      }
+      setErrorMessage('Error al validar el código con el servidor.');
     } finally {
       setIsLoading(false);
     }
@@ -388,38 +341,18 @@ export const VerifiedLoginPanel: React.FC<VerifiedLoginPanelProps> = ({
           </div>
         </div>
 
-        {/* Quick Demo Credential Fill Box */}
-        <div className="pt-8 mt-8 border-t border-white/10 space-y-3">
+        {/* Security Verification Notice */}
+        <div className="pt-8 mt-8 border-t border-white/10 space-y-2.5">
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-mono uppercase tracking-wider text-sky-400 font-semibold">
-              Credenciales Administrativas (1-Click):
+              Entorno Protegido · Sesión Firmada
             </span>
-            <span className="text-[11px] font-mono text-neutral-400">TLS 1.3</span>
+            <span className="text-[11px] font-mono text-emerald-400">TLS 1.3 · HMAC</span>
           </div>
-
-          <button
-            type="button"
-            onClick={() => {
-              setUsernameOrEmail('gaston.barea');
-              setPassword('gaston2026');
-              setLoginMode('direct');
-              setErrorMessage('');
-            }}
-            className="w-full text-left p-3.5 bg-white/[0.04] hover:bg-white/[0.09] border border-white/10 transition-colors flex items-center justify-between gap-3 cursor-pointer group"
-          >
-            <div className="min-w-0">
-              <div className="text-xs font-semibold text-white group-hover:text-sky-300 transition-colors">
-                Gastón Barea · Super Admin & PMO Director
-              </div>
-              <div className="text-[11px] font-mono text-neutral-400 truncate mt-0.5">
-                Usuario: <strong className="text-white">gaston.barea</strong> · Clave:{' '}
-                <strong className="text-emerald-300">gaston2026</strong>
-              </div>
-            </div>
-            <span className="px-2.5 py-1 bg-sky-500/20 text-sky-300 text-[10px] font-mono font-semibold shrink-0">
-              Autocompletar
-            </span>
-          </button>
+          <div className="p-3.5 bg-white/[0.04] border border-white/10 text-xs text-neutral-300 leading-relaxed">
+            Acceso exclusivo de dirección operativa. Las sesiones se validan en el servidor mediante
+            tokens firmados criptográficamente y protección contra intentos repetidos.
+          </div>
         </div>
       </div>
 
@@ -520,7 +453,6 @@ export const VerifiedLoginPanel: React.FC<VerifiedLoginPanelProps> = ({
                   <label className="block text-xs font-sans font-semibold text-[#1D1D1F]">
                     Contraseña Maestra
                   </label>
-                  <span className="text-[11px] font-mono text-slate-400">Clave: gaston2026</span>
                 </div>
                 <div className="relative">
                   <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />

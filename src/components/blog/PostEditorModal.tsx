@@ -19,6 +19,8 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { BlogPost, BlogCategory, MediaBlock, MediaBlockType } from '../../types/blog';
+import defaultCoverImg from '../../assets/images/digital_twin_architecture_1794799691080.jpg';
+import defaultDiagramImg from '../../assets/images/odoo_linux_engineering_1794799691939.jpg';
 
 interface PostEditorModalProps {
   isOpen: boolean;
@@ -55,8 +57,7 @@ export const PostEditorModal: React.FC<PostEditorModalProps> = ({
     postToEdit?.category || 'Innovación & Negocios'
   );
   const [coverImage, setCoverImage] = useState<string>(
-    postToEdit?.coverImage ||
-      'https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=1200&q=80'
+    postToEdit?.coverImage || defaultCoverImg
   );
   const [readTime, setReadTime] = useState<string>(postToEdit?.readTime || '5 min');
   const [tagsInput, setTagsInput] = useState<string>(
@@ -83,16 +84,32 @@ export const PostEditorModal: React.FC<PostEditorModalProps> = ({
 
   if (!isOpen) return null;
 
-  const handleVerifyPasskey = (e: React.FormEvent) => {
+  const handleVerifyPasskey = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Default master passkey for Gastón: "gaston2026" (or stored custom passkey)
-    const storedMaster = localStorage.getItem('gb_master_passkey') || 'gaston2026';
-    if (passkeyInput === storedMaster || passkeyInput === 'admin') {
-      setIsAuthenticated(true);
-      localStorage.setItem('gb_blog_auth', 'true');
-      setPasskeyError('');
-    } else {
-      setPasskeyError('Clave de autor incorrecta. Prueba con gaston2026');
+    const cleanPasskey = passkeyInput.trim();
+    if (!cleanPasskey) {
+      setPasskeyError('Ingresá tu clave de autor.');
+      return;
+    }
+
+    try {
+      const res = await fetch('/api/admin/auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ passkey: cleanPasskey }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success && data.token) {
+        setIsAuthenticated(true);
+        localStorage.setItem('gb_blog_auth', 'true');
+        localStorage.setItem('gb_admin_token', data.token);
+        localStorage.setItem('gb_master_passkey', cleanPasskey);
+        setPasskeyError('');
+        return;
+      }
+      setPasskeyError(data.error || 'Clave de autor incorrecta.');
+    } catch {
+      setPasskeyError('No se pudo validar la clave con el servidor.');
     }
   };
 
@@ -111,7 +128,7 @@ export const PostEditorModal: React.FC<PostEditorModalProps> = ({
         newBlock = {
           id: newId,
           type: 'youtube',
-          videoIdOrUrl: 'L_LUpnjgPso',
+          videoIdOrUrl: '',
           caption: 'Video explicativo en YouTube',
         };
         break;
@@ -137,8 +154,7 @@ export const PostEditorModal: React.FC<PostEditorModalProps> = ({
         newBlock = {
           id: newId,
           type: 'image',
-          imageUrl:
-            'https://images.unsplash.com/photo-1558494949-ef010cbdcc31?auto=format&fit=crop&w=1200&q=80',
+          imageUrl: defaultDiagramImg,
           caption: 'Diagrama de topología de arquitectura',
         };
         break;
@@ -524,7 +540,7 @@ export const PostEditorModal: React.FC<PostEditorModalProps> = ({
                           type="text"
                           value={block.videoIdOrUrl}
                           onChange={(e) => handleUpdateBlock(block.id, { videoIdOrUrl: e.target.value })}
-                          placeholder="URL o ID de YouTube (ej: https://www.youtube.com/watch?v=... o L_LUpnjgPso)"
+                          placeholder="URL o ID de YouTube (ej: https://www.youtube.com/watch?v=...)"
                           className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-mono text-slate-900"
                         />
                         <input

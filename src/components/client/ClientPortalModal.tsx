@@ -90,11 +90,11 @@ export const ClientPortalModal: React.FC<ClientPortalModalProps> = ({ isOpen = t
 
   // Login & Open Registration form state
   const [loginMethod, setLoginMethod] = useState<'password' | 'register' | 'otp'>('password');
-  const [usernameInput, setUsernameInput] = useState<string>('martin.arismendi');
-  const [passwordInput, setPasswordInput] = useState<string>('cliente2026');
+  const [usernameInput, setUsernameInput] = useState<string>('');
+  const [passwordInput, setPasswordInput] = useState<string>('');
   const [showPassword, setShowPassword] = useState<boolean>(false);
   const [rememberClient, setRememberClient] = useState<boolean>(true);
-  const [emailInput, setEmailInput] = useState<string>('martin@distribuidorasur.com.ar');
+  const [emailInput, setEmailInput] = useState<string>('');
   const [codeInput, setCodeInput] = useState<string>('');
   const [step, setStep] = useState<'email' | 'code'>('email');
   const [authLoading, setAuthLoading] = useState<boolean>(false);
@@ -487,62 +487,17 @@ export const ClientPortalModal: React.FC<ClientPortalModalProps> = ({ isOpen = t
           return;
         }
       }
-    } catch (err) {
-      console.warn('Client login fallback evaluation:', err);
-    }
-
-    // Local/Serverless account validation
-    const matchedAccount = CLIENT_ACCOUNTS.find(
-      (acc) => acc.username.toLowerCase() === identifier || acc.email.toLowerCase() === identifier
-    );
-    const validMasterPasswords = ['cliente2026', 'client2026', 'gaston2026', 'distribuidora2026', 'nova2026'];
-    const isPasswordValid =
-      (matchedAccount && matchedAccount.password === pass) || validMasterPasswords.includes(pass);
-
-    if (isPasswordValid) {
-      const resolvedEmail = matchedAccount
-        ? matchedAccount.email.toLowerCase()
-        : identifier.includes('@')
-        ? identifier
-        : 'martin@distribuidorasur.com.ar';
-
-      const matchedProj = INITIAL_CLIENT_PROJECTS.find(
-        (p) =>
-          (matchedAccount?.projectId && p.id === matchedAccount.projectId) ||
-          p.clientEmail.toLowerCase() === resolvedEmail
+      const errData = await res.json().catch(() => ({}));
+      setAuthError(
+        errData.error ||
+          'Usuario o contraseña incorrectos. Verificá tus credenciales o registrate gratis.'
       );
-
-      const fallbackToken = 'gb_cli_' + Date.now();
-      const clientObj = {
-        id: matchedAccount?.id,
-        email: resolvedEmail,
-        username: matchedAccount?.username || resolvedEmail.split('@')[0],
-        name: matchedAccount?.name || matchedProj?.clientName || 'Usuario Registrado',
-        company:
-          matchedAccount?.company ||
-          matchedProj?.company ||
-          (matchedAccount?.contactType === 'individual' ? 'Contacto Individual' : 'Organización'),
-        companyId: matchedAccount?.companyId,
-        role: matchedAccount?.role || 'Usuario Registrado',
-        contactType: matchedAccount?.contactType || 'corporate_member',
-        hasActiveService:
-          matchedAccount?.hasActiveService !== undefined
-            ? matchedAccount.hasActiveService
-            : Boolean(matchedProj),
-        linkedProjectId: matchedAccount?.projectId || matchedProj?.id,
-      };
-
-      setToken(fallbackToken);
-      setClientSession(clientObj);
-      if (rememberClient) {
-        localStorage.setItem('gb_client_token', fallbackToken);
-        localStorage.setItem('gb_client_user', JSON.stringify(clientObj));
-      }
-      loadDashboardData(fallbackToken, clientObj);
-    } else {
-      setAuthError('Usuario o contraseña incorrectos. Verificá tus credenciales o registrate gratis.');
+    } catch (err) {
+      console.warn('Client login request failed:', err);
+      setAuthError('No se pudo conectar con el servidor del Portal. Intentá nuevamente.');
+    } finally {
+      setAuthLoading(false);
     }
-    setAuthLoading(false);
   };
 
   // Open User Registration (Corporate Member or Individual Contact — No active service required)
@@ -553,13 +508,19 @@ export const ClientPortalModal: React.FC<ClientPortalModalProps> = ({ isOpen = t
 
     const cleanName = regFullName.trim();
     const cleanEmail = regEmail.trim().toLowerCase();
-    const cleanPassword = regPassword.trim() || 'cliente2026';
+    const cleanPassword = regPassword.trim();
     const cleanUsername =
       (regUsername.trim() || cleanEmail.split('@')[0]).toLowerCase().replace(/[^a-z0-9._-]/g, '') ||
       `usuario.${Date.now().toString().slice(-4)}`;
 
     if (!cleanName || !cleanEmail || !cleanEmail.includes('@')) {
       setAuthError('Por favor ingresá tu nombre completo y un correo electrónico válido.');
+      setAuthLoading(false);
+      return;
+    }
+
+    if (cleanPassword.length < 6) {
+      setAuthError('Elegí una contraseña de al menos 6 caracteres para proteger tu cuenta.');
       setAuthLoading(false);
       return;
     }
@@ -597,40 +558,15 @@ export const ClientPortalModal: React.FC<ClientPortalModalProps> = ({ isOpen = t
         localStorage.setItem('gb_client_token', data.token);
         localStorage.setItem('gb_client_user', JSON.stringify(data.client));
         loadDashboardData(data.token, data.client);
-        setAuthLoading(false);
-        return;
-      } else if (!res.ok && data.error) {
-        setAuthError(data.error);
-        setAuthLoading(false);
         return;
       }
+      setAuthError(data.error || 'No se pudo completar el registro. Verificá los datos ingresados.');
     } catch (err) {
-      console.warn('Registration fallback to local session:', err);
+      console.warn('Registration request failed:', err);
+      setAuthError('Error de conexión al registrar tu cuenta. Intentá nuevamente.');
+    } finally {
+      setAuthLoading(false);
     }
-
-    // Resilient local registration fallback
-    const fallbackToken = 'gb_cli_reg_' + Date.now();
-    const clientObj = {
-      email: cleanEmail,
-      username: cleanUsername,
-      name: cleanName,
-      company:
-        regContactType === 'corporate_member'
-          ? regCompanyName.trim()
-          : 'Contacto Individual / Independiente',
-      role:
-        regRoleTitle.trim() ||
-        (regContactType === 'corporate_member' ? 'Representante Corporativo' : 'Contacto Individual'),
-      contactType: regContactType,
-      hasActiveService: false,
-    };
-
-    setToken(fallbackToken);
-    setClientSession(clientObj);
-    localStorage.setItem('gb_client_token', fallbackToken);
-    localStorage.setItem('gb_client_user', JSON.stringify(clientObj));
-    loadDashboardData(fallbackToken, clientObj);
-    setAuthLoading(false);
   };
 
   // Step 1: Request OTP Access Code (with resilient zero-friction fallback)
@@ -659,26 +595,19 @@ export const ClientPortalModal: React.FC<ClientPortalModalProps> = ({ isOpen = t
           if (data.codeHint) setCodeHint(data.codeHint);
           setEmailInput(emailToUse);
           return;
-        } else {
-          setAuthError(data.error || 'Error al solicitar el código de acceso.');
-          return;
         }
+        setAuthError(data.error || 'Error al solicitar el código de acceso.');
+        return;
       }
-    } catch (err: any) {
-      console.warn('Backend request-code issue, advancing with instant OTP code fallback:', err);
+      setAuthError('No se pudo emitir el código de verificación. Intentá nuevamente.');
+    } catch {
+      setAuthError('Error de conexión al solicitar el código temporal.');
     } finally {
       setAuthLoading(false);
     }
-
-    // Zero-friction instant access fallback
-    const fallbackOtp = '742918';
-    setCodeHint(fallbackOtp);
-    setEmailInput(emailToUse);
-    setStep('code');
-    setAuthError('');
   };
 
-  // Step 2: Verify OTP or Master PIN
+  // Step 2: Verify OTP Code via Server
   const handleVerifyCode = async (e: React.FormEvent) => {
     e.preventDefault();
     setAuthLoading(true);
@@ -686,7 +615,6 @@ export const ClientPortalModal: React.FC<ClientPortalModalProps> = ({ isOpen = t
 
     const cleanInput = codeInput.trim();
     const cleanEmail = emailInput.trim().toLowerCase();
-    const masterPins = ['client2026', 'gaston2026', '742918', codeHint.trim()].filter(Boolean);
 
     try {
       const res = await fetch('/api/client/auth/verify-code', {
@@ -694,50 +622,22 @@ export const ClientPortalModal: React.FC<ClientPortalModalProps> = ({ isOpen = t
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: cleanEmail, code: cleanInput }),
       });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.success && data.token) {
-          setToken(data.token);
-          setClientSession(data.client);
-          localStorage.setItem('gb_client_token', data.token);
-          localStorage.setItem('gb_client_user', JSON.stringify(data.client));
-          setStep('email');
-          setCodeInput('');
-          loadDashboardData(data.token, data.client);
-          return;
-        } else if (!masterPins.includes(cleanInput)) {
-          setAuthError(data.error || 'Código incorrecto o expirado.');
-          return;
-        }
+      const data = await res.json();
+      if (res.ok && data.success && data.token) {
+        setToken(data.token);
+        setClientSession(data.client);
+        localStorage.setItem('gb_client_token', data.token);
+        localStorage.setItem('gb_client_user', JSON.stringify(data.client));
+        setStep('email');
+        setCodeInput('');
+        loadDashboardData(data.token, data.client);
+        return;
       }
-    } catch (err: any) {
-      console.warn('Backend verify-code issue, validating via local master keys:', err);
+      setAuthError(data.error || 'Código incorrecto o expirado. Solicitá uno nuevo.');
+    } catch {
+      setAuthError('Error al verificar el código con el servidor.');
     } finally {
       setAuthLoading(false);
-    }
-
-    // Fallback validation for master pins or 6-digit test codes
-    if (masterPins.includes(cleanInput) || (cleanInput.length >= 6 && /^\d+$/.test(cleanInput))) {
-      const fallbackToken = 'gb_token_' + Date.now();
-      const matchedProj = INITIAL_CLIENT_PROJECTS.find(
-        (p) => p.clientEmail.toLowerCase() === cleanEmail
-      ) || INITIAL_CLIENT_PROJECTS[0];
-
-      const clientObj = {
-        email: cleanEmail,
-        name: matchedProj.clientName,
-        company: matchedProj.company,
-      };
-
-      setToken(fallbackToken);
-      setClientSession(clientObj);
-      localStorage.setItem('gb_client_token', fallbackToken);
-      localStorage.setItem('gb_client_user', JSON.stringify(clientObj));
-      setStep('email');
-      setCodeInput('');
-      loadDashboardData(fallbackToken, clientObj);
-    } else {
-      setAuthError('Código incorrecto. Ingresá el código sugerido arriba o el PIN maestro: client2026');
     }
   };
 
@@ -1723,7 +1623,7 @@ export const ClientPortalModal: React.FC<ClientPortalModalProps> = ({ isOpen = t
                         maxLength={10}
                         value={codeInput}
                         onChange={(e) => setCodeInput(e.target.value)}
-                        placeholder="Ej: 742918"
+                        placeholder="Ingresá los 6 dígitos"
                         className="w-full pl-10 pr-4 py-3 bg-[#F5F5F7] border border-black/15 text-sm font-mono tracking-widest text-[#1D1D1F] focus:outline-none focus:border-[#291B64] focus:bg-white"
                       />
                     </div>
