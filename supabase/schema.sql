@@ -268,6 +268,54 @@ CREATE TABLE IF NOT EXISTS public.client_inquiries (
 CREATE INDEX IF NOT EXISTS idx_client_inquiries_email ON public.client_inquiries (client_email);
 
 -- ==============================================================================
+-- 7B. TABLAS DEL AGENTE AUTÓNOMO ARN 24/7 (MEMORIA, ESCALACIONES VIP Y LOGS)
+-- ==============================================================================
+CREATE TABLE IF NOT EXISTS public.agent_conversations (
+    id TEXT PRIMARY KEY,
+    channel TEXT NOT NULL,
+    external_id TEXT NOT NULL,
+    client_name TEXT,
+    client_email TEXT,
+    client_phone TEXT,
+    stage TEXT DEFAULT 'new',
+    conversation_data JSONB NOT NULL DEFAULT '{}'::jsonb,
+    last_message_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_agent_conversations_ext ON public.agent_conversations (channel, external_id);
+CREATE INDEX IF NOT EXISTS idx_agent_conversations_stage ON public.agent_conversations (stage);
+
+CREATE TABLE IF NOT EXISTS public.agent_escalations (
+    id TEXT PRIMARY KEY,
+    severity TEXT DEFAULT 'vip',
+    reason TEXT NOT NULL,
+    channel TEXT NOT NULL,
+    status TEXT DEFAULT 'open',
+    escalation_data JSONB NOT NULL DEFAULT '{}'::jsonb,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_agent_escalations_status ON public.agent_escalations (status);
+
+CREATE TABLE IF NOT EXISTS public.agent_activity_logs (
+    id TEXT PRIMARY KEY,
+    channel TEXT NOT NULL,
+    outcome TEXT NOT NULL,
+    noise_suppressed BOOLEAN DEFAULT true,
+    log_data JSONB NOT NULL DEFAULT '{}'::jsonb,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_agent_activity_logs_created ON public.agent_activity_logs (created_at DESC);
+
+CREATE TABLE IF NOT EXISTS public.agent_autopilot_config (
+    id TEXT PRIMARY KEY DEFAULT 'current',
+    config JSONB NOT NULL DEFAULT '{}'::jsonb,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- ==============================================================================
 -- 8. POLÍTICAS DE SEGURIDAD ENDURECIDAS (ROW LEVEL SECURITY - RLS IDEMPOTENTES)
 -- Nota: El backend Vercel Serverless opera con SUPABASE_SERVICE_ROLE_KEY.
 -- El rol público 'anon' SOLO puede leer blog_posts/site_settings e insertar formularios públicos.
@@ -287,6 +335,10 @@ ALTER TABLE public.arn_service_stock ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.client_bookings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.support_tickets ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.client_inquiries ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.agent_conversations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.agent_escalations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.agent_activity_logs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.agent_autopilot_config ENABLE ROW LEVEL SECURITY;
 
 -- Limpieza previa de políticas para ejecución idempotente
 DROP POLICY IF EXISTS "Permitir inserción anónima de propuestas" ON public.proposals;
@@ -312,6 +364,10 @@ DROP POLICY IF EXISTS "Acceso backend a arn_service_stock" ON public.arn_service
 DROP POLICY IF EXISTS "Acceso backend a client_bookings" ON public.client_bookings;
 DROP POLICY IF EXISTS "Acceso backend a support_tickets" ON public.support_tickets;
 DROP POLICY IF EXISTS "Acceso backend a client_inquiries" ON public.client_inquiries;
+DROP POLICY IF EXISTS "Acceso backend a agent_conversations" ON public.agent_conversations;
+DROP POLICY IF EXISTS "Acceso backend a agent_escalations" ON public.agent_escalations;
+DROP POLICY IF EXISTS "Acceso backend a agent_activity_logs" ON public.agent_activity_logs;
+DROP POLICY IF EXISTS "Acceso backend a agent_autopilot_config" ON public.agent_autopilot_config;
 
 -- Formularios públicos: anon solo puede insertar; lectura/gestión restringida a service_role
 CREATE POLICY "Permitir inserción anónima de propuestas"
@@ -339,7 +395,7 @@ ON public.site_settings FOR SELECT TO anon, authenticated USING (true);
 CREATE POLICY "Gestión backend service_role site_settings"
 ON public.site_settings FOR ALL TO service_role USING (true) WITH CHECK (true);
 
--- Tablas privadas de CRM, Portal de Clientes y Stock ARN: acceso exclusivo del servidor (service_role)
+-- Tablas privadas de CRM, Portal de Clientes, Stock ARN y Agente Autónomo: acceso exclusivo del servidor (service_role)
 CREATE POLICY "Acceso backend a crm_opportunities"
 ON public.crm_opportunities FOR ALL TO service_role USING (true) WITH CHECK (true);
 
@@ -372,3 +428,15 @@ ON public.support_tickets FOR ALL TO service_role USING (true) WITH CHECK (true)
 
 CREATE POLICY "Acceso backend a client_inquiries"
 ON public.client_inquiries FOR ALL TO service_role USING (true) WITH CHECK (true);
+
+CREATE POLICY "Acceso backend a agent_conversations"
+ON public.agent_conversations FOR ALL TO service_role USING (true) WITH CHECK (true);
+
+CREATE POLICY "Acceso backend a agent_escalations"
+ON public.agent_escalations FOR ALL TO service_role USING (true) WITH CHECK (true);
+
+CREATE POLICY "Acceso backend a agent_activity_logs"
+ON public.agent_activity_logs FOR ALL TO service_role USING (true) WITH CHECK (true);
+
+CREATE POLICY "Acceso backend a agent_autopilot_config"
+ON public.agent_autopilot_config FOR ALL TO service_role USING (true) WITH CHECK (true);

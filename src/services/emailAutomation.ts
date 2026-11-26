@@ -1377,5 +1377,42 @@ export async function sendBookingConfirmationEmail(params: {
   }
 }
 
+export async function sendExecutiveDigestEmail(params: {
+  toEmail: string;
+  subject: string;
+  html: string;
+}): Promise<{ success: boolean; configured: boolean; provider: string; error?: string }> {
+  const cfg = resolveEmailConfig();
+  if (!cfg.configured) {
+    return {
+      success: false,
+      configured: false,
+      provider: cfg.provider,
+      error: 'RESEND_API_KEY no configurada en el entorno.',
+    };
+  }
+  try {
+    await dispatchTransactionalEmail({
+      to: { email: params.toEmail },
+      replyTo: cfg.notificationEmail,
+      subject: params.subject,
+      html: params.html,
+    });
+    return {
+      success: true,
+      configured: true,
+      provider: cfg.provider,
+    };
+  } catch (err: any) {
+    return {
+      success: false,
+      configured: true,
+      provider: cfg.provider,
+      error: err?.message || 'Error al enviar resumen ejecutivo',
+    };
+  }
+}
+
+
 
 

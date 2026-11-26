@@ -176,8 +176,23 @@ export function getWhatsAppPublicStatus() {
 
 export interface WhatsAppDispatchInput {
   toPhone: string;
+  recipientName?: string;
   message: string;
-  contextType?: 'lead_alert' | 'quote_dispatch' | 'kickoff_welcome' | 'test_message';
+  contextType?:
+    | 'lead_alert'
+    | 'quote_dispatch'
+    | 'kickoff_welcome'
+    | 'test_message'
+    | 'autonomous_agent_reply'
+    | 'approved_draft_reply'
+    | 'vip_escalation'
+    | 'critical_sla_alert'
+    | 'daily_executive_digest'
+    | 'quote_followup_48h'
+    | 'quote_followup_7d'
+    | 'meet_reminder_24h'
+    | 'meet_reminder_2h'
+    | (string & {});
   metadata?: Record<string, any>;
 }
 

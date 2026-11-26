@@ -34,12 +34,14 @@ import {
   Github,
   Image as ImageIcon,
   Layers,
+  Bot,
 } from 'lucide-react';
 import { BlogPost } from '../../types/blog';
 import { SiteConfig, SITE_CONFIG } from '../../data/siteConfig';
 import { PostEditorModal } from '../blog/PostEditorModal';
 import { CrmDashboard } from './crm/CrmDashboard';
 import { VerifiedLoginPanel } from './VerifiedLoginPanel';
+import { AutopilotConsole } from './AutopilotConsole';
 
 interface AdminDashboardModalProps {
   isOpen?: boolean;
@@ -65,8 +67,8 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
       return null;
     }
   });
-  // Active Tab: 'crm' | 'service_stock' | 'client_portal' | 'settings' | 'blog' | 'infrastructure'
-  const [activeTab, setActiveTab] = useState<'crm' | 'service_stock' | 'client_portal' | 'settings' | 'blog' | 'infrastructure'>('crm');
+  // Active Tab: 'autopilot' | 'crm' | 'service_stock' | 'client_portal' | 'settings' | 'blog' | 'infrastructure'
+  const [activeTab, setActiveTab] = useState<'autopilot' | 'crm' | 'service_stock' | 'client_portal' | 'settings' | 'blog' | 'infrastructure'>('autopilot');
   const [infraStatus, setInfraStatus] = useState<any>(null);
   const [isLoadingInfra, setIsLoadingInfra] = useState<boolean>(false);
   const [testEmailTarget, setTestEmailTarget] = useState<string>('notificaciones@gastonbarea.com');
@@ -168,7 +170,7 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
     setIsSendingTestEmail(true);
     setTestEmailFeedback(null);
     const token = localStorage.getItem('gb_admin_token') || sessionToken;
-    const passkey = localStorage.getItem('gb_master_passkey') || 'gaston2026';
+    const passkey = localStorage.getItem('gb_master_passkey') || '';
 
     try {
       const res = await fetch('/api/admin/test-email', {
@@ -205,7 +207,7 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
 
   const loadClientPortalData = () => {
     const token = localStorage.getItem('gb_admin_token') || sessionToken;
-    const passkey = localStorage.getItem('gb_master_passkey') || 'gaston2026';
+    const passkey = localStorage.getItem('gb_master_passkey') || '';
     fetch('/api/admin/client-portal/overview', {
       headers: {
         'x-admin-token': token,
@@ -490,6 +492,24 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
 
                 <button
                   type="button"
+                  onClick={() => setActiveTab('autopilot')}
+                  className={`w-full px-3.5 py-2.5 text-xs font-sans font-semibold transition-all flex items-center justify-between cursor-pointer ${
+                    activeTab === 'autopilot'
+                      ? 'bg-[#291B64] text-white border-l-2 border-emerald-400'
+                      : 'text-neutral-200 hover:bg-white/[0.06] hover:text-white'
+                  }`}
+                >
+                  <span className="inline-flex items-center gap-2.5">
+                    <Bot className="w-4 h-4 text-emerald-400 shrink-0" />
+                    <span>Piloto Automático 24/7</span>
+                  </span>
+                  <span className="text-[10px] font-mono px-1.5 py-0.5 bg-emerald-500/20 text-emerald-300 shrink-0">
+                    ARN
+                  </span>
+                </button>
+
+                <button
+                  type="button"
                   onClick={() => setActiveTab('crm')}
                   className={`w-full px-3.5 py-2.5 text-xs font-sans font-semibold transition-all flex items-center gap-2.5 cursor-pointer ${
                     activeTab === 'crm'
@@ -498,7 +518,7 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
                   }`}
                 >
                   <TrendingUp className="w-4 h-4 text-emerald-400" />
-                  <span>Red ARN & Autopiloto</span>
+                  <span>Red ARN & CRM</span>
                 </button>
 
                 <button
@@ -601,12 +621,19 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
           </aside>
 
           {/* Main Content Area */}
-          <div className={`flex-1 min-w-0 ${activeTab === 'crm' || activeTab === 'service_stock' ? 'p-0' : 'p-6 sm:p-8 lg:p-10'} bg-white flex flex-col`}>
+          <div className={`flex-1 min-w-0 ${activeTab === 'crm' || activeTab === 'service_stock' || activeTab === 'autopilot' ? 'p-0' : 'p-6 sm:p-8 lg:p-10'} bg-white flex flex-col`}>
+            {/* TAB A: PILOTO AUTOMÁTICO 24/7 & PROXMOX/N8N */}
+            {activeTab === 'autopilot' && (
+              <div className="flex-1 h-full">
+                <AutopilotConsole sessionToken={sessionToken} />
+              </div>
+            )}
+
             {/* TAB 0: CRM OPERATIVO & STOCK DE SERVICIOS ARN */}
             {(activeTab === 'crm' || activeTab === 'service_stock') && (
               <div className="flex-1 h-full">
                 <CrmDashboard
-                  passkey={localStorage.getItem('gb_master_passkey') || 'gaston2026'}
+                  passkey={localStorage.getItem('gb_master_passkey') || ''}
                   onClose={onClose}
                   initialTab={activeTab === 'service_stock' ? 'service_stock' : 'kanban'}
                   onTabChange={(tab) => {

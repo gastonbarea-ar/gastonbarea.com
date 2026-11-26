@@ -16,7 +16,23 @@ import {
   buildGoogleCalendarInviteUrl,
   getBookingTypeLabel,
   getEmailConfigStatus,
+  sendExecutiveDigestEmail,
 } from './src/services/emailAutomation.ts';
+import {
+  AgentActivityLog,
+  AgentConversation,
+  AutopilotConfig,
+  DEFAULT_AUTOPILOT_CONFIG,
+  VipEscalationItem,
+} from './src/types/autopilot.ts';
+import {
+  compileDailyExecutiveDigest,
+  computeAutopilotMetrics,
+  evaluateFollowUpCandidates,
+  evaluateSelfHealingAlert,
+  processInboundAutonomousMessage,
+} from './src/services/autopilotEngine.ts';
+import { generateProxmoxAndN8nBlueprints } from './src/services/proxmoxBlueprints.ts';
 import {
   getWhatsAppConfig,
   getWhatsAppPublicStatus,
@@ -274,6 +290,12 @@ let cachedClientProjects = [...INITIAL_CLIENT_PROJECTS];
 let cachedClientInquiries = [...INITIAL_CONSULTING_INQUIRIES];
 let cachedSupportTickets = [...INITIAL_SUPPORT_TICKETS];
 let cachedClientBookings = [...INITIAL_CONSULTING_BOOKINGS];
+
+// Autonomous ARN 24/7 Autopilot State (Persisted to Supabase + crm_settings mirror)
+let cachedAutopilotConfig: AutopilotConfig = { ...DEFAULT_AUTOPILOT_CONFIG };
+let cachedAgentConversations: AgentConversation[] = [];
+let cachedAgentEscalations: VipEscalationItem[] = [];
+let cachedAgentActivityLogs: AgentActivityLog[] = [];
 const activeClientSessions = new Map<
   string,
   {
@@ -478,9 +500,158 @@ async function hydratePortalAndStockFromSupabase(force = false): Promise<void> {
         ...savedBookingAvail,
       };
     }
+
+    // Hydrate Autonomous ARN 24/7 Autopilot state
+    const [convRes, escRes, logRes, apCfgRes, apFallbackRes] = await Promise.all([
+      supabase.from('agent_conversations').select('conversation_data').order('last_message_at', { ascending: false }).limit(100),
+      supabase.from('agent_escalations').select('escalation_data').order('created_at', { ascending: false }).limit(100),
+      supabase.from('agent_activity_logs').select('log_data').order('created_at', { ascending: false }).limit(200),
+      supabase.from('agent_autopilot_config').select('config').eq('id', 'current').maybeSingle(),
+      supabase
+        .from('crm_settings')
+        .select('id, config')
+        .in('id', [
+          'store_agent_conversations',
+          'store_agent_escalations',
+          'store_agent_activity_logs',
+          'store_agent_autopilot_config',
+        ]),
+    ]);
+
+    const apFallback = new Map<string, any>();
+    if (!apFallbackRes.error && Array.isArray(apFallbackRes.data)) {
+      for (const row of apFallbackRes.data) {
+        apFallback.set(row.id, row.config);
+      }
+    }
+
+    if (!convRes.error && Array.isArray(convRes.data) && convRes.data.length > 0) {
+      cachedAgentConversations = convRes.data.map((r: any) => r.conversation_data).filter(Boolean);
+    } else if (Array.isArray(apFallback.get('store_agent_conversations')?.items)) {
+      cachedAgentConversations = apFallback.get('store_agent_conversations').items;
+    }
+
+    if (!escRes.error && Array.isArray(escRes.data) && escRes.data.length > 0) {
+      cachedAgentEscalations = escRes.data.map((r: any) => r.escalation_data).filter(Boolean);
+    } else if (Array.isArray(apFallback.get('store_agent_escalations')?.items)) {
+      cachedAgentEscalations = apFallback.get('store_agent_escalations').items;
+    }
+
+    if (!logRes.error && Array.isArray(logRes.data) && logRes.data.length > 0) {
+      cachedAgentActivityLogs = logRes.data.map((r: any) => r.log_data).filter(Boolean);
+    } else if (Array.isArray(apFallback.get('store_agent_activity_logs')?.items)) {
+      cachedAgentActivityLogs = apFallback.get('store_agent_activity_logs').items;
+    }
+
+    const loadedApConfig =
+      (!apCfgRes.error && apCfgRes.data?.config) || apFallback.get('store_agent_autopilot_config');
+    if (loadedApConfig && loadedApConfig.channels) {
+      cachedAutopilotConfig = {
+        ...DEFAULT_AUTOPILOT_CONFIG,
+        ...loadedApConfig,
+        channels: {
+          ...DEFAULT_AUTOPILOT_CONFIG.channels,
+          ...loadedApConfig.channels,
+        },
+      };
+    }
   } catch (err) {
     console.warn('[Supabase Portal/Stock Hydration] non-blocking:', err);
   }
+}
+
+async function persistAutopilotStores(): Promise<void> {
+  await Promise.all([
+    persistCollectionStore(
+      'agent_conversations',
+      'store_agent_conversations',
+      cachedAgentConversations.slice(0, 120),
+      (c: AgentConversation) => ({
+        id: c.id,
+        channel: c.channel,
+        external_id: c.externalId,
+        client_name: c.clientName,
+        client_email: c.clientEmail || null,
+        client_phone: c.clientPhone || null,
+        stage: c.stage,
+        conversation_data: c,
+        last_message_at: c.lastMessageAt,
+        updated_at: c.updatedAt,
+      })
+    ),
+    persistCollectionStore(
+      'agent_escalations',
+      'store_agent_escalations',
+      cachedAgentEscalations.slice(0, 120),
+      (e: VipEscalationItem) => ({
+        id: e.id,
+        severity: e.severity,
+        reason: e.reason,
+        channel: e.channel,
+        status: e.status,
+        escalation_data: e,
+        created_at: e.createdAt,
+      })
+    ),
+    persistCollectionStore(
+      'agent_activity_logs',
+      'store_agent_activity_logs',
+      cachedAgentActivityLogs.slice(0, 250),
+      (l: AgentActivityLog) => ({
+        id: l.id,
+        channel: l.channel,
+        outcome: l.outcome,
+        noise_suppressed: l.noiseSuppressed,
+        log_data: l,
+        created_at: l.createdAt,
+      })
+    ),
+  ]);
+}
+
+async function persistAutopilotConfigStore(): Promise<void> {
+  if (!supabase) return;
+  try {
+    const now = new Date().toISOString();
+    cachedAutopilotConfig.updatedAt = now;
+    await supabase.from('crm_settings').upsert({
+      id: 'store_agent_autopilot_config',
+      config: cachedAutopilotConfig,
+      updated_at: now,
+    });
+    const { error } = await supabase.from('agent_autopilot_config').upsert({
+      id: 'current',
+      config: cachedAutopilotConfig,
+      updated_at: now,
+    });
+    if (error && !isMissingTableError(error)) {
+      console.warn('[Supabase Sync agent_autopilot_config] warning:', error.message);
+    }
+  } catch (err) {
+    console.warn('[Supabase Persist agent_autopilot_config] non-blocking:', err);
+  }
+}
+
+function isAuthorizedWebhookOrAdmin(req: express.Request): boolean {
+  const adminToken =
+    (req.headers['x-admin-token'] as string) ||
+    req.headers.authorization?.replace(/^Bearer\s+/i, '');
+  if (resolveAdminSession(adminToken)) return true;
+
+  const providedSecret =
+    (req.headers['x-webhook-secret'] as string) ||
+    (req.headers['x-admin-passkey'] as string) ||
+    (req.body?.webhookSecret as string) ||
+    '';
+  if (!providedSecret) return false;
+
+  const envWebhookSecret = process.env.WEBHOOK_SECRET?.trim() || '';
+  if (envWebhookSecret && safeEqualStrings(providedSecret, envWebhookSecret)) return true;
+
+  const envAdminPasskey = process.env.ADMIN_PASSKEY?.trim() || '';
+  if (envAdminPasskey && safeEqualStrings(providedSecret, envAdminPasskey)) return true;
+
+  return false;
 }
 
 // Automatic One-Time Initial Seed for Empty Supabase Tables
@@ -3838,45 +4009,207 @@ app.get('/api/webhooks/whatsapp', (req, res) => {
   return res.status(403).json({ error: 'Token de verificación de WhatsApp inválido' });
 });
 
-// Meta WhatsApp Cloud API & Evolution API Inbound Message Webhook (POST)
+// Meta WhatsApp Cloud API & Evolution API v2 Inbound Autonomous Webhook (POST)
 app.post('/api/webhooks/whatsapp', async (req, res) => {
   try {
+    await hydratePortalAndStockFromSupabase();
     const body = req.body || {};
 
-    // Extract sender phone, name, and text from either Meta Cloud API or Evolution API payload
+    // Ignore outbound echoes sent by our own WhatsApp instance
+    if (body?.data?.key?.fromMe === true) {
+      return res.status(200).json({ received: true, ignored: 'fromMe' });
+    }
+
+    // Extract sender phone, name, text, and optional voice note from Meta Cloud API or Evolution API v2
     const metaEntry = body?.entry?.[0]?.changes?.[0]?.value;
     const metaMsg = metaEntry?.messages?.[0];
     const metaContact = metaEntry?.contacts?.[0];
 
     const senderPhone = normalizePhoneE164(
-      metaMsg?.from || body?.data?.key?.remoteJid?.replace('@s.whatsapp.net', '') || body?.from || ''
+      metaMsg?.from ||
+        body?.data?.key?.remoteJid?.replace('@s.whatsapp.net', '') ||
+        body?.from ||
+        ''
     );
     const senderName =
-      metaContact?.profile?.name || body?.data?.pushName || body?.senderName || 'Contacto WhatsApp';
+      metaContact?.profile?.name ||
+      body?.data?.pushName ||
+      body?.senderName ||
+      'Contacto WhatsApp';
     const messageText =
       metaMsg?.text?.body ||
       body?.data?.message?.conversation ||
       body?.data?.message?.extendedTextMessage?.text ||
       body?.text ||
       '';
+    const audioBase64 =
+      body?.audioBase64 ||
+      body?.data?.message?.base64 ||
+      body?.data?.message?.audioMessage?.base64 ||
+      undefined;
+    const audioMimeType =
+      body?.audioMimeType ||
+      body?.data?.message?.audioMessage?.mimetype ||
+      'audio/ogg';
 
-    if (senderPhone && messageText) {
-      await autoProvisionCrmFromWebLead({
-        source: 'whatsapp_inbound',
-        clientName: senderName,
-        clientEmail: `${senderPhone}@whatsapp.gastonbarea.com`,
-        clientPhone: senderPhone,
-        companyName: '',
-        title: `Consulta WhatsApp: ${messageText.slice(0, 48)}`,
-        notes: `Mensaje recibido por WhatsApp Business (+${senderPhone}):\n${messageText}`,
-        rawTextForCategory: messageText,
-      });
+    if (!senderPhone || (!messageText && !audioBase64)) {
+      return res.status(200).json({ received: true, ignored: 'empty_payload' });
     }
 
-    return res.status(200).json({ received: true });
+    const nowIso = new Date().toISOString();
+    let conversation = cachedAgentConversations.find(
+      (c) => c.channel === 'whatsapp' && c.externalId === senderPhone
+    );
+
+    const decision = await processInboundAutonomousMessage({
+      channel: 'whatsapp',
+      externalId: senderPhone,
+      senderName,
+      senderPhone,
+      messageText,
+      audioBase64,
+      audioMimeType,
+      config: cachedAutopilotConfig,
+      existingConversation: conversation,
+      store: {
+        opportunities: cachedOpportunities,
+        contacts: cachedCrmContacts,
+        quotes: cachedQuotes,
+        projects: cachedClientProjects,
+        bookings: cachedClientBookings,
+        tickets: cachedSupportTickets,
+        serviceStock: cachedServiceStock,
+      },
+      aiClient: ai,
+      groqApiKey: process.env.GROQ_API_KEY,
+    });
+
+    const resolvedText = decision.transcript || messageText;
+
+    // 1. Auto-provision CRM Lead / Contact
+    await autoProvisionCrmFromWebLead({
+      source: 'whatsapp_inbound',
+      clientName: senderName,
+      clientEmail: `${senderPhone}@whatsapp.gastonbarea.com`,
+      clientPhone: senderPhone,
+      companyName: conversation?.companyName || '',
+      title: `WhatsApp ARN: ${resolvedText.slice(0, 48)}`,
+      notes: `Mensaje WhatsApp (+${senderPhone})${decision.transcript ? ' [Audio transcrito]' : ''}:\n${resolvedText}`,
+      rawTextForCategory: resolvedText,
+    });
+
+    // 2. Persist Auto-Quote if deterministically generated from Stock ARN
+    if (decision.autoQuote) {
+      cachedQuotes.unshift(decision.autoQuote);
+    }
+
+    // 3. Upsert Conversation Memory
+    if (!conversation) {
+      conversation = {
+        id: `conv-wa-${senderPhone}`,
+        channel: 'whatsapp',
+        externalId: senderPhone,
+        clientName: senderName,
+        clientPhone: senderPhone,
+        clientEmail: `${senderPhone}@whatsapp.gastonbarea.com`,
+        stage: decision.nextStage,
+        employeeCount: decision.detectedEmployeeCount,
+        matchedStockCode: decision.matchedStock?.code,
+        matchedStockName: decision.matchedStock?.name,
+        quoteId: decision.autoQuote?.quoteNumber,
+        messages: [],
+        lastMessageAt: nowIso,
+        createdAt: nowIso,
+        updatedAt: nowIso,
+      };
+      cachedAgentConversations.unshift(conversation);
+    } else {
+      conversation.stage = decision.nextStage;
+      if (decision.detectedEmployeeCount) conversation.employeeCount = decision.detectedEmployeeCount;
+      if (decision.matchedStock) {
+        conversation.matchedStockCode = decision.matchedStock.code;
+        conversation.matchedStockName = decision.matchedStock.name;
+      }
+      if (decision.autoQuote) conversation.quoteId = decision.autoQuote.quoteNumber;
+      conversation.lastMessageAt = nowIso;
+      conversation.updatedAt = nowIso;
+    }
+
+    conversation.messages.push({
+      id: `m-in-${Date.now()}`,
+      role: 'user',
+      content: resolvedText,
+      mediaType: decision.transcript ? 'audio' : 'text',
+      transcript: decision.transcript,
+      timestamp: nowIso,
+    });
+
+    // 4. Dispatch Autonomous Reply via Evolution API / Meta Cloud API if allowed by Kill-Switch
+    let dispatchResult: any = null;
+    if (decision.shouldDispatchReply && decision.replyText) {
+      conversation.messages.push({
+        id: `m-out-${Date.now() + 1}`,
+        role: 'agent',
+        content: decision.replyText,
+        mediaType: 'text',
+        timestamp: new Date().toISOString(),
+      });
+      dispatchResult = await dispatchWhatsAppMessage({
+        toPhone: senderPhone,
+        recipientName: senderName,
+        message: decision.replyText,
+        contextType: 'autonomous_agent_reply',
+      }).catch((err) => ({ success: false, error: err?.message }));
+    }
+
+    // 5. Record VIP Escalation ONLY if required (<10% of traffic or draft mode)
+    let createdEscalation: VipEscalationItem | null = null;
+    if (decision.vipEscalation) {
+      createdEscalation = {
+        ...decision.vipEscalation,
+        id: `esc-${Date.now()}`,
+        conversationId: conversation.id,
+        status: 'open',
+        createdAt: nowIso,
+      };
+      cachedAgentEscalations.unshift(createdEscalation);
+
+      // Optional VIP push to Gastón's dedicated VIP WhatsApp number ONLY for true VIP/Critical events
+      if (
+        createdEscalation.severity !== 'draft' &&
+        cachedAutopilotConfig.vipNotificationPhone
+      ) {
+        await dispatchWhatsAppMessage({
+          toPhone: cachedAutopilotConfig.vipNotificationPhone,
+          recipientName: 'Gastón Barea (VIP)',
+          message: `🔔 [ESCALACIÓN VIP ARN]\n${createdEscalation.title}\n${createdEscalation.summary}\nAcción sugerida: ${createdEscalation.suggestedAction}`,
+          contextType: 'vip_escalation',
+        }).catch(() => {});
+      }
+    }
+
+    // 6. Log activity for real metrics
+    cachedAgentActivityLogs.unshift({
+      ...decision.activityLog,
+      id: `log-${Date.now()}`,
+      createdAt: nowIso,
+    });
+
+    await persistAutopilotStores();
+
+    return res.status(200).json({
+      received: true,
+      mode: cachedAutopilotConfig.channels.whatsapp,
+      providerUsed: decision.llmProviderUsed,
+      repliedAutonomously: decision.shouldDispatchReply,
+      replyText: decision.shouldDispatchReply ? decision.replyText : undefined,
+      vipEscalated: Boolean(createdEscalation),
+      quoteNumber: decision.autoQuote?.quoteNumber || null,
+      dispatchResult,
+    });
   } catch (err: any) {
     console.error('[WhatsApp Webhook] Error:', err);
-    return res.status(200).json({ received: true });
+    return res.status(200).json({ received: true, error: err?.message });
   }
 });
 
@@ -4503,6 +4836,59 @@ app.post('/api/client/inquiries', async (req, res) => {
     updatedAt: new Date().toISOString(),
   };
 
+  // Level-1 Autonomous Portal Support Triage (resolves silently without interrupting Gastón)
+  let autopilotReplyText: string | null = null;
+  if (cachedAutopilotConfig.channels.portal_support !== 'paused') {
+    const decision = await processInboundAutonomousMessage({
+      channel: 'portal',
+      externalId: client.email,
+      senderName: client.name || 'Cliente',
+      senderEmail: client.email,
+      messageText: `[Consulta Portal: ${topic}] ${question}`,
+      config: cachedAutopilotConfig,
+      store: {
+        opportunities: cachedOpportunities,
+        contacts: cachedCrmContacts,
+        quotes: cachedQuotes,
+        projects: cachedClientProjects,
+        bookings: cachedClientBookings,
+        tickets: cachedSupportTickets,
+        serviceStock: cachedServiceStock,
+      },
+      aiClient: ai,
+      groqApiKey: process.env.GROQ_API_KEY,
+    }).catch(() => null);
+
+    if (decision) {
+      const nowIso = new Date().toISOString();
+      if (decision.shouldDispatchReply && decision.replyText) {
+        autopilotReplyText = decision.replyText;
+        (newInquiry.messages as any[]).push({
+          id: `msg-agent-${Date.now() + 1}`,
+          sender: 'gaston',
+          senderName: 'Asistente Autónomo ARN',
+          text: decision.replyText,
+          createdAt: nowIso,
+        });
+        (newInquiry as any).status = decision.vipEscalation ? 'pending' : 'answered';
+      }
+      if (decision.vipEscalation) {
+        cachedAgentEscalations.unshift({
+          ...decision.vipEscalation,
+          id: `esc-portal-${Date.now()}`,
+          status: 'open',
+          createdAt: nowIso,
+        });
+      }
+      cachedAgentActivityLogs.unshift({
+        ...decision.activityLog,
+        id: `log-portal-${Date.now()}`,
+        createdAt: nowIso,
+      });
+      await persistAutopilotStores();
+    }
+  }
+
   cachedClientInquiries.unshift(newInquiry);
   await persistCollectionStore(
     'client_inquiries',
@@ -4519,7 +4905,7 @@ app.post('/api/client/inquiries', async (req, res) => {
       updated_at: inq.updatedAt,
     })
   );
-  return res.json({ success: true, inquiry: newInquiry });
+  return res.json({ success: true, inquiry: newInquiry, autopilotReply: autopilotReplyText });
 });
 
 // 6. Client: Add Message to Inquiry Thread
@@ -4618,6 +5004,49 @@ app.post('/api/client/tickets', async (req, res) => {
       created_at: t.createdAt,
     })
   );
+
+  // Autonomous Ticket Triage: Critical escalates to VIP; non-critical logged silently for triage
+  const nowIso = new Date().toISOString();
+  if (newTicket.severity === 'critical') {
+    cachedAgentEscalations.unshift({
+      id: `esc-tick-${Date.now()}`,
+      severity: 'critical',
+      reason: 'critical_sla_unresolved',
+      channel: 'portal_support',
+      title: `Ticket Crítico ${newTicket.ticketNumber} · ${newTicket.company}`,
+      summary: `${newTicket.subject}: ${String(description).slice(0, 140)}`,
+      suggestedAction: 'Revisar incidente SLA crítico (2h) en Portal Clientes.',
+      clientName: newTicket.clientName,
+      clientEmail: newTicket.clientEmail,
+      status: 'open',
+      createdAt: nowIso,
+    });
+    cachedAgentActivityLogs.unshift({
+      id: `log-tick-${Date.now()}`,
+      channel: 'portal_support',
+      actionType: 'critical_ticket_escalated',
+      targetLabel: `${newTicket.company} (${newTicket.ticketNumber})`,
+      outcome: 'vip_escalated',
+      noiseSuppressed: false,
+      estimatedMinutesSaved: 5,
+      detail: `Ticket crítico escalado inmediatamente a Bandeja VIP.`,
+      createdAt: nowIso,
+    });
+  } else {
+    cachedAgentActivityLogs.unshift({
+      id: `log-tick-${Date.now()}`,
+      channel: 'portal_support',
+      actionType: 'ticket_triaged_silently',
+      targetLabel: `${newTicket.company} (${newTicket.ticketNumber})`,
+      outcome: 'resolved_silently',
+      noiseSuppressed: true,
+      estimatedMinutesSaved: 10,
+      detail: `Ticket ${newTicket.severity} clasificado y encolado sin interrumpir a Gastón.`,
+      createdAt: nowIso,
+    });
+  }
+  await persistAutopilotStores();
+
   return res.json({ success: true, ticket: newTicket });
 });
 
@@ -6115,23 +6544,10 @@ app.post('/api/client-portal/agent-assist', async (req, res) => {
 
 // 13A-4. n8n Community Edition (Self-Hosted Docker) Bidirectional Webhook Bridge
 app.post('/api/arn/agent-webhook', async (req, res) => {
-  const expectedSecret = process.env.WEBHOOK_SECRET || 'super-secret-webhook-token';
-  const providedSecret =
-    (req.headers['x-webhook-secret'] as string) ||
-    (req.headers['x-admin-passkey'] as string) ||
-    req.body?.webhookSecret;
-  const adminToken =
-    (req.headers['x-admin-token'] as string) ||
-    req.headers.authorization?.replace(/^Bearer\s+/i, '');
-  const isAuthorized =
-    Boolean(resolveAdminSession(adminToken)) ||
-    providedSecret === expectedSecret ||
-    providedSecret === (process.env.ADMIN_PASSKEY || 'gaston2026');
-
-  if (!isAuthorized) {
+  if (!isAuthorizedWebhookOrAdmin(req)) {
     return res.status(401).json({
       success: false,
-      error: 'Webhook no autorizado. Incluí x-webhook-secret o token de administrador.',
+      error: 'Webhook no autorizado. Incluí x-webhook-secret válido o token de administrador.',
     });
   }
 
@@ -6571,6 +6987,352 @@ app.post('/api/arn/resend-quote-email', async (req, res) => {
     success: emailResult.success,
     targetEmail: cleanTargetEmail,
     emailResult,
+  });
+});
+
+// ==============================================================================
+// 14. AUTONOMOUS ARN 24/7 EXECUTIVE AUTOPILOT CONSOLE & N8N/PROXMOX BRIDGE APIs
+// ==============================================================================
+
+// 14A. Admin Overview: Metrics, Kill-Switch Config, VIP Queue, Conversations & Logs
+app.get('/api/admin/autopilot/overview', requireAdminAuth, async (_req, res) => {
+  await hydratePortalAndStockFromSupabase();
+  const metrics = computeAutopilotMetrics({
+    conversations: cachedAgentConversations,
+    escalations: cachedAgentEscalations,
+    logs: cachedAgentActivityLogs,
+  });
+  const pendingFollowUps = evaluateFollowUpCandidates({
+    opportunities: cachedOpportunities,
+    quotes: cachedQuotes,
+    bookings: cachedClientBookings,
+  });
+
+  return res.json({
+    success: true,
+    config: cachedAutopilotConfig,
+    metrics,
+    escalations: cachedAgentEscalations,
+    conversations: cachedAgentConversations.slice(0, 50),
+    logs: cachedAgentActivityLogs.slice(0, 80),
+    pendingFollowUpsCount: pendingFollowUps.length,
+    whatsappStatus: getWhatsAppPublicStatus(),
+    emailStatus: getEmailConfigStatus(),
+  });
+});
+
+// 14B. Admin Update Kill-Switch & Guardrails Config
+app.put('/api/admin/autopilot/config', requireAdminAuth, async (req, res) => {
+  await hydratePortalAndStockFromSupabase();
+  const body = req.body || {};
+  const allowedModes = new Set(['autonomous', 'draft_only', 'paused']);
+
+  if (body.channels && typeof body.channels === 'object') {
+    (['whatsapp', 'portal_support', 'followup_n8n', 'self_healing'] as const).forEach((ch) => {
+      const candidate = body.channels[ch];
+      if (allowedModes.has(candidate)) {
+        cachedAutopilotConfig.channels[ch] = candidate;
+      }
+    });
+  }
+
+  if (typeof body.dailyDigestTime === 'string' && /^\d{2}:\d{2}$/.test(body.dailyDigestTime)) {
+    cachedAutopilotConfig.dailyDigestTime = body.dailyDigestTime;
+  }
+  if (typeof body.dailyDigestEmail === 'string' && /\S+@\S+\.\S+/.test(body.dailyDigestEmail.trim())) {
+    cachedAutopilotConfig.dailyDigestEmail = body.dailyDigestEmail.trim();
+  }
+  if (typeof body.vipNotificationPhone === 'string') {
+    cachedAutopilotConfig.vipNotificationPhone = body.vipNotificationPhone.trim();
+  }
+  if (Number.isFinite(Number(body.maxAutoQuoteAmountUsd)) && Number(body.maxAutoQuoteAmountUsd) >= 500) {
+    cachedAutopilotConfig.maxAutoQuoteAmountUsd = Number(body.maxAutoQuoteAmountUsd);
+  }
+  if (Number.isFinite(Number(body.selfHealingGraceMinutes)) && Number(body.selfHealingGraceMinutes) >= 1) {
+    cachedAutopilotConfig.selfHealingGraceMinutes = Number(body.selfHealingGraceMinutes);
+  }
+  if (typeof body.autoTranscribeWhatsAppAudio === 'boolean') {
+    cachedAutopilotConfig.autoTranscribeWhatsAppAudio = body.autoTranscribeWhatsAppAudio;
+  }
+  if (typeof body.antiNoShowRemindersEnabled === 'boolean') {
+    cachedAutopilotConfig.antiNoShowRemindersEnabled = body.antiNoShowRemindersEnabled;
+  }
+
+  await persistAutopilotConfigStore();
+  return res.json({ success: true, config: cachedAutopilotConfig });
+});
+
+// 14C. Admin VIP Escalation Action (Approve Draft + Send / Resolve / Dismiss)
+app.post('/api/admin/autopilot/escalations/:id/action', requireAdminAuth, async (req, res) => {
+  await hydratePortalAndStockFromSupabase();
+  const { id } = req.params;
+  const { action, customReply } = req.body || {};
+
+  const item = cachedAgentEscalations.find((e) => e.id === id);
+  if (!item) {
+    return res.status(404).json({ success: false, error: 'Escalación VIP no encontrada.' });
+  }
+
+  const nowIso = new Date().toISOString();
+  let dispatchResult: any = null;
+
+  if (action === 'approve_send') {
+    const textToSend = String(customReply || item.draftReply || '').trim();
+    if (textToSend && item.clientPhone) {
+      dispatchResult = await dispatchWhatsAppMessage({
+        toPhone: item.clientPhone,
+        recipientName: item.clientName || 'Cliente',
+        message: textToSend,
+        contextType: 'approved_draft_reply',
+      }).catch((err) => ({ success: false, error: err?.message }));
+    }
+    item.status = 'approved';
+    item.resolvedAt = nowIso;
+  } else if (action === 'dismiss') {
+    item.status = 'dismissed';
+    item.resolvedAt = nowIso;
+  } else {
+    item.status = 'resolved';
+    item.resolvedAt = nowIso;
+  }
+
+  await persistAutopilotStores();
+  return res.json({ success: true, escalation: item, dispatchResult });
+});
+
+// 14D. Admin Live Calibration Simulator (Test WhatsApp/Portal agent without sending real WA)
+app.post('/api/admin/autopilot/simulate', requireAdminAuth, async (req, res) => {
+  await hydratePortalAndStockFromSupabase();
+  const { channel = 'whatsapp', senderName = 'Prospecto Simulación', senderPhone = '5491100001111', senderEmail, messageText } =
+    req.body || {};
+
+  if (!messageText || !String(messageText).trim()) {
+    return res.status(400).json({ success: false, error: 'Ingresá un mensaje para simular el agente.' });
+  }
+
+  const decision = await processInboundAutonomousMessage({
+    channel: channel === 'portal' ? 'portal' : 'whatsapp',
+    externalId: senderPhone,
+    senderName: String(senderName),
+    senderPhone: String(senderPhone),
+    senderEmail: senderEmail ? String(senderEmail) : undefined,
+    messageText: String(messageText),
+    config: cachedAutopilotConfig,
+    store: {
+      opportunities: cachedOpportunities,
+      contacts: cachedCrmContacts,
+      quotes: cachedQuotes,
+      projects: cachedClientProjects,
+      bookings: cachedClientBookings,
+      tickets: cachedSupportTickets,
+      serviceStock: cachedServiceStock,
+    },
+    aiClient: ai,
+    groqApiKey: process.env.GROQ_API_KEY,
+  });
+
+  return res.json({
+    success: true,
+    simulation: decision,
+  });
+});
+
+// 14E. Proxmox + Cloudflare Tunnel + n8n Importable Blueprints Bundle
+app.get('/api/admin/autopilot/blueprints', requireAdminAuth, (req, res) => {
+  const siteUrl = (req.query.siteUrl as string) || 'https://www.gastonbarea.com';
+  const bundle = generateProxmoxAndN8nBlueprints({ siteUrl });
+  return res.json({ success: true, bundle });
+});
+
+// 14F. n8n Cron Bridge: Commercial Follow-ups (48h / 7d) + Meet Anti No-Show (24h / 2h)
+app.post('/api/autopilot/n8n/followups', async (req, res) => {
+  if (!isAuthorizedWebhookOrAdmin(req)) {
+    return res.status(401).json({ success: false, error: 'No autorizado (x-webhook-secret requerido).' });
+  }
+  await hydratePortalAndStockFromSupabase();
+
+  const mode = cachedAutopilotConfig.channels.followup_n8n;
+  const shouldDispatch = Boolean(req.body?.dispatch) && mode === 'autonomous';
+  const candidates = evaluateFollowUpCandidates({
+    opportunities: cachedOpportunities,
+    quotes: cachedQuotes,
+    bookings: cachedClientBookings,
+  });
+
+  const executed: Array<{ targetId: string; type: string; dispatched: boolean }> = [];
+  const nowIso = new Date().toISOString();
+
+  for (const item of candidates) {
+    if (mode === 'paused') continue;
+
+    if (item.type === 'mark_cold_21d') {
+      const q = cachedQuotes.find((x) => x.id === item.targetId);
+      if (q && q.status === 'sent') {
+        q.status = 'expired' as any;
+        q.updatedAt = nowIso;
+      }
+      cachedAgentActivityLogs.unshift({
+        id: `log-fu-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        channel: 'followup_n8n',
+        actionType: item.type,
+        targetLabel: `${item.clientName} (${item.referenceCode})`,
+        outcome: 'resolved_silently',
+        noiseSuppressed: true,
+        estimatedMinutesSaved: 5,
+        detail: `Presupuesto vencido (>21 días) archivado silenciosamente.`,
+        createdAt: nowIso,
+      });
+      executed.push({ targetId: item.targetId, type: item.type, dispatched: false });
+      continue;
+    }
+
+    if (shouldDispatch && item.clientPhone) {
+      await dispatchWhatsAppMessage({
+        toPhone: item.clientPhone,
+        recipientName: item.clientName,
+        message: item.suggestedMessage,
+        contextType: item.type,
+      }).catch(() => {});
+      cachedAgentActivityLogs.unshift({
+        id: `log-fu-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        channel: 'followup_n8n',
+        actionType: item.type,
+        targetLabel: `${item.clientName} (${item.referenceCode})`,
+        outcome: 'resolved_silently',
+        noiseSuppressed: true,
+        estimatedMinutesSaved: 8,
+        detail: `Seguimiento automático (${item.type}) despachado por WhatsApp.`,
+        createdAt: nowIso,
+      });
+      executed.push({ targetId: item.targetId, type: item.type, dispatched: true });
+    } else if (mode === 'draft_only') {
+      cachedAgentEscalations.unshift({
+        id: `esc-fu-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        severity: 'draft',
+        reason: 'draft_approval_needed',
+        channel: 'followup_n8n',
+        title: `Borrador Follow-Up (${item.type}) · ${item.clientName}`,
+        summary: `Referencia ${item.referenceCode} (${item.dueSinceHours}h).`,
+        suggestedAction: 'Aprobar envío de seguimiento.',
+        draftReply: item.suggestedMessage,
+        clientName: item.clientName,
+        clientPhone: item.clientPhone,
+        clientEmail: item.clientEmail,
+        status: 'open',
+        createdAt: nowIso,
+      });
+      executed.push({ targetId: item.targetId, type: item.type, dispatched: false });
+    }
+  }
+
+  if (executed.length > 0) {
+    await persistAutopilotStores();
+  }
+
+  return res.json({
+    success: true,
+    mode,
+    candidatesCount: candidates.length,
+    executedCount: executed.length,
+    candidates,
+  });
+});
+
+// 14G. n8n Webhook Bridge: Uptime Kuma Anti-Noise Self-Healing Alert Filter
+app.post('/api/autopilot/n8n/self-healing', async (req, res) => {
+  if (!isAuthorizedWebhookOrAdmin(req)) {
+    return res.status(401).json({ success: false, error: 'No autorizado (x-webhook-secret requerido).' });
+  }
+  await hydratePortalAndStockFromSupabase();
+
+  const {
+    serviceName = 'Servicio Proxmox',
+    status = 'down',
+    downMinutes = 1,
+    errorDetail = '',
+  } = req.body || {};
+
+  const evaluation = evaluateSelfHealingAlert({
+    serviceName: String(serviceName),
+    status: status === 'up' ? 'up' : status === 'degraded' ? 'degraded' : 'down',
+    downMinutes: Number(downMinutes) || 1,
+    errorDetail: String(errorDetail || ''),
+    config: cachedAutopilotConfig,
+  });
+
+  const nowIso = new Date().toISOString();
+  cachedAgentActivityLogs.unshift({
+    ...evaluation.activityLog,
+    id: `log-heal-${Date.now()}`,
+    createdAt: nowIso,
+  });
+
+  if (evaluation.vipEscalation) {
+    cachedAgentEscalations.unshift({
+      ...evaluation.vipEscalation,
+      id: `esc-heal-${Date.now()}`,
+      status: 'open',
+      createdAt: nowIso,
+    });
+    if (cachedAutopilotConfig.vipNotificationPhone) {
+      await dispatchWhatsAppMessage({
+        toPhone: cachedAutopilotConfig.vipNotificationPhone,
+        recipientName: 'Gastón Barea (SLA Crítico)',
+        message: `🚨 [SLA CRÍTICO SIN AUTO-SANAR]\n${evaluation.vipEscalation.title}\n${evaluation.vipEscalation.summary}`,
+        contextType: 'critical_sla_alert',
+      }).catch(() => {});
+    }
+  }
+
+  await persistAutopilotStores();
+
+  return res.json({
+    success: true,
+    action: evaluation.action,
+    escalateVip: evaluation.escalateVip,
+    runbookSteps: evaluation.runbookSteps,
+  });
+});
+
+// 14H. n8n Cron Bridge: Single Daily Executive Digest (08:30 GMT-3)
+app.post('/api/autopilot/n8n/daily-digest', async (req, res) => {
+  if (!isAuthorizedWebhookOrAdmin(req)) {
+    return res.status(401).json({ success: false, error: 'No autorizado (x-webhook-secret requerido).' });
+  }
+  await hydratePortalAndStockFromSupabase();
+
+  const digest = compileDailyExecutiveDigest({
+    conversations: cachedAgentConversations,
+    escalations: cachedAgentEscalations,
+    logs: cachedAgentActivityLogs,
+    bookings: cachedClientBookings,
+  });
+
+  let emailResult: any = null;
+  if (req.body?.sendEmail !== false) {
+    emailResult = await sendExecutiveDigestEmail({
+      toEmail: cachedAutopilotConfig.dailyDigestEmail || 'notificaciones@gastonbarea.com',
+      subject: digest.subject,
+      html: digest.html,
+    });
+  }
+
+  let whatsappResult: any = null;
+  if (req.body?.sendWhatsApp && cachedAutopilotConfig.vipNotificationPhone) {
+    whatsappResult = await dispatchWhatsAppMessage({
+      toPhone: cachedAutopilotConfig.vipNotificationPhone,
+      recipientName: 'Gastón Barea',
+      message: digest.plainText,
+      contextType: 'daily_executive_digest',
+    }).catch((err) => ({ success: false, error: err?.message }));
+  }
+
+  return res.json({
+    success: true,
+    subject: digest.subject,
+    plainText: digest.plainText,
+    emailResult,
+    whatsappResult,
   });
 });
 
