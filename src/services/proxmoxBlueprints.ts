@@ -77,7 +77,7 @@ services:
 
   # 4. Evolution API v2 (WhatsApp Business QR · Texto + Audios Base64 + PDFs · Costo $0/msg)
   evolution-api:
-    image: atendai/evolution-api:v2.2.3
+    image: evoapicloud/evolution-api:v2.3.8
     container_name: arn-evolution
     restart: unless-stopped
     depends_on:
