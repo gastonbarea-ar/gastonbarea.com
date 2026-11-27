@@ -1020,7 +1020,19 @@ export function compileDailyExecutiveDigest(params: {
   });
 
   const openVips = params.escalations.filter((e) => e.status === 'open');
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const now = new Date();
+  const todayStr = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Argentina/Buenos_Aires',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(now);
+  const localTimestampAr = new Intl.DateTimeFormat('es-AR', {
+    timeZone: 'America/Argentina/Buenos_Aires',
+    dateStyle: 'full',
+    timeStyle: 'short',
+  }).format(now);
+
   const todaysMeetings = params.bookings.filter(
     (b) => b.status === 'confirmed' && b.date >= todayStr
   );
@@ -1045,6 +1057,7 @@ export function compileDailyExecutiveDigest(params: {
 
   const plainText =
     `RESUMEN EJECUTIVO DIARIO · AGENTE AUTÓNOMO ARN 24/7\n` +
+    `Emitido: ${localTimestampAr} (GMT-3 · Argentina)\n` +
     `--------------------------------------------------\n` +
     `• Consultas resueltas en silencio: ${metrics.resolvedSilentlyCount}\n` +
     `• Alertas técnicas auto-sanadas: ${metrics.selfHealedAlertsCount}\n` +
@@ -1057,7 +1070,8 @@ export function compileDailyExecutiveDigest(params: {
 
   const html = `
     <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 640px; margin: 0 auto; color: #0f172a; border: 1px solid #e2e8f0; padding: 24px;">
-      <h2 style="margin: 0 0 8px 0; font-size: 18px; color: #0f172a;">Resumen Ejecutivo Diario · Piloto Automático ARN</h2>
+      <h2 style="margin: 0 0 4px 0; font-size: 18px; color: #0f172a;">Resumen Ejecutivo Diario · Piloto Automático ARN</h2>
+      <p style="margin: 0 0 6px 0; font-size: 12px; font-family: monospace; color: #64748b;">Emitido: ${localTimestampAr} (GMT-3 · Argentina)</p>
       <p style="margin: 0 0 20px 0; font-size: 13px; color: #475569;">Lectura asincrónica de 2 minutos. Tu foco queda reservado para Consultoría y Arquitectura IA.</p>
       <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 13px;">
         <tr>
