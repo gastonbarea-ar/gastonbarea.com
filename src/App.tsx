@@ -165,9 +165,23 @@ export default function App() {
   };
 
   const handleOpenWhatsApp = (customText?: string) => {
-    const defaultText = SITE_CONFIG.whatsapp.defaultMessage;
+    const pageContextMessages: Partial<Record<PageSectionId, string>> = {
+      servicios:
+        'Hola Gastón, estoy revisando tus Soluciones en gastonbarea.com y quiero consultar sobre arquitectura o implementación para mi empresa.',
+      'ia-services':
+        'Hola Gastón, vi tus IA Services y Agentes en gastonbarea.com y quiero evaluar una solución de IA aplicada a nuestra operación.',
+      bioeconomia:
+        'Hola Gastón, me contacto desde la sección de Bioeconomía de gastonbarea.com para consultar sobre trazabilidad o proyecto productivo.',
+      proyectos:
+        'Hola Gastón, estuve viendo tus Proyectos en producción en gastonbarea.com y quiero consultar por un desarrollo similar.',
+      trayectoria:
+        'Hola Gastón, estuve viendo tu trayectoria en gastonbarea.com y quiero consultar por Dirección de Proyectos / Consultoría.',
+      blog:
+        'Hola Gastón, vengo desde el Blog de gastonbarea.com y quiero hacerte una consulta sobre un proyecto.',
+    };
+    const defaultText = pageContextMessages[activePage] || SITE_CONFIG.whatsapp.defaultMessage;
     const textToSend = customText || defaultText;
-    const phone = SITE_CONFIG.whatsapp.phoneNumber;
+    const phone = (SITE_CONFIG.whatsapp.phoneNumber || '5491171081874').replace(/\D+/g, '');
     const whatsappUrl = phone
       ? `https://wa.me/${phone}?text=${encodeURIComponent(textToSend)}`
       : `https://wa.me/?text=${encodeURIComponent(textToSend)}`;

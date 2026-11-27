@@ -263,10 +263,15 @@ export const Footer: React.FC<FooterProps> = ({
               <button
                 type="button"
                 onClick={onWhatsAppClick}
-                className="flex items-center gap-2 text-slate-700 hover:text-[#291B64] font-medium text-left cursor-pointer"
+                className="flex items-center gap-2 text-slate-700 hover:text-[#15803D] font-medium text-left cursor-pointer transition-colors"
               >
-                <MessageSquare className="w-3.5 h-3.5" />
-                <span>WhatsApp Ejecutivo Directo</span>
+                <MessageSquare className="w-3.5 h-3.5 text-[#15803D] shrink-0" />
+                <span>
+                  WhatsApp Business ·{' '}
+                  <strong className="tabular-nums">
+                    {liveConfig.whatsapp?.displayPhone || '+54 9 11 7108-1874'}
+                  </strong>
+                </span>
               </button>
             </div>
           </div>

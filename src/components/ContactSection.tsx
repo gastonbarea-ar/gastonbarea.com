@@ -338,6 +338,20 @@ export const ContactSection: React.FC<ContactSectionProps> = ({
                   </span>
                 </a>
 
+                <button
+                  type="button"
+                  onClick={() => onWhatsAppClick()}
+                  className="w-full flex items-center justify-between p-3.5 bg-white hover:bg-[#15803D] hover:text-white transition-colors group cursor-pointer text-left"
+                >
+                  <span className="font-semibold inline-flex items-center gap-2">
+                    <MessageSquare className="w-3.5 h-3.5 text-[#15803D] group-hover:text-white shrink-0" />
+                    <span>WhatsApp Business 24/7</span>
+                  </span>
+                  <span className="font-mono text-xs text-slate-600 group-hover:text-white tabular-nums">
+                    {SITE_CONFIG.whatsapp.displayPhone || '+54 9 11 7108-1874'}
+                  </span>
+                </button>
+
                 <div className="grid grid-cols-2 gap-3">
                   <a
                     href={SITE_CONFIG.social.linkedin}

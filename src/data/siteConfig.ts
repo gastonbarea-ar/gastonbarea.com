@@ -34,7 +34,8 @@ export interface SiteConfig {
     meetingTitle: string;
   };
   whatsapp: {
-    phoneNumber: string; // Formato internacional sin símbolos, ej: 5492804xxxxxx
+    phoneNumber: string; // Formato internacional sin símbolos, ej: 5491171081874
+    displayPhone?: string;
     defaultMessage: string;
   };
   presentationVideo: {
@@ -174,9 +175,10 @@ export const SITE_CONFIG: SiteConfig = {
   whatsapp: {
     phoneNumber:
       getEnvVar('VITE_WHATSAPP_PHONE') ||
-      '',
+      '5491171081874',
+    displayPhone: '+54 9 11 7108-1874',
     defaultMessage:
-      'Hola Gastón, estuve interactuando con tu Gemelo Digital en gastonbarea.com y me gustaría coordinar una reunión por Google Meet Pro para evaluar un proyecto.',
+      'Hola Gastón, me contacto desde gastonbarea.com para consultar sobre una solución tecnológica o de IA y evaluar una reunión.',
   },
 
   presentationVideo: {

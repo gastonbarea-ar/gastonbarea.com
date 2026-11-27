@@ -96,16 +96,16 @@ export function getWhatsAppConfig(): WhatsAppBusinessConfig {
     '';
 
   const businessPhone = normalizePhoneE164(
-    runtimeWhatsAppConfig.businessPhone ??
-      process.env.WHATSAPP_BUSINESS_PHONE ??
-      process.env.VITE_WHATSAPP_PHONE ??
-      SITE_CONFIG.whatsapp.phoneNumber ??
-      ''
+    runtimeWhatsAppConfig.businessPhone ||
+      process.env.WHATSAPP_BUSINESS_PHONE ||
+      process.env.VITE_WHATSAPP_PHONE ||
+      SITE_CONFIG.whatsapp.phoneNumber ||
+      '5491171081874'
   );
 
   const adminNotifyPhone = normalizePhoneE164(
-    runtimeWhatsAppConfig.adminNotifyPhone ??
-      process.env.WHATSAPP_ADMIN_PHONE ??
+    runtimeWhatsAppConfig.adminNotifyPhone ||
+      process.env.WHATSAPP_ADMIN_PHONE ||
       businessPhone
   );
 

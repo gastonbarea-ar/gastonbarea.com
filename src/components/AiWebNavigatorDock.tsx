@@ -30,11 +30,27 @@ interface AiWebNavigatorDockProps {
   onWhatsAppClick?: (customText?: string) => void;
 }
 
+const WhatsAppGlyph: React.FC<{ className?: string }> = ({ className = 'w-4 h-4' }) => (
+  <svg
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className={className}
+    aria-hidden="true"
+  >
+    <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
+  </svg>
+);
+
 export const AiWebNavigatorDock: React.FC<AiWebNavigatorDockProps> = ({
   activePage = 'inicio',
   onNavigateToSolution,
   onScheduleClick,
   onClientPortalClick,
+  onWhatsAppClick,
 }) => {
   const [isOpen, setIsOpen] = useState<boolean>(false);
   const [query, setQuery] = useState<string>('');
@@ -96,8 +112,29 @@ export const AiWebNavigatorDock: React.FC<AiWebNavigatorDockProps> = ({
     }
   };
 
+  const handleWhatsAppAction = (customMessage?: string) => {
+    setIsOpen(false);
+    if (onWhatsAppClick) {
+      onWhatsAppClick(customMessage);
+    }
+  };
+
+  // Before scrolling past Hero on Home, show a single restrained architectural WhatsApp Business button (zero overlap)
   if (!isVisibleByScroll && !isOpen) {
-    return null;
+    if (!onWhatsAppClick) return null;
+    return (
+      <div className="fixed bottom-4 right-4 sm:bottom-5 sm:right-6 z-40">
+        <button
+          type="button"
+          onClick={() => handleWhatsAppAction()}
+          aria-label="Escribir por WhatsApp Business (+54 9 11 7108-1874)"
+          className="min-h-[44px] px-4 py-2.5 bg-[#0F111A]/95 hover:bg-[#15803D] text-white border border-white/15 rounded-none shadow-xl backdrop-blur-xl transition-colors duration-200 inline-flex items-center gap-2.5 text-xs font-mono font-semibold whitespace-nowrap shrink-0 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400"
+        >
+          <WhatsAppGlyph className="w-4 h-4 text-emerald-400 shrink-0" />
+          <span>WhatsApp 24/7</span>
+        </button>
+      </div>
+    );
   }
 
   return (
@@ -205,6 +242,21 @@ export const AiWebNavigatorDock: React.FC<AiWebNavigatorDockProps> = ({
                         >
                           <Video className="w-4 h-4" />
                         </button>
+                        {onWhatsAppClick && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handleWhatsAppAction(
+                                `Hola Gastón, la Guía IA de gastonbarea.com me sugirió "${matched.serviceTitle}" y quiero consultarte por WhatsApp.`
+                              )
+                            }
+                            className="px-3 py-2 rounded-lg text-xs font-semibold text-white bg-[#15803D] hover:bg-[#166534] transition-colors inline-flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
+                            title="Consultar por WhatsApp Business"
+                          >
+                            <WhatsAppGlyph className="w-3.5 h-3.5" />
+                            <span>WhatsApp</span>
+                          </button>
+                        )}
                       </div>
                     </div>
                   )}
@@ -220,11 +272,11 @@ export const AiWebNavigatorDock: React.FC<AiWebNavigatorDockProps> = ({
       </AnimatePresence>
 
       {/* MOBILE STICKY BOTTOM BAR (< 640px) */}
-      <div className="sm:hidden pointer-events-auto w-full bg-[#0B0D14]/96 backdrop-blur-xl text-white border-t border-white/15 grid grid-cols-3 divide-x divide-white/10 shadow-2xl">
+      <div className="sm:hidden pointer-events-auto w-full bg-[#0B0D14]/96 backdrop-blur-xl text-white border-t border-white/15 grid grid-cols-4 divide-x divide-white/10 shadow-2xl">
         <button
           type="button"
           onClick={() => setIsOpen(!isOpen)}
-          className="min-h-[52px] px-2 py-2 flex flex-col items-center justify-center gap-0.5 hover:bg-white/10 text-white font-mono font-semibold text-[11px] cursor-pointer"
+          className="min-h-[52px] px-1.5 py-2 flex flex-col items-center justify-center gap-0.5 hover:bg-white/10 text-white font-mono font-semibold text-[10px] cursor-pointer whitespace-nowrap"
         >
           <Compass className="w-4 h-4 text-sky-400 shrink-0" />
           <span>Guía IA</span>
@@ -233,11 +285,32 @@ export const AiWebNavigatorDock: React.FC<AiWebNavigatorDockProps> = ({
         <button
           type="button"
           onClick={openPortalGate}
-          className="min-h-[52px] px-2 py-2 flex flex-col items-center justify-center gap-0.5 bg-emerald-400 text-emerald-950 font-mono font-bold text-[11px] cursor-pointer"
+          className="min-h-[52px] px-1.5 py-2 flex flex-col items-center justify-center gap-0.5 bg-emerald-400 text-emerald-950 font-mono font-bold text-[10px] cursor-pointer whitespace-nowrap"
         >
           <UserCheck className="w-4 h-4 shrink-0" />
-          <span>Mi Portal ARN</span>
+          <span>Portal ARN</span>
         </button>
+
+        {onWhatsAppClick ? (
+          <button
+            type="button"
+            onClick={() => handleWhatsAppAction()}
+            aria-label="Consultar por WhatsApp Business"
+            className="min-h-[52px] px-1.5 py-2 flex flex-col items-center justify-center gap-0.5 bg-[#15803D] hover:bg-[#166534] text-white font-mono font-semibold text-[10px] cursor-pointer whitespace-nowrap"
+          >
+            <WhatsAppGlyph className="w-4 h-4 shrink-0" />
+            <span>WhatsApp</span>
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={openPortalGate}
+            className="min-h-[52px] px-1.5 py-2 flex flex-col items-center justify-center gap-0.5 hover:bg-white/10 text-white font-mono font-semibold text-[10px] cursor-pointer whitespace-nowrap"
+          >
+            <Zap className="w-4 h-4 text-emerald-300 shrink-0" />
+            <span>Cotizar</span>
+          </button>
+        )}
 
         <button
           type="button"
@@ -245,10 +318,10 @@ export const AiWebNavigatorDock: React.FC<AiWebNavigatorDockProps> = ({
             setIsOpen(false);
             onScheduleClick('Sesión Google Meet Pro agendada desde Barra Móvil');
           }}
-          className="min-h-[52px] px-2 py-2 flex flex-col items-center justify-center gap-0.5 bg-[#291B64] text-white font-mono font-semibold text-[11px] cursor-pointer"
+          className="min-h-[52px] px-1.5 py-2 flex flex-col items-center justify-center gap-0.5 bg-[#291B64] text-white font-mono font-semibold text-[10px] cursor-pointer whitespace-nowrap"
         >
           <Video className="w-4 h-4 text-emerald-300 shrink-0" />
-          <span>Agendar Meet</span>
+          <span>Meet</span>
         </button>
       </div>
 
@@ -262,7 +335,7 @@ export const AiWebNavigatorDock: React.FC<AiWebNavigatorDockProps> = ({
             setIsOpen(!isOpen);
           }
         }}
-        className="hidden sm:flex pointer-events-auto w-full max-w-2xl rounded-2xl bg-[#11131D]/92 backdrop-blur-2xl text-white border border-white/15 px-3.5 py-2 shadow-2xl items-center gap-2.5"
+        className="hidden sm:flex pointer-events-auto w-full max-w-3xl rounded-2xl bg-[#11131D]/92 backdrop-blur-2xl text-white border border-white/15 px-3.5 py-2 shadow-2xl items-center gap-2.5"
       >
         <button
           type="button"
@@ -293,6 +366,18 @@ export const AiWebNavigatorDock: React.FC<AiWebNavigatorDockProps> = ({
           <span>Ir</span>
           <Send className="w-3 h-3" />
         </button>
+
+        {onWhatsAppClick && (
+          <button
+            type="button"
+            onClick={() => handleWhatsAppAction()}
+            aria-label="Escribir por WhatsApp Business (+54 9 11 7108-1874)"
+            className="px-3.5 py-1.5 rounded-xl text-xs font-mono font-semibold text-white bg-[#15803D] hover:bg-[#166534] transition-colors inline-flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0"
+          >
+            <WhatsAppGlyph className="w-3.5 h-3.5 shrink-0" />
+            <span>WhatsApp</span>
+          </button>
+        )}
       </form>
     </motion.div>
   );
