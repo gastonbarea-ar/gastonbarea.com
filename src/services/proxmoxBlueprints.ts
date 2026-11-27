@@ -31,9 +31,10 @@ export function generateProxmoxAndN8nBlueprints(options?: {
 # PROXMOX + CLOUDFLARE TUNNEL ZERO-TRUST STACK · AGENTE AUTÓNOMO ARN 24/7
 # Recursos sugeridos: 1 VM Ubuntu Server / LXC Docker (4 vCPU · 6-8 GB RAM · 40 GB SSD)
 # Puertos abiertos en router: 0 (Todo entra cifrado por cloudflared)
+# Nota: Si ya tenés n8n en otro LXC de Proxmox, podés comentar el bloque "n8n" de abajo.
 # ==============================================================================
 services:
-  # 1. Túnel Zero-Trust Cloudflare (Publica n8n, Evolution API y Uptime Kuma sin abrir puertos)
+  # 1. Túnel Zero-Trust Cloudflare (Publica Evolution API, Uptime Kuma y n8n sin abrir puertos)
   cloudflared:
     image: cloudflare/cloudflared:latest
     container_name: arn-cloudflared
@@ -44,52 +45,67 @@ services:
     networks:
       - arn_net
 
-  # 2. Orquestador n8n (Follow-ups 48h/7d, Anti No-Show, Auto-Sanación y Digest 08:30)
-  n8n:
-    image: docker.n8n.io/n8nio/n8n:latest
-    container_name: arn-n8n
+  # 2. PostgreSQL 16 (Requerido por Evolution API v2 para persistencia de sesiones y mensajes)
+  evolution-postgres:
+    image: postgres:16-alpine
+    container_name: arn-evolution-postgres
     restart: unless-stopped
     environment:
-      - N8N_HOST=${n8nHost}
-      - N8N_PROTOCOL=https
-      - WEBHOOK_URL=https://${n8nHost}/
-      - GENERIC_TIMEZONE=America/Argentina/Buenos_Aires
-      - TZ=America/Argentina/Buenos_Aires
-      - N8N_ENCRYPTION_KEY=\${N8N_ENCRYPTION_KEY}
-      - ARN_API_BASE_URL=${siteUrl}
-      - ARN_WEBHOOK_SECRET=\${ARN_WEBHOOK_SECRET}
+      - POSTGRES_DB=evolution_db
+      - POSTGRES_USER=evolution_user
+      - POSTGRES_PASSWORD=\${EVOLUTION_DB_PASSWORD}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U evolution_user -d evolution_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
     volumes:
-      - n8n_data:/home/node/.n8n
+      - evolution_pg_data:/var/lib/postgresql/data
     networks:
       - arn_net
 
-  # 3. Redis ligero para sesiones estables de Evolution API v2
+  # 3. Redis ligero para caché y estabilidad de sesiones WhatsApp
   redis:
     image: redis:7-alpine
     container_name: arn-redis
     restart: unless-stopped
-    command: redis-server --appendonly yes
+    command: redis-server --appendonly yes --requirepass \${REDIS_PASSWORD}
     volumes:
       - redis_data:/data
     networks:
       - arn_net
 
-  # 4. Evolution API v2 (WhatsApp Business QR · Audios + PDFs · Costo $0/mensaje)
+  # 4. Evolution API v2 (WhatsApp Business QR · Texto + Audios Base64 + PDFs · Costo $0/msg)
   evolution-api:
     image: atendai/evolution-api:v2.2.3
     container_name: arn-evolution
     restart: unless-stopped
     depends_on:
-      - redis
+      evolution-postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
     environment:
+      - SERVER_PORT=8080
       - SERVER_URL=https://${waHost}
       - AUTHENTICATION_API_KEY=\${EVOLUTION_API_KEY}
+      - DATABASE_ENABLED=true
+      - DATABASE_PROVIDER=postgresql
+      - DATABASE_CONNECTION_URI=postgresql://evolution_user:\${EVOLUTION_DB_PASSWORD}@evolution-postgres:5432/evolution_db?schema=public
+      - DATABASE_SAVE_DATA_INSTANCE=true
+      - DATABASE_SAVE_DATA_CHATS=true
+      - DATABASE_SAVE_DATA_CONTACTS=true
+      - DATABASE_SAVE_DATA_NEW_MESSAGE=true
+      - CACHE_LOCAL_ENABLED=false
       - CACHE_REDIS_ENABLED=true
-      - CACHE_REDIS_URI=redis://redis:6379/1
+      - CACHE_REDIS_URI=redis://:\${REDIS_PASSWORD}@redis:6379/1
+      - CACHE_REDIS_PREFIX_KEY=arn_evolution
+      - CACHE_REDIS_SAVE_INSTANCES=true
       - WEBHOOK_GLOBAL_ENABLED=true
       - WEBHOOK_GLOBAL_URL=${siteUrl}/api/webhooks/whatsapp
       - WEBHOOK_GLOBAL_WEBHOOK_BY_EVENTS=false
       - WEBHOOK_EVENTS_MESSAGES_UPSERT=true
+      - WEBHOOK_BASE64=true
       - CONFIG_SESSION_PHONE_CLIENT=ARN Autopilot 24/7
       - TZ=America/Argentina/Buenos_Aires
     volumes:
@@ -115,11 +131,31 @@ services:
     networks:
       - arn_net
 
+  # 7. Orquestador n8n (Opcional: comentá este bloque si ya usás tu n8n existente en otro LXC)
+  n8n:
+    image: docker.n8n.io/n8nio/n8n:latest
+    container_name: arn-n8n
+    restart: unless-stopped
+    environment:
+      - N8N_HOST=${n8nHost}
+      - N8N_PROTOCOL=https
+      - WEBHOOK_URL=https://${n8nHost}/
+      - GENERIC_TIMEZONE=America/Argentina/Buenos_Aires
+      - TZ=America/Argentina/Buenos_Aires
+      - N8N_ENCRYPTION_KEY=\${N8N_ENCRYPTION_KEY}
+      - ARN_API_BASE_URL=${siteUrl}
+      - ARN_WEBHOOK_SECRET=\${ARN_WEBHOOK_SECRET}
+    volumes:
+      - n8n_data:/home/node/.n8n
+    networks:
+      - arn_net
+
 volumes:
-  n8n_data:
+  evolution_pg_data:
   redis_data:
   evolution_instances:
   uptime_kuma_data:
+  n8n_data:
 
 networks:
   arn_net:
@@ -127,11 +163,13 @@ networks:
 `;
 
   const envTemplate = `# Guardar como .env junto al docker-compose.yml en tu VM/LXC de Proxmox
-# Generar claves seguras con: openssl rand -hex 32
+# Generar claves seguras con: openssl rand -hex 24
 
 CLOUDFLARE_TUNNEL_TOKEN=REEMPLAZAR_CON_TOKEN_DE_CLOUDFLARE_ZERO_TRUST
-N8N_ENCRYPTION_KEY=REEMPLAZAR_CON_CLAVE_ALEATORIA_64_HEX
+EVOLUTION_DB_PASSWORD=REEMPLAZAR_CON_CLAVE_POSTGRES_SEGURA
+REDIS_PASSWORD=REEMPLAZAR_CON_CLAVE_REDIS_SEGURA
 EVOLUTION_API_KEY=REEMPLAZAR_CON_API_KEY_EVOLUTION
+N8N_ENCRYPTION_KEY=REEMPLAZAR_CON_CLAVE_ALEATORIA_64_HEX
 ARN_WEBHOOK_SECRET=DEBE_COINCIDIR_CON_WEBHOOK_SECRET_EN_VERCEL
 `;
 
