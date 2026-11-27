@@ -4009,15 +4009,52 @@ app.get('/api/webhooks/whatsapp', (req, res) => {
   return res.status(403).json({ error: 'Token de verificación de WhatsApp inválido' });
 });
 
+// In-memory fast deduplication cache for WhatsApp webhooks (complemented by atomic Supabase lock)
+const recentWhatsAppWebhookKeys = new Map<string, number>();
+
+function pruneWhatsAppDedupCache(nowMs: number) {
+  if (recentWhatsAppWebhookKeys.size > 400) {
+    for (const [key, ts] of recentWhatsAppWebhookKeys.entries()) {
+      if (nowMs - ts > 10 * 60 * 1000) recentWhatsAppWebhookKeys.delete(key);
+    }
+  }
+}
+
+function formatTextForWhatsApp(raw: string): string {
+  return (raw || '')
+    .replace(/\*\*([^*]+)\*\*/g, '*$1*')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
 // Meta WhatsApp Cloud API & Evolution API v2 Inbound Autonomous Webhook (POST)
 app.post('/api/webhooks/whatsapp', async (req, res) => {
   try {
-    await hydratePortalAndStockFromSupabase();
     const body = req.body || {};
 
-    // Ignore outbound echoes sent by our own WhatsApp instance
-    if (body?.data?.key?.fromMe === true) {
+    // 1. Strict Evolution API v2 event filter: only process inbound message upserts
+    if (body?.event) {
+      const normalizedEvent = String(body.event).toLowerCase().replace(/_/g, '.');
+      if (normalizedEvent !== 'messages.upsert') {
+        return res.status(200).json({ received: true, ignored: `event:${normalizedEvent}` });
+      }
+    }
+
+    // 2. Ignore outbound echoes sent by our own WhatsApp instance
+    if (body?.data?.key?.fromMe === true || body?.fromMe === true) {
       return res.status(200).json({ received: true, ignored: 'fromMe' });
+    }
+
+    // 3. Ignore group chats, status broadcasts, and WhatsApp channels
+    const rawRemoteJid = String(body?.data?.key?.remoteJid || '');
+    const rawRemoteJidAlt = String(body?.data?.key?.remoteJidAlt || '');
+    if (
+      rawRemoteJid.endsWith('@g.us') ||
+      rawRemoteJid === 'status@broadcast' ||
+      rawRemoteJid.endsWith('@broadcast') ||
+      rawRemoteJid.endsWith('@newsletter')
+    ) {
+      return res.status(200).json({ received: true, ignored: 'non_individual_chat' });
     }
 
     // Extract sender phone, name, text, and optional voice note from Meta Cloud API or Evolution API v2
@@ -4025,28 +4062,47 @@ app.post('/api/webhooks/whatsapp', async (req, res) => {
     const metaMsg = metaEntry?.messages?.[0];
     const metaContact = metaEntry?.contacts?.[0];
 
+    const resolvedJid =
+      rawRemoteJid.endsWith('@lid') && rawRemoteJidAlt ? rawRemoteJidAlt : rawRemoteJid;
+
     const senderPhone = normalizePhoneE164(
       metaMsg?.from ||
-        body?.data?.key?.remoteJid?.replace('@s.whatsapp.net', '') ||
+        resolvedJid.replace(/@s\.whatsapp\.net$/i, '').replace(/@c\.us$/i, '') ||
         body?.from ||
         ''
     );
+
+    // Prevent self-reply loops against our own WhatsApp Business number
+    const ownBusinessPhone = getWhatsAppConfig().businessPhone;
+    if (ownBusinessPhone && senderPhone && senderPhone === ownBusinessPhone) {
+      return res.status(200).json({ received: true, ignored: 'self_number' });
+    }
+
     const senderName =
       metaContact?.profile?.name ||
       body?.data?.pushName ||
       body?.senderName ||
       'Contacto WhatsApp';
-    const messageText =
+    const messageText = String(
       metaMsg?.text?.body ||
-      body?.data?.message?.conversation ||
-      body?.data?.message?.extendedTextMessage?.text ||
-      body?.text ||
-      '';
-    const audioBase64 =
+        body?.data?.message?.conversation ||
+        body?.data?.message?.extendedTextMessage?.text ||
+        body?.text ||
+        ''
+    ).trim();
+
+    // Only extract audio base64 when an actual audio/voice payload is present (never for images/stickers)
+    const hasAudioMessage = Boolean(
       body?.audioBase64 ||
-      body?.data?.message?.base64 ||
-      body?.data?.message?.audioMessage?.base64 ||
-      undefined;
+        body?.data?.message?.audioMessage ||
+        String(body?.audioMimeType || '').startsWith('audio/')
+    );
+    const audioBase64 = hasAudioMessage
+      ? body?.audioBase64 ||
+        body?.data?.message?.audioMessage?.base64 ||
+        body?.data?.message?.base64 ||
+        undefined
+      : undefined;
     const audioMimeType =
       body?.audioMimeType ||
       body?.data?.message?.audioMessage?.mimetype ||
@@ -4056,10 +4112,67 @@ app.post('/api/webhooks/whatsapp', async (req, res) => {
       return res.status(200).json({ received: true, ignored: 'empty_payload' });
     }
 
+    // 4. Dual-layer Idempotency / Deduplication Lock (prevents duplicate replies from Evolution retries,
+    // double webhooks, or concurrent Vercel Serverless cold starts)
+    const incomingMessageId = String(
+      metaMsg?.id || body?.data?.key?.id || body?.messageId || ''
+    ).trim();
+    const nowMs = Date.now();
+    pruneWhatsAppDedupCache(nowMs);
+
+    const textFingerprint = `${senderPhone}:${(messageText || '[audio]').toLowerCase().slice(0, 120)}`;
+    if (incomingMessageId) {
+      const seenAt = recentWhatsAppWebhookKeys.get(`id:${incomingMessageId}`);
+      if (seenAt && nowMs - seenAt < 10 * 60 * 1000) {
+        return res.status(200).json({ received: true, ignored: 'duplicate_message_id_mem' });
+      }
+      recentWhatsAppWebhookKeys.set(`id:${incomingMessageId}`, nowMs);
+    }
+    const recentSameTextAt = recentWhatsAppWebhookKeys.get(`fp:${textFingerprint}`);
+    if (recentSameTextAt && nowMs - recentSameTextAt < 20 * 1000) {
+      return res.status(200).json({ received: true, ignored: 'duplicate_burst_mem' });
+    }
+    recentWhatsAppWebhookKeys.set(`fp:${textFingerprint}`, nowMs);
+
     const nowIso = new Date().toISOString();
+
+    // Atomic distributed lock in Supabase Postgres (PRIMARY KEY constraint on crm_settings.id)
+    if (supabase && incomingMessageId) {
+      const lockId = `wa_dedup_${incomingMessageId.replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 80)}`;
+      const { error: lockError } = await supabase.from('crm_settings').insert({
+        id: lockId,
+        config: { senderPhone, createdAt: nowIso },
+        updated_at: nowIso,
+      });
+      if (lockError) {
+        if (lockError.code === '23505' || String(lockError.message || '').toLowerCase().includes('duplicate')) {
+          return res.status(200).json({ received: true, ignored: 'duplicate_message_id_db' });
+        }
+        console.warn('[WhatsApp Webhook] Dedup lock warning:', lockError.message);
+      }
+    }
+
+    await hydratePortalAndStockFromSupabase();
+
     let conversation = cachedAgentConversations.find(
       (c) => c.channel === 'whatsapp' && c.externalId === senderPhone
     );
+
+    // Secondary persistent check against conversation history (catches retries without message ID)
+    if (conversation) {
+      if (incomingMessageId && conversation.messages.some((m) => m.id === `wa-in-${incomingMessageId}`)) {
+        return res.status(200).json({ received: true, ignored: 'duplicate_in_history' });
+      }
+      const lastUserMsg = [...conversation.messages].reverse().find((m) => m.role === 'user');
+      if (
+        lastUserMsg &&
+        messageText &&
+        lastUserMsg.content.trim().toLowerCase() === messageText.toLowerCase() &&
+        nowMs - new Date(lastUserMsg.timestamp).getTime() < 20 * 1000
+      ) {
+        return res.status(200).json({ received: true, ignored: 'duplicate_recent_text' });
+      }
+    }
 
     const decision = await processInboundAutonomousMessage({
       channel: 'whatsapp',
@@ -4136,7 +4249,7 @@ app.post('/api/webhooks/whatsapp', async (req, res) => {
     }
 
     conversation.messages.push({
-      id: `m-in-${Date.now()}`,
+      id: incomingMessageId ? `wa-in-${incomingMessageId}` : `m-in-${Date.now()}`,
       role: 'user',
       content: resolvedText,
       mediaType: decision.transcript ? 'audio' : 'text',
@@ -4146,18 +4259,19 @@ app.post('/api/webhooks/whatsapp', async (req, res) => {
 
     // 4. Dispatch Autonomous Reply via Evolution API / Meta Cloud API if allowed by Kill-Switch
     let dispatchResult: any = null;
-    if (decision.shouldDispatchReply && decision.replyText) {
+    const formattedReply = decision.replyText ? formatTextForWhatsApp(decision.replyText) : '';
+    if (decision.shouldDispatchReply && formattedReply) {
       conversation.messages.push({
-        id: `m-out-${Date.now() + 1}`,
+        id: incomingMessageId ? `wa-out-${incomingMessageId}` : `m-out-${Date.now() + 1}`,
         role: 'agent',
-        content: decision.replyText,
+        content: formattedReply,
         mediaType: 'text',
         timestamp: new Date().toISOString(),
       });
       dispatchResult = await dispatchWhatsAppMessage({
         toPhone: senderPhone,
         recipientName: senderName,
-        message: decision.replyText,
+        message: formattedReply,
         contextType: 'autonomous_agent_reply',
       }).catch((err) => ({ success: false, error: err?.message }));
     }
