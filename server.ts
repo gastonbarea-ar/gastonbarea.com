@@ -7161,6 +7161,26 @@ app.post('/api/autopilot/n8n/followups', async (req, res) => {
 
   const executed: Array<{ targetId: string; type: string; dispatched: boolean }> = [];
   const nowIso = new Date().toISOString();
+  const DEMO_DOMAINS = [
+    '@distribuidorasur.com.ar',
+    '@novafintech.io',
+    '@logistix.com',
+    '@agroinsumos.com.ar',
+    '@clinicamedica.org',
+    '@example.com',
+  ];
+  const isDemoSeedContact = (email?: string, phone?: string) => {
+    const e = (email || '').toLowerCase();
+    const p = (phone || '').replace(/\D/g, '');
+    if (DEMO_DOMAINS.some((d) => e.endsWith(d))) return true;
+    if (p && (p.includes('5558900') || p.includes('67894321') || p.includes('48291122') || p.endsWith('000000'))) {
+      return true;
+    }
+    return false;
+  };
+
+  const dispatchPromises: Array<Promise<void>> = [];
+  let dispatchedCount = 0;
 
   for (const item of candidates) {
     if (mode === 'paused') continue;
@@ -7186,26 +7206,32 @@ app.post('/api/autopilot/n8n/followups', async (req, res) => {
       continue;
     }
 
-    if (shouldDispatch && item.clientPhone) {
-      await dispatchWhatsAppMessage({
-        toPhone: item.clientPhone,
-        recipientName: item.clientName,
-        message: item.suggestedMessage,
-        contextType: item.type,
-      }).catch(() => {});
-      cachedAgentActivityLogs.unshift({
-        id: `log-fu-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-        channel: 'followup_n8n',
-        actionType: item.type,
-        targetLabel: `${item.clientName} (${item.referenceCode})`,
-        outcome: 'resolved_silently',
-        noiseSuppressed: true,
-        estimatedMinutesSaved: 8,
-        detail: `Seguimiento automático (${item.type}) despachado por WhatsApp.`,
-        createdAt: nowIso,
-      });
-      executed.push({ targetId: item.targetId, type: item.type, dispatched: true });
-    } else if (mode === 'draft_only') {
+    if (shouldDispatch && item.clientPhone && !isDemoSeedContact(item.clientEmail, item.clientPhone) && dispatchedCount < 5) {
+      dispatchedCount += 1;
+      dispatchPromises.push(
+        dispatchWhatsAppMessage({
+          toPhone: item.clientPhone,
+          recipientName: item.clientName,
+          message: item.suggestedMessage,
+          contextType: item.type,
+        })
+          .then(() => {
+            cachedAgentActivityLogs.unshift({
+              id: `log-fu-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+              channel: 'followup_n8n',
+              actionType: item.type,
+              targetLabel: `${item.clientName} (${item.referenceCode})`,
+              outcome: 'resolved_silently',
+              noiseSuppressed: true,
+              estimatedMinutesSaved: 8,
+              detail: `Seguimiento automático (${item.type}) despachado por WhatsApp.`,
+              createdAt: nowIso,
+            });
+            executed.push({ targetId: item.targetId, type: item.type, dispatched: true });
+          })
+          .catch(() => {})
+      );
+    } else if (mode === 'draft_only' && !isDemoSeedContact(item.clientEmail, item.clientPhone)) {
       cachedAgentEscalations.unshift({
         id: `esc-fu-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
         severity: 'draft',
@@ -7223,6 +7249,10 @@ app.post('/api/autopilot/n8n/followups', async (req, res) => {
       });
       executed.push({ targetId: item.targetId, type: item.type, dispatched: false });
     }
+  }
+
+  if (dispatchPromises.length > 0) {
+    await Promise.allSettled(dispatchPromises);
   }
 
   if (executed.length > 0) {

@@ -229,6 +229,7 @@ export async function dispatchWhatsAppMessage(input: WhatsAppDispatchInput): Pro
       const url = `https://graph.facebook.com/v21.0/${cfg.metaPhoneNumberId}/messages`;
       const res = await fetch(url, {
         method: 'POST',
+        signal: AbortSignal.timeout(6000),
         headers: {
           Authorization: `Bearer ${cfg.metaAccessToken}`,
           'Content-Type': 'application/json',
@@ -262,12 +263,13 @@ export async function dispatchWhatsAppMessage(input: WhatsAppDispatchInput): Pro
       };
     }
 
-    // 2. Evolution API v2 (Self-hosted on Docker / CyberPanel VPS 138.219.41.106)
+    // 2. Evolution API v2 (Self-hosted on Docker / Proxmox)
     if (cfg.provider === 'evolution_api' && cfg.evolutionApiUrl && cfg.evolutionApiKey) {
       const baseUrl = cfg.evolutionApiUrl.replace(/\/+$/, '');
       const url = `${baseUrl}/message/sendText/${encodeURIComponent(cfg.evolutionInstanceName || 'gastonbarea')}`;
       const res = await fetch(url, {
         method: 'POST',
+        signal: AbortSignal.timeout(6000),
         headers: {
           apikey: cfg.evolutionApiKey,
           'Content-Type': 'application/json',
@@ -298,6 +300,7 @@ export async function dispatchWhatsAppMessage(input: WhatsAppDispatchInput): Pro
     if (cfg.provider === 'webhook_n8n' && cfg.webhookUrl) {
       const res = await fetch(cfg.webhookUrl, {
         method: 'POST',
+        signal: AbortSignal.timeout(6000),
         headers: {
           'Content-Type': 'application/json',
         },
